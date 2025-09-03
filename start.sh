@@ -3,9 +3,9 @@
 
 echo "Starting deployment process..."
 
-# Run database migrations
-echo "Running database migrations..."
-npx prisma migrate deploy
+# Setup database schema (for development databases without migration files)
+echo "Setting up database schema..."
+npx prisma db push --accept-data-loss
 
 # Start the application
 echo "Starting the application..."
