@@ -38,6 +38,10 @@ COPY --from=builder --chown=sveltekit:nodejs /app/build ./build
 COPY --from=builder --chown=sveltekit:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=sveltekit:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=sveltekit:nodejs /app/prisma ./prisma
+COPY --chown=sveltekit:nodejs start.sh ./start.sh
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Switch to non-root user
 USER sveltekit
@@ -54,4 +58,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "const http = require('http'); const options = { host: 'localhost', port: process.env.PORT || 3000, path: '/health', timeout: 2000 }; const req = http.request(options, (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }); req.on('error', () => process.exit(1)); req.end();"
 
 # Start the application
-CMD ["dumb-init", "node", "build/index.js"]
+CMD ["dumb-init", "sh", "./start.sh"]
