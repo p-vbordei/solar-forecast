@@ -1,6 +1,9 @@
 # Multi-stage build for SvelteKit application
 FROM node:18-alpine AS builder
 
+# Install OpenSSL and other dependencies for Prisma
+RUN apk add --no-cache openssl1.1-compat
+
 # Set working directory
 WORKDIR /app
 
@@ -14,8 +17,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client with correct binary target for Alpine
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Build the application
 RUN npm run build
@@ -26,8 +29,8 @@ RUN npm prune --production
 # Production stage
 FROM node:18-alpine AS runner
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling and OpenSSL for Prisma
+RUN apk add --no-cache dumb-init openssl1.1-compat
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
