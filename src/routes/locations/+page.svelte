@@ -441,7 +441,10 @@
 	}
 
 	function toggleAdvancedSection(section: keyof typeof showAdvancedSections) {
-		showAdvancedSections[section] = !showAdvancedSections[section];
+		showAdvancedSections = {
+			...showAdvancedSections,
+			[section]: !showAdvancedSections[section]
+		};
 	}
 
 	// Helper functions imported from types/location.ts
