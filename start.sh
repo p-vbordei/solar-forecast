@@ -3,10 +3,23 @@
 
 echo "Starting deployment process..."
 
-# Setup database schema (for development databases without migration files)
+# Setup database schema
 echo "Setting up database schema..."
-npx prisma db push --accept-data-loss
+
+# Try migration first (production approach)
+echo "Checking for migrations..."
+if npx prisma migrate status 2>/dev/null | grep -q "No migrations found"; then
+    echo "No migrations found, using db push for schema setup..."
+    npx prisma db push --accept-data-loss --force-reset
+else
+    echo "Applying migrations..."
+    npx prisma migrate deploy
+fi
+
+# Generate Prisma client to ensure it's up to date
+echo "Generating Prisma client..."
+npx prisma generate
 
 # Start the application
 echo "Starting the application..."
-node build/index.js
+exec node build/index.js
