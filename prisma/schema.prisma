@@ -1,0 +1,365 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User and Authentication (deferred but schema ready)
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  name           String?
+  role           UserRole  @default(USER)
+  passwordHash   String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relations
+  clientId       Int?
+  client         Client?   @relation(fields: [clientId], references: [id])
+  forecasts      Forecast[]
+  alerts         Alert[]
+  reports        Report[]
+  
+  @@index([email])
+  @@index([clientId])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+  VIEWER
+}
+
+// Client/Company
+model Client {
+  id             Int       @id @default(autoincrement())
+  name           String
+  code           String    @unique
+  contactEmail   String?
+  contactPhone   String?
+  address        String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relations
+  users          User[]
+  locations      Location[]
+  
+  @@index([code])
+}
+
+// Solar Installation Locations
+model Location {
+  id                Int       @id @default(autoincrement())
+  clientId          Int
+  name              String
+  code              String    @unique
+  latitude          Float
+  longitude         Float
+  timezone          String    @default("UTC")
+  altitude          Float?
+  
+  // Technical specifications
+  capacityMW        Float     // Capacity in Megawatts
+  panelCount        Int?
+  panelType         String?
+  inverterType      String?
+  installationDate  DateTime?
+  commissioningDate DateTime?
+  
+  // Status
+  status            LocationStatus @default(ACTIVE)
+  lastMaintenance   DateTime?
+  nextMaintenance   DateTime?
+  
+  // Metadata
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  client            Client    @relation(fields: [clientId], references: [id])
+  forecasts         Forecast[]
+  production        Production[]
+  alerts            Alert[]
+  weatherData       WeatherData[]
+  
+  @@index([clientId])
+  @@index([code])
+  @@index([status])
+  @@index([latitude, longitude])
+}
+
+enum LocationStatus {
+  ACTIVE
+  MAINTENANCE
+  OFFLINE
+  DECOMMISSIONED
+}
+
+// Forecast Data (TimescaleDB hypertable)
+model Forecast {
+  time              DateTime
+  locationId        Int
+  
+  // Forecast values
+  powerOutputMW     Float     // Forecasted power in MW
+  energyMWh         Float?    // Forecasted energy in MWh
+  confidence        Float?    // Confidence percentage (0-100)
+  
+  // Forecast metadata
+  modelType         ModelType
+  modelVersion      String?
+  horizonHours      Int       // How many hours ahead
+  
+  // Weather context
+  temperature       Float?
+  irradiance        Float?    // W/m²
+  cloudCover        Float?    // Percentage
+  windSpeed         Float?    // m/s
+  weatherData       Json?     // Full weather context
+  
+  // Tracking
+  createdAt         DateTime  @default(now())
+  createdBy         Int?
+  
+  // Relations
+  location          Location  @relation(fields: [locationId], references: [id])
+  user              User?     @relation(fields: [createdBy], references: [id])
+  
+  @@id([time, locationId])
+  @@index([locationId, time])
+  @@index([modelType])
+}
+
+enum ModelType {
+  ML
+  PHYSICAL
+  HYBRID
+  ENSEMBLE
+}
+
+// Actual Production Data (TimescaleDB hypertable)
+model Production {
+  time              DateTime
+  locationId        Int
+  
+  // Production values
+  powerOutputMW     Float     // Actual power in MW
+  energyMWh         Float?    // Actual energy in MWh
+  efficiency        Float?    // Efficiency percentage
+  availabilty       Float?    // Availability percentage
+  
+  // Environmental conditions
+  temperature       Float?
+  irradiance        Float?    // W/m²
+  windSpeed         Float?    // m/s
+  
+  // Quality flags
+  dataQuality       DataQuality @default(GOOD)
+  isValidated       Boolean   @default(false)
+  
+  // Relations
+  location          Location  @relation(fields: [locationId], references: [id])
+  
+  @@id([time, locationId])
+  @@index([locationId, time])
+  @@index([dataQuality])
+}
+
+enum DataQuality {
+  GOOD
+  ESTIMATED
+  POOR
+  MISSING
+}
+
+// Weather Data (TimescaleDB hypertable)
+model WeatherData {
+  time              DateTime
+  locationId        Int
+  
+  // Weather metrics
+  temperature       Float     // Celsius
+  humidity          Float     // Percentage
+  pressure          Float     // hPa
+  windSpeed         Float     // m/s
+  windDirection     Float     // Degrees
+  cloudCover        Float     // Percentage
+  precipitation     Float?    // mm
+  
+  // Solar specific
+  ghi               Float?    // Global Horizontal Irradiance W/m²
+  dni               Float?    // Direct Normal Irradiance W/m²
+  dhi               Float?    // Diffuse Horizontal Irradiance W/m²
+  solarZenith       Float?    // Degrees
+  solarAzimuth      Float?    // Degrees
+  
+  // Source
+  source            String    // e.g., "OpenWeather", "Satellite"
+  
+  // Relations
+  location          Location  @relation(fields: [locationId], references: [id])
+  
+  @@id([time, locationId])
+  @@index([locationId, time])
+}
+
+// Alert System
+model Alert {
+  id                String    @id @default(uuid())
+  locationId        Int?
+  userId            Int?
+  
+  // Alert details
+  type              AlertType
+  severity          AlertSeverity
+  title             String
+  message           String
+  details           Json?
+  
+  // Status
+  status            AlertStatus @default(ACTIVE)
+  acknowledgedAt    DateTime?
+  acknowledgedBy    Int?
+  resolvedAt        DateTime?
+  resolvedBy        Int?
+  
+  // Timestamps
+  triggeredAt       DateTime  @default(now())
+  expiresAt         DateTime?
+  
+  // Relations
+  location          Location? @relation(fields: [locationId], references: [id])
+  user              User?     @relation(fields: [userId], references: [id])
+  
+  @@index([locationId])
+  @@index([status])
+  @@index([severity])
+  @@index([triggeredAt])
+}
+
+enum AlertType {
+  PRODUCTION_LOW
+  PRODUCTION_HIGH
+  FORECAST_DEVIATION
+  SYSTEM_OFFLINE
+  MAINTENANCE_DUE
+  WEATHER_WARNING
+  DATA_QUALITY
+  THRESHOLD_BREACH
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  EXPIRED
+}
+
+// Reports
+model Report {
+  id                String    @id @default(uuid())
+  userId            Int
+  
+  // Report details
+  type              ReportType
+  name              String
+  description       String?
+  parameters        Json      // Report configuration
+  
+  // Schedule
+  schedule          String?   // Cron expression
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
+  
+  // Output
+  format            ReportFormat @default(PDF)
+  outputUrl         String?
+  
+  // Metadata
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([type])
+}
+
+enum ReportType {
+  DAILY_PRODUCTION
+  WEEKLY_SUMMARY
+  MONTHLY_ANALYSIS
+  FORECAST_ACCURACY
+  ALERT_SUMMARY
+  CUSTOM
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  JSON
+}
+
+// ML Model Registry
+model MLModel {
+  id                String    @id @default(uuid())
+  name              String
+  version           String
+  type              ModelType
+  
+  // Model details
+  description       String?
+  algorithm         String?
+  hyperparameters   Json?
+  metrics           Json?     // Training/validation metrics
+  
+  // Storage
+  modelPath         String    // Path to model file
+  checksum          String?   // Model file checksum
+  
+  // Status
+  status            ModelStatus @default(TRAINING)
+  isDefault         Boolean   @default(false)
+  
+  // Training info
+  trainedAt         DateTime?
+  trainDataStart    DateTime?
+  trainDataEnd      DateTime?
+  
+  // Metadata
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([name, version])
+  @@index([type])
+  @@index([status])
+}
+
+enum ModelStatus {
+  TRAINING
+  VALIDATING
+  ACTIVE
+  DEPRECATED
+  FAILED
+}

@@ -1,0 +1,229 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom font imports */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap');
+
+/* Base styles */
+@layer base {
+  :root {
+    --color-dark-petrol: #003135;
+    --color-teal-dark: #024950;
+    --color-alert-red: #DC2626;
+    --color-alert-orange: #EA580C;
+    --color-cyan: #0FA4AF;
+    --color-soft-blue: #AFDDE5;
+  }
+
+  body {
+    @apply bg-dark-petrol text-soft-blue font-primary;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-soft-blue font-semibold;
+  }
+
+  a {
+    @apply text-cyan hover:text-soft-blue transition-colors;
+  }
+}
+
+/* Component styles */
+@layer components {
+  /* Glass Card */
+  .card-glass {
+    @apply bg-gradient-dark border border-glass-border backdrop-blur-md rounded-xl p-6 shadow-2xl;
+  }
+
+  /* Metric Display */
+  .metric-value {
+    @apply font-mono text-cyan text-3xl font-semibold;
+  }
+
+  .metric-label {
+    @apply text-soft-blue text-sm uppercase tracking-wider opacity-80;
+  }
+
+  /* Status Indicators */
+  .status-active {
+    @apply text-cyan;
+  }
+
+  .status-warning {
+    @apply text-alert-orange;
+  }
+
+  .status-critical {
+    @apply text-alert-red;
+  }
+
+  .status-offline {
+    @apply text-gray-500;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 inline-flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-cyan text-dark-petrol hover:bg-soft-blue hover:-translate-y-0.5 hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-glass-white border border-glass-border text-soft-blue hover:bg-white/10;
+  }
+
+  .btn-danger {
+    @apply bg-alert-red text-white hover:bg-red-700;
+  }
+
+  .btn-warning {
+    @apply bg-alert-orange text-white hover:bg-orange-700;
+  }
+
+  /* Form Elements */
+  .input {
+    @apply w-full px-4 py-2 bg-glass-white border border-glass-border rounded-lg text-soft-blue placeholder-soft-blue/50 focus:outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20;
+  }
+
+  .select {
+    @apply w-full px-4 py-2 bg-glass-white border border-glass-border rounded-lg text-soft-blue focus:outline-none focus:border-cyan focus:ring-2 focus:ring-cyan/20;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-soft-blue mb-2;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply px-4 py-2 rounded-lg text-soft-blue/80 hover:text-soft-blue hover:bg-glass-white transition-all;
+  }
+
+  .nav-link-active {
+    @apply bg-glass-white text-cyan;
+  }
+
+  /* Alerts */
+  .alert {
+    @apply p-4 rounded-lg border backdrop-blur-sm;
+  }
+
+  .alert-info {
+    @apply bg-cyan/10 border-cyan/30 text-cyan;
+  }
+
+  .alert-warning {
+    @apply bg-alert-orange/10 border-alert-orange/30 text-alert-orange;
+  }
+
+  .alert-error {
+    @apply bg-alert-red/10 border-alert-red/30 text-alert-red;
+  }
+
+  .alert-success {
+    @apply bg-green-500/10 border-green-500/30 text-green-500;
+  }
+
+  /* Charts */
+  .chart-container {
+    @apply bg-gradient-dark border border-glass-border rounded-xl p-6;
+  }
+
+  /* Tables */
+  .table {
+    @apply w-full text-left;
+  }
+
+  .table thead {
+    @apply border-b border-glass-border;
+  }
+
+  .table th {
+    @apply px-4 py-3 text-xs font-medium text-soft-blue/60 uppercase tracking-wider;
+  }
+
+  .table td {
+    @apply px-4 py-3 text-sm text-soft-blue;
+  }
+
+  .table tbody tr {
+    @apply border-b border-glass-border/30 hover:bg-glass-white transition-colors;
+  }
+
+  /* Loading States */
+  .skeleton {
+    @apply animate-pulse bg-glass-white rounded;
+  }
+
+  .spinner {
+    @apply animate-spin h-5 w-5 border-2 border-cyan border-t-transparent rounded-full;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-cyan {
+    @apply bg-cyan/20 text-cyan;
+  }
+
+  .badge-warning {
+    @apply bg-alert-orange/20 text-alert-orange;
+  }
+
+  .badge-danger {
+    @apply bg-alert-red/20 text-alert-red;
+  }
+
+  .badge-success {
+    @apply bg-green-500/20 text-green-500;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  /* Glass effect utilities */
+  .glass-effect {
+    @apply bg-glass-white backdrop-blur-md;
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-cyan to-soft-blue bg-clip-text text-transparent;
+  }
+
+  /* Glow effects */
+  .glow-cyan {
+    @apply shadow-[0_0_20px_rgba(15,164,175,0.3)];
+  }
+
+  .glow-red {
+    @apply shadow-[0_0_20px_rgba(220,38,38,0.3)];
+  }
+
+  .glow-orange {
+    @apply shadow-[0_0_20px_rgba(234,88,12,0.3)];
+  }
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-dark-petrol;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-glass-border rounded-full hover:bg-cyan/30;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-cyan/50 ring-offset-2 ring-offset-dark-petrol;
+}
