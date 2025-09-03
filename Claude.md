@@ -228,6 +228,12 @@ Before any frontend commit, verify:
 - **Prisma**: Type-safe database access, excellent DX
 - **FastAPI**: High-performance Python API for analytics
 
+  Correct Architecture:
+  - SvelteKit: Full-stack framework with Controller/Service/Repository layers (using Prisma ORM)
+  - Python Worker: Microservice for ML/analytics tasks only (called by SvelteKit backend)
+
+
+
 Database is PostgreSQL
 Implementation ( Deployment) will be done on Railway.
 
@@ -292,10 +298,10 @@ solar/
 │   │   ├── +page.svelte          # Dashboard with real-time metrics
 │   │   └── api/locations/        # CSR pattern API implementation
 │   ├── lib/
-│   │   ├── components/           
+│   │   ├── components/
 │   │   │   ├── Navigation.svelte # Line-art icon navigation
 │   │   │   ├── Header.svelte     # Real-time clock & weather
-│   │   │   └── dashboard/        
+│   │   │   └── dashboard/
 │   │   │       ├── MetricCard.svelte
 │   │   │       ├── ProductionChart.svelte
 │   │   │       ├── AlertsPanel.svelte
@@ -338,10 +344,11 @@ solar/
    - User profile section
    - Real-time weather and clock display
 
-### 🔄 Phase 2 - In Progress
-- [ ] Database integration with Prisma
-- [ ] TimescaleDB setup for time-series data
-- [ ] Python worker implementation
+### ✅ Phase 2 - Completed
+- [x] Database integration with Prisma
+- [x] CSR Architecture in SvelteKit (Controller/Service/Repository)
+- [x] Python worker as ML microservice
+- [x] PostgreSQL database schema
 
 ### 📋 Phase 3 - Planned
 - [ ] WebSocket real-time updates
@@ -352,16 +359,41 @@ solar/
 - [ ] JWT Authentication (intentionally deferred to final phase)
 
 ### **Running the Application**
+
+#### 1. Start PostgreSQL Database
+```bash
+# Ensure PostgreSQL is running
+# Database: solar_forecast
+```
+
+#### 2. Start Python Worker (ML Microservice)
+```bash
+cd /Users/vladbordei/Documents/Development/solar/python-worker
+uv sync
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+# Python Worker API: http://localhost:8001
+```
+
+#### 3. Start SvelteKit Application
 ```bash
 cd /Users/vladbordei/Documents/Development/solar
 npm install
+npx prisma generate
+npx prisma db push
 npm run dev
-# Access at http://localhost:5173
+# Frontend: http://localhost:5173
 ```
 
 ### **Key Design Decisions**
 - **NO EMOJIS** in UI - Only line-art/vector icons
-- **CSR Pattern** strictly enforced for all API routes
+- **CSR Pattern** in SvelteKit - Controller/Service/Repository layers
+- **Prisma ORM** for type-safe database access
+- **Python Worker** as pure microservice for ML/analytics only
 - **Dark Theme Only** - No light mode switch
-- **Mock Data** currently used - Ready for database integration
 - **TypeScript** throughout for type safety
+
+### **Architecture Summary**
+- **SvelteKit Backend**: Handles all business logic, database operations, API routes
+- **Python Worker**: ML microservice for forecasting, weather data, and analytics
+- **Database**: PostgreSQL with Prisma ORM for type-safe queries
+- **Communication**: SvelteKit services call Python worker via HTTP for ML tasks

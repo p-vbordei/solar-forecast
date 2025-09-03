@@ -15,16 +15,20 @@ A modern solar energy forecasting platform built with SvelteKit, featuring real-
 
 - **Frontend**: SvelteKit 2.0 + TypeScript
 - **Styling**: Tailwind CSS (Dark theme)
-- **Backend**: FastAPI (Python)
-- **Database**: PostgreSQL + TimescaleDB
-- **Architecture**: CSR Pattern (Controller-Service-Repository)
+- **Backend**: SvelteKit API Routes (CSR Pattern)
+- **Database**: PostgreSQL + Prisma ORM
+- **ML Microservice**: FastAPI (Python) - ML/Analytics only
+- **Architecture**: 
+  - **SvelteKit**: Full-stack with Controller/Service/Repository layers
+  - **Python Worker**: Microservice for ML predictions and analytics
 
 ## 📋 Prerequisites
 
 - Node.js 18+ 
 - Python 3.11+
 - PostgreSQL 14+
-- Redis (for caching)
+- Redis (optional, for caching)
+- UV (Python package manager)
 
 ## 🔧 Installation
 
@@ -49,16 +53,26 @@ cp .env.example .env
 # Create PostgreSQL database
 createdb solar_forecast
 
-# Install TimescaleDB extension
-psql -d solar_forecast -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+# Run Prisma migrations
+npx prisma generate
+npx prisma db push
 ```
 
-5. **Run development server**
+5. **Setup Python Worker** (in separate terminal)
+```bash
+cd python-worker
+uv sync
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+```
+
+6. **Run SvelteKit development server**
 ```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+The application will be available at:
+- Frontend: `http://localhost:5173`
+- Python Worker: `http://localhost:8001`
 
 ## 🏗️ Project Structure
 
@@ -75,8 +89,12 @@ solar/
 │   │   │   └── repositories/ # Data access
 │   │   └── types/       # TypeScript definitions
 │   └── app.css          # Global styles
-├── python-worker/       # Python backend (to be implemented)
-├── prisma/              # Database schema (to be implemented)
+├── python-worker/       # Python ML microservice
+│   ├── app/            # FastAPI application
+│   │   ├── modules/    # ML modules (forecast, weather, analysis)
+│   │   └── core/       # Core utilities
+├── prisma/              # Database schema and migrations
+│   └── schema.prisma   # Prisma schema definition
 └── ...
 ```
 
@@ -91,9 +109,28 @@ The platform uses a custom dark theme with the following color palette:
 - **Alert Red**: `#DC2626` - Critical alerts
 - **Alert Orange**: `#EA580C` - Warning alerts
 
-## 📡 API Architecture
+## 📡 Architecture
 
-The platform follows the CSR (Controller-Service-Repository) pattern:
+### Correct Architecture:
+- **SvelteKit**: Full-stack framework handling all business logic
+  - **Controller Layer**: API routes (`src/routes/api/`)
+  - **Service Layer**: Business logic (`src/lib/server/services/`)
+  - **Repository Layer**: Data access with Prisma (`src/lib/server/repositories/`)
+- **Python Worker**: Pure microservice for ML/analytics tasks
+  - Forecasting models
+  - Weather data processing
+  - Performance analytics
+  - Model training pipeline
+
+### Data Flow:
+1. Client makes request to SvelteKit API
+2. Controller validates request
+3. Service layer orchestrates business logic
+4. Repository layer handles database operations via Prisma
+5. Service layer calls Python Worker for ML tasks when needed
+6. Response sent back to client
+
+The platform follows the CSR (Controller-Service-Repository) pattern in SvelteKit:
 
 ### Controller Layer
 Handles HTTP requests and responses

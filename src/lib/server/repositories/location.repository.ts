@@ -1,166 +1,245 @@
-import type { Location, LocationCreateInput, LocationFilter } from '$lib/types/location';
+import { db } from '../database';
+import type { Prisma, Location, LocationStatus } from '@prisma/client';
+import type { LocationFilter, LocationCreateInput } from '$lib/types/location';
 
-// Repository - handles data access
+// Repository - handles data access using Prisma
 export class LocationRepository {
-	// Mock data for now - will be replaced with Prisma
-	private locations: Location[] = [
-		{
-			id: 1,
-			clientId: 1,
-			name: 'Solar Farm Alpha',
-			latitude: 44.4268,
-			longitude: 26.1025,
-			timezone: 'Europe/Bucharest',
-			capacity: 25.5,
-			panelCount: 5000,
-			panelType: 'Monocrystalline',
-			installationDate: new Date('2022-01-15'),
-			lastMaintenance: new Date('2024-10-15'),
-			status: 'active',
-			createdAt: new Date('2022-01-01'),
-			updatedAt: new Date('2024-10-15')
-		},
-		{
-			id: 2,
-			clientId: 1,
-			name: 'Solar Station Beta',
-			latitude: 45.6578,
-			longitude: 25.6012,
-			timezone: 'Europe/Bucharest',
-			capacity: 18.3,
-			panelCount: 3500,
-			panelType: 'Polycrystalline',
-			installationDate: new Date('2021-06-20'),
-			lastMaintenance: new Date('2024-09-10'),
-			status: 'active',
-			createdAt: new Date('2021-06-01'),
-			updatedAt: new Date('2024-09-10')
-		},
-		{
-			id: 3,
-			clientId: 2,
-			name: 'Green Energy Park',
-			latitude: 46.7712,
-			longitude: 23.6236,
-			timezone: 'Europe/Bucharest',
-			capacity: 42.0,
-			panelCount: 8000,
-			panelType: 'Bifacial',
-			installationDate: new Date('2023-03-10'),
-			lastMaintenance: new Date('2024-11-01'),
-			status: 'maintenance',
-			createdAt: new Date('2023-03-01'),
-			updatedAt: new Date('2024-11-01')
-		}
-	];
-	
 	async findAll(filter?: LocationFilter): Promise<Location[]> {
-		let results = [...this.locations];
+		const where: Prisma.LocationWhereInput = {};
 		
 		if (filter) {
 			if (filter.clientId !== undefined) {
-				results = results.filter(l => l.clientId === filter.clientId);
+				where.clientId = filter.clientId;
 			}
 			
 			if (filter.status) {
-				results = results.filter(l => l.status === filter.status);
+				where.status = filter.status.toUpperCase() as LocationStatus;
 			}
 			
-			if (filter.minCapacity !== undefined) {
-				results = results.filter(l => l.capacity >= filter.minCapacity!);
-			}
-			
-			if (filter.maxCapacity !== undefined) {
-				results = results.filter(l => l.capacity <= filter.maxCapacity!);
+			if (filter.minCapacity !== undefined || filter.maxCapacity !== undefined) {
+				where.capacityMW = {};
+				if (filter.minCapacity !== undefined) {
+					where.capacityMW.gte = filter.minCapacity;
+				}
+				if (filter.maxCapacity !== undefined) {
+					where.capacityMW.lte = filter.maxCapacity;
+				}
 			}
 		}
 		
-		return results;
+		return await db.location.findMany({
+			where,
+			include: {
+				client: true,
+				_count: {
+					select: {
+						forecasts: true,
+						production: true,
+						alerts: {
+							where: { status: 'ACTIVE' }
+						}
+					}
+				}
+			},
+			orderBy: {
+				name: 'asc'
+			}
+		});
 	}
 	
 	async findById(id: number): Promise<Location | null> {
-		return this.locations.find(l => l.id === id) || null;
+		return await db.location.findUnique({
+			where: { id },
+			include: {
+				client: true,
+				forecasts: {
+					take: 24,
+					orderBy: { time: 'desc' }
+				},
+				production: {
+					take: 24,
+					orderBy: { time: 'desc' }
+				},
+				alerts: {
+					where: { status: 'ACTIVE' },
+					orderBy: { triggeredAt: 'desc' },
+					take: 5
+				},
+				weatherData: {
+					take: 1,
+					orderBy: { time: 'desc' }
+				}
+			}
+		});
 	}
 	
 	async findByCoordinates(latitude: number, longitude: number): Promise<Location | null> {
 		// Check if location exists within 0.001 degrees (about 100m)
-		return this.locations.find(l => 
-			Math.abs(l.latitude - latitude) < 0.001 &&
-			Math.abs(l.longitude - longitude) < 0.001
-		) || null;
+		const locations = await db.location.findMany({
+			where: {
+				AND: [
+					{ latitude: { gte: latitude - 0.001, lte: latitude + 0.001 } },
+					{ longitude: { gte: longitude - 0.001, lte: longitude + 0.001 } }
+				]
+			}
+		});
+		
+		return locations[0] || null;
 	}
 	
 	async create(data: LocationCreateInput): Promise<Location> {
-		const newLocation: Location = {
-			id: Math.max(...this.locations.map(l => l.id)) + 1,
-			clientId: data.clientId || 1,
+		const prismaData: Prisma.LocationCreateInput = {
+			client: {
+				connect: { id: data.clientId || 1 }
+			},
 			name: data.name,
+			code: data.code || `LOC-${Date.now()}`,
 			latitude: data.latitude,
 			longitude: data.longitude,
 			timezone: data.timezone || 'UTC',
-			capacity: data.capacity,
+			capacityMW: data.capacity,
 			panelCount: data.panelCount,
 			panelType: data.panelType || 'Monocrystalline',
 			installationDate: data.installationDate ? new Date(data.installationDate) : new Date(),
-			lastMaintenance: null,
-			status: 'active',
-			createdAt: new Date(),
-			updatedAt: new Date()
+			status: 'ACTIVE'
 		};
 		
-		this.locations.push(newLocation);
-		return newLocation;
+		return await db.location.create({
+			data: prismaData,
+			include: {
+				client: true
+			}
+		});
 	}
 	
 	async update(id: number, data: Partial<LocationCreateInput>): Promise<Location> {
-		const index = this.locations.findIndex(l => l.id === id);
+		const updateData: Prisma.LocationUpdateInput = {};
 		
-		if (index === -1) {
-			throw new Error('Location not found');
+		if (data.name !== undefined) updateData.name = data.name;
+		if (data.latitude !== undefined) updateData.latitude = data.latitude;
+		if (data.longitude !== undefined) updateData.longitude = data.longitude;
+		if (data.timezone !== undefined) updateData.timezone = data.timezone;
+		if (data.capacity !== undefined) updateData.capacityMW = data.capacity;
+		if (data.panelCount !== undefined) updateData.panelCount = data.panelCount;
+		if (data.panelType !== undefined) updateData.panelType = data.panelType;
+		if (data.installationDate !== undefined) {
+			updateData.installationDate = new Date(data.installationDate);
 		}
 		
-		const updated: Location = {
-			...this.locations[index],
-			...data,
-			updatedAt: new Date()
-		};
-		
-		this.locations[index] = updated;
-		return updated;
+		return await db.location.update({
+			where: { id },
+			data: updateData,
+			include: {
+				client: true
+			}
+		});
 	}
 	
 	async delete(id: number): Promise<boolean> {
-		const index = this.locations.findIndex(l => l.id === id);
-		
-		if (index === -1) {
+		try {
+			// Soft delete by setting status to DECOMMISSIONED
+			await db.location.update({
+				where: { id },
+				data: { status: 'DECOMMISSIONED' }
+			});
+			return true;
+		} catch (error) {
 			return false;
 		}
-		
-		this.locations.splice(index, 1);
-		return true;
 	}
 	
 	// Additional repository methods
 	async countByClient(clientId: number): Promise<number> {
-		return this.locations.filter(l => l.clientId === clientId).length;
+		return await db.location.count({
+			where: { clientId }
+		});
 	}
 	
 	async getTotalCapacity(filter?: LocationFilter): Promise<number> {
-		const locations = await this.findAll(filter);
-		return locations.reduce((sum, l) => sum + l.capacity, 0);
+		const where: Prisma.LocationWhereInput = {};
+		
+		if (filter?.clientId !== undefined) {
+			where.clientId = filter.clientId;
+		}
+		
+		if (filter?.status) {
+			where.status = filter.status.toUpperCase() as LocationStatus;
+		}
+		
+		const result = await db.location.aggregate({
+			where,
+			_sum: {
+				capacityMW: true
+			}
+		});
+		
+		return result._sum.capacityMW || 0;
 	}
 	
 	async getLocationsByStatus(): Promise<Record<string, number>> {
+		const statuses = await db.location.groupBy({
+			by: ['status'],
+			_count: {
+				status: true
+			}
+		});
+		
 		const statusCount: Record<string, number> = {
-			active: 0,
-			maintenance: 0,
-			offline: 0
+			ACTIVE: 0,
+			MAINTENANCE: 0,
+			OFFLINE: 0,
+			DECOMMISSIONED: 0
 		};
 		
-		this.locations.forEach(l => {
-			statusCount[l.status] = (statusCount[l.status] || 0) + 1;
+		statuses.forEach(s => {
+			statusCount[s.status] = s._count.status;
 		});
 		
 		return statusCount;
+	}
+	
+	// Production and forecast statistics
+	async getLocationStatistics(locationId: number, startDate?: Date, endDate?: Date) {
+		const where: any = { locationId };
+		
+		if (startDate || endDate) {
+			where.time = {};
+			if (startDate) where.time.gte = startDate;
+			if (endDate) where.time.lte = endDate;
+		}
+		
+		const [production, forecasts, alerts] = await Promise.all([
+			db.production.aggregate({
+				where,
+				_avg: {
+					powerOutputMW: true,
+					efficiency: true
+				},
+				_sum: {
+					energyMWh: true
+				},
+				_count: true
+			}),
+			db.forecast.aggregate({
+				where,
+				_avg: {
+					powerOutputMW: true,
+					confidence: true
+				},
+				_count: true
+			}),
+			db.alert.count({
+				where: {
+					locationId,
+					status: 'ACTIVE'
+				}
+			})
+		]);
+		
+		return {
+			production,
+			forecasts,
+			activeAlerts: alerts
+		};
 	}
 }
