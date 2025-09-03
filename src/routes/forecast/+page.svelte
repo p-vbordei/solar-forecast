@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ProductionChart from '$lib/components/dashboard/ProductionChart.svelte';
+	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
+	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
+	
+	let showExplanation = false;
 	
 	let selectedLocation = 1;
 	let forecastHorizon = '48h';
@@ -245,5 +249,55 @@
 				</tbody>
 			</table>
 		</div>
+	</div>
+
+	<!-- Understanding Solar Forecasting -->
+	<div class="card-glass mt-6">
+		<button 
+			on:click={() => showExplanation = !showExplanation}
+			class="flex items-center justify-between w-full text-left"
+		>
+			<div class="flex items-center space-x-3">
+				<div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
+					<DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
+				</div>
+				<div>
+					<h3 class="text-lg font-semibold text-white">Understanding Solar Forecasting</h3>
+					<p class="text-sm text-soft-blue/80">Learn how to generate and interpret solar production forecasts</p>
+				</div>
+			</div>
+			<div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
+				<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+				</svg>
+			</div>
+		</button>
+		
+		{#if showExplanation}
+			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
+							<span>Forecast Generation</span>
+						</h4>
+						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+							Generate accurate solar production forecasts using machine learning models trained on 
+							weather data, historical production patterns, and seasonal variations.
+						</p>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
+							<span>Model Performance</span>
+						</h4>
+						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+							Monitor forecast accuracy, model versions, and performance metrics to ensure 
+							reliable predictions for energy trading and grid management decisions.
+						</p>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 </div>

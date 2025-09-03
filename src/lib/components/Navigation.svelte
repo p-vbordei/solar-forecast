@@ -30,10 +30,6 @@
 				<path d={getIcon(item.icon)} fill="currentColor" stroke="none"/>
 			</svg>
 			<span class="font-medium">{item.label}</span>
-			
-			{#if item.label === 'Alerts' && currentPath !== '/alerts'}
-				<span class="ml-auto bg-alert-red text-white text-xs px-2 py-1 rounded-full">3</span>
-			{/if}
 		</a>
 	{/each}
 </nav>

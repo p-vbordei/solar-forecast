@@ -8,6 +8,10 @@
   import DownloadIcon from '$lib/components/icons/DownloadIcon.svelte';
   import CalendarIcon from '$lib/components/icons/CalendarIcon.svelte';
   import MapPinIcon from '$lib/components/icons/MapPinIcon.svelte';
+  import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
+  import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
+  
+  let showExplanation = false;
 
   let selectedLocation = '';
   let selectedInterval: '15min' | 'hourly' | 'daily' | 'weekly' = 'hourly';
@@ -408,4 +412,144 @@
       </div>
     </div>
   </div>
+
+  <!-- Understanding Solar Forecast Analysis -->
+  <div class="card-glass">
+    <button 
+      on:click={() => showExplanation = !showExplanation}
+      class="flex items-center justify-between w-full text-left"
+    >
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
+          <DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
+        </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Understanding Solar Forecast Analysis</h3>
+          <p class="text-sm text-soft-blue/80">Learn how to interpret forecast data, accuracy metrics, and visualization features</p>
+        </div>
+      </div>
+      <div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
+        <svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </button>
+    
+    {#if showExplanation}
+      <div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Forecast Analysis -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
+              <span>Advanced Forecast Visualization</span>
+            </h4>
+            <p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+              The Analysis module provides sophisticated forecast visualization with confidence bands, multiple time aggregations,
+              and comparative analysis between predicted and actual solar production data.
+            </p>
+            <div class="bg-cyan/20 rounded-lg p-3 border border-cyan/30">
+              <p class="text-xs text-soft-blue/70">
+                <strong class="text-cyan">Prediction Models:</strong> Uses machine learning algorithms trained on 
+                weather data, historical production, and irradiance patterns for accurate forecasting.
+              </p>
+            </div>
+          </div>
+
+          <!-- Accuracy Metrics -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
+              <span>Accuracy Metrics Explained</span>
+            </h4>
+            <div class="space-y-2">
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">MAPE:</strong> Mean Absolute Percentage Error - lower is better</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">RMSE:</strong> Root Mean Square Error - measures prediction variance</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">MAE:</strong> Mean Absolute Error - average prediction deviation</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Confidence Bands:</strong> Statistical uncertainty ranges</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visualization Features -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
+              <span>Chart & Analysis Tools</span>
+            </h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Time Aggregation:</strong></span>
+                <span class="text-soft-blue/80">15min, hourly, daily, weekly views</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Confidence Bands:</strong></span>
+                <span class="text-soft-blue/80">Show prediction uncertainty ranges</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Actual vs Forecast:</strong></span>
+                <span class="text-soft-blue/80">Compare predictions to reality</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Auto-refresh:</strong></span>
+                <span class="text-soft-blue/80">Real-time data updates</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Business Applications -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">4</span>
+              <span>Decision Making Applications</span>
+            </h4>
+            <div class="space-y-2">
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Energy Trading:</strong> Optimize electricity market bids</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Grid Management:</strong> Plan energy storage and dispatch</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Maintenance Planning:</strong> Schedule based on production windows</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Performance Analysis:</strong> Identify underperforming assets</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Tools -->
+        <div class="bg-teal-dark/30 rounded-xl p-4 border border-cyan/20">
+          <h5 class="font-medium text-white mb-2 flex items-center space-x-2">
+            <ChartBarIcon class="w-4 h-4 text-cyan" />
+            <span>Analysis Tools & Controls</span>
+          </h5>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+            <div class="text-soft-blue/80">• <strong class="text-white">Location Filter:</strong> Select specific solar farms</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Time Range:</strong> Custom date range selection</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Export Data:</strong> Download analysis results</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Toggle Views:</strong> Switch between chart types</div>
+          </div>
+        </div>
+      </div>
+    {/if}
+  </div>
+
 </div>

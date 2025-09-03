@@ -150,6 +150,20 @@ model Location {
   degradationRate   Float?    // Percentage per year
   performanceRatio  Float?    // PR target
   
+  // Comprehensive Technical Data (JSON fields for complex configurations)
+  locationData      Json?     // Extended location details (address, timezone, etc.)
+  plantData         Json?     // Comprehensive plant specifications
+  performanceData   Json?     // Performance parameters and thresholds
+  outputConfig      Json?     // Output formats and delivery configuration
+  calibrationSettings Json?   // Calibration and adjustment settings
+  
+  // Additional metadata
+  notes             String?   // Serialized JSON array of notes
+  tags              String?   // Serialized JSON array of tags
+  certificationData String?   // Serialized JSON for certification info
+  lastMaintenanceDate DateTime?
+  version           Int       @default(1)  // For version control
+  
   // Metadata
   metadata          Json?
   createdAt         DateTime  @default(now())

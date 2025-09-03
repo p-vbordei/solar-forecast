@@ -318,143 +318,67 @@
 
 <div class="space-y-6">
 
-  <!-- Collapsible Explanation -->
-  <div class="card-glass mb-8">
-    <button 
-      on:click={() => showExplanation = !showExplanation}
-      class="flex items-center justify-between w-full text-left"
-    >
-      <div class="flex items-center space-x-3">
-        <div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
-          <DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
+  <!-- Quick Actions -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="card-glass">
+      <button 
+        on:click={() => generateQuickReport('production-summary', 'daily')}
+        class="w-full text-left"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Daily Production</h3>
+            <p class="text-sm text-soft-blue">Generate daily production report</p>
+          </div>
+          <SunIcon className="w-6 h-6 text-cyan" />
         </div>
-        <div>
-          <h3 class="text-lg font-semibold text-white">Understanding Solar Production Reports</h3>
-          <p class="text-sm text-soft-blue/80">Click to learn about report types and analytics capabilities</p>
-        </div>
-      </div>
-      <div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
-        <svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-        </svg>
-      </div>
-    </button>
+      </button>
+    </div>
     
-    {#if showExplanation}
-      <div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Purpose Section -->
+    <div class="card-glass">
+      <button 
+        on:click={() => generateQuickReport('efficiency-analysis', 'weekly')}
+        class="w-full text-left"
+      >
+        <div class="flex items-center justify-between">
           <div>
-            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
-              <span>Analytics & Reporting</span>
-            </h4>
-            <p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-              The Reports module provides comprehensive analytics for solar power production, efficiency metrics, and financial performance.
-              Generate detailed analysis of energy generation, forecast accuracy, and maintenance insights with automated data compilation.
-            </p>
-            <div class="bg-cyan/20 rounded-lg p-3 border border-cyan/30">
-              <p class="text-xs text-soft-blue/70">
-                <strong class="text-cyan">Real-time Analytics:</strong> All reports are generated from live production data 
-                with automatic calculations, ensuring accuracy for decision-making and compliance.
-              </p>
-            </div>
+            <h3 class="text-lg font-semibold text-white">Weekly Efficiency</h3>
+            <p class="text-sm text-soft-blue">Generate weekly efficiency report</p>
           </div>
-
-          <!-- Report Categories -->
-          <div>
-            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
-              <span>Available Report Types</span>
-            </h4>
-            <div class="space-y-2">
-              <div class="flex items-start space-x-2">
-                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Production Reports:</strong> Energy generation and capacity utilization</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Performance Reports:</strong> Panel efficiency and system optimization</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Analytics Reports:</strong> Forecast accuracy and weather impact analysis</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Maintenance Reports:</strong> System health and downtime tracking</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Report Features -->
-          <div>
-            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
-              <span>Report Features & Formats</span>
-            </h4>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-cyan"><strong>PDF Reports:</strong></span>
-                <span class="text-soft-blue/80">Professional formatted documents</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-cyan"><strong>Excel Export:</strong></span>
-                <span class="text-soft-blue/80">Data analysis and manipulation</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-cyan"><strong>CSV Export:</strong></span>
-                <span class="text-soft-blue/80">System integration and import</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-cyan"><strong>Scheduled Reports:</strong></span>
-                <span class="text-soft-blue/80">Automated daily/weekly/monthly</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Use Cases -->
-          <div>
-            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">4</span>
-              <span>Business Applications</span>
-            </h4>
-            <div class="space-y-2">
-              <div class="flex items-start space-x-2">
-                <span class="text-cyan">•</span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Performance Monitoring:</strong> Track production efficiency KPIs</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="text-cyan">•</span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Regulatory Compliance:</strong> Environmental and grid compliance reports</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="text-cyan">•</span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Investment Analysis:</strong> ROI and financial performance metrics</p>
-              </div>
-              <div class="flex items-start space-x-2">
-                <span class="text-cyan">•</span>
-                <p class="text-sm text-soft-blue/80"><strong class="text-white">Maintenance Planning:</strong> Predictive maintenance scheduling</p>
-              </div>
-            </div>
-          </div>
+          <BoltIcon className="w-6 h-6 text-cyan" />
         </div>
-
-        <!-- Report Tools -->
-        <div class="bg-teal-dark/30 rounded-xl p-4 border border-cyan/20">
-          <h5 class="font-medium text-white mb-2 flex items-center space-x-2">
-            <ChartBarIcon class="w-4 h-4 text-cyan" />
-            <span>Report Generation Tools</span>
-          </h5>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-            <div class="text-soft-blue/80">• <strong class="text-white">Custom Date Ranges:</strong> Flexible time period selection</div>
-            <div class="text-soft-blue/80">• <strong class="text-white">Location Filters:</strong> Specific location or consolidated views</div>
-            <div class="text-soft-blue/80">• <strong class="text-white">Format Options:</strong> PDF, Excel, CSV export formats</div>
-            <div class="text-soft-blue/80">• <strong class="text-white">Email Delivery:</strong> Automatic distribution to stakeholders</div>
+      </button>
+    </div>
+    
+    <div class="card-glass">
+      <button 
+        on:click={() => generateQuickReport('financial-summary', 'monthly')}
+        class="w-full text-left"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Monthly Financial</h3>
+            <p class="text-sm text-soft-blue">Generate monthly financial analysis</p>
           </div>
+          <CurrencyDollarIcon className="w-6 h-6 text-cyan" />
         </div>
-      </div>
-    {/if}
+      </button>
+    </div>
+
+    <div class="card-glass">
+      <button 
+        on:click={() => generateQuickReport('compliance-report', 'monthly')}
+        class="w-full text-left"
+      >
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Compliance</h3>
+            <p class="text-sm text-soft-blue">Generate compliance report</p>
+          </div>
+          <ShieldCheckIcon className="w-6 h-6 text-cyan" />
+        </div>
+      </button>
+    </div>
   </div>
 
   <!-- Report Categories Filter -->
@@ -694,66 +618,143 @@
     </div>
   </div>
 
-  <!-- Quick Actions -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('production-summary', 'daily')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">Daily Production</h3>
-            <p class="text-sm text-soft-blue">Generate daily production report</p>
-          </div>
-          <SunIcon className="w-6 h-6 text-cyan" />
+  <!-- Understanding Solar Production Reports -->
+  <div class="card-glass">
+    <button 
+      on:click={() => showExplanation = !showExplanation}
+      class="flex items-center justify-between w-full text-left"
+    >
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
+          <DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
         </div>
-      </button>
-    </div>
+        <div>
+          <h3 class="text-lg font-semibold text-white">Understanding Solar Production Reports</h3>
+          <p class="text-sm text-soft-blue/80">Click to learn about report types and analytics capabilities</p>
+        </div>
+      </div>
+      <div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
+        <svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </div>
+    </button>
     
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('efficiency-analysis', 'weekly')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
+    {#if showExplanation}
+      <div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Purpose Section -->
           <div>
-            <h3 class="text-lg font-semibold text-white">Weekly Efficiency</h3>
-            <p class="text-sm text-soft-blue">Generate weekly efficiency report</p>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
+              <span>Analytics & Reporting</span>
+            </h4>
+            <p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+              The Reports module provides comprehensive analytics for solar power production, efficiency metrics, and financial performance.
+              Generate detailed analysis of energy generation, forecast accuracy, and maintenance insights with automated data compilation.
+            </p>
+            <div class="bg-cyan/20 rounded-lg p-3 border border-cyan/30">
+              <p class="text-xs text-soft-blue/70">
+                <strong class="text-cyan">Real-time Analytics:</strong> All reports are generated from live production data 
+                with automatic calculations, ensuring accuracy for decision-making and compliance.
+              </p>
+            </div>
           </div>
-          <BoltIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
-    
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('financial-summary', 'monthly')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">Monthly Financial</h3>
-            <p class="text-sm text-soft-blue">Generate monthly financial analysis</p>
-          </div>
-          <CurrencyDollarIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
 
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('compliance-report', 'monthly')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
+          <!-- Report Categories -->
           <div>
-            <h3 class="text-lg font-semibold text-white">Compliance</h3>
-            <p class="text-sm text-soft-blue">Generate compliance report</p>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
+              <span>Available Report Types</span>
+            </h4>
+            <div class="space-y-2">
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Production Reports:</strong> Energy generation and capacity utilization</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Performance Reports:</strong> Panel efficiency and system optimization</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Analytics Reports:</strong> Forecast accuracy and weather impact analysis</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Maintenance Reports:</strong> System health and downtime tracking</p>
+              </div>
+            </div>
           </div>
-          <ShieldCheckIcon className="w-6 h-6 text-cyan" />
+
+          <!-- Report Features -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
+              <span>Report Features & Formats</span>
+            </h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>PDF Reports:</strong></span>
+                <span class="text-soft-blue/80">Professional formatted documents</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Excel Export:</strong></span>
+                <span class="text-soft-blue/80">Data analysis and manipulation</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>CSV Export:</strong></span>
+                <span class="text-soft-blue/80">System integration and import</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-cyan"><strong>Scheduled Reports:</strong></span>
+                <span class="text-soft-blue/80">Automated daily/weekly/monthly</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Use Cases -->
+          <div>
+            <h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+              <span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">4</span>
+              <span>Business Applications</span>
+            </h4>
+            <div class="space-y-2">
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Performance Monitoring:</strong> Track production efficiency KPIs</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Regulatory Compliance:</strong> Environmental and grid compliance reports</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Investment Analysis:</strong> ROI and financial performance metrics</p>
+              </div>
+              <div class="flex items-start space-x-2">
+                <span class="text-cyan">•</span>
+                <p class="text-sm text-soft-blue/80"><strong class="text-white">Maintenance Planning:</strong> Predictive maintenance scheduling</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </button>
-    </div>
+
+        <!-- Report Tools -->
+        <div class="bg-teal-dark/30 rounded-xl p-4 border border-cyan/20">
+          <h5 class="font-medium text-white mb-2 flex items-center space-x-2">
+            <ChartBarIcon class="w-4 h-4 text-cyan" />
+            <span>Report Generation Tools</span>
+          </h5>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+            <div class="text-soft-blue/80">• <strong class="text-white">Custom Date Ranges:</strong> Flexible time period selection</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Location Filters:</strong> Specific location or consolidated views</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Format Options:</strong> PDF, Excel, CSV export formats</div>
+            <div class="text-soft-blue/80">• <strong class="text-white">Email Delivery:</strong> Automatic distribution to stakeholders</div>
+          </div>
+        </div>
+      </div>
+    {/if}
   </div>
+
 </div>

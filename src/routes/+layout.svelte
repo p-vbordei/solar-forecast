@@ -10,7 +10,6 @@
 		{ href: '/locations', label: 'Locations', icon: 'location' },
 		{ href: '/forecast', label: 'Forecast', icon: 'forecast' },
 		{ href: '/analysis', label: 'Analysis', icon: 'analysis' },
-		{ href: '/alerts', label: 'Alerts', icon: 'alert' },
 		{ href: '/reports', label: 'Reports', icon: 'report' },
 	];
 </script>
