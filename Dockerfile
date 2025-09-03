@@ -2,7 +2,7 @@
 FROM node:18-alpine AS builder
 
 # Install OpenSSL and other dependencies for Prisma
-RUN apk add --no-cache openssl1.1-compat
+RUN apk add --no-cache openssl openssl-dev libc6-compat
 
 # Set working directory
 WORKDIR /app
@@ -30,7 +30,7 @@ RUN npm prune --production
 FROM node:18-alpine AS runner
 
 # Install dumb-init for proper signal handling and OpenSSL for Prisma
-RUN apk add --no-cache dumb-init openssl1.1-compat
+RUN apk add --no-cache dumb-init openssl libc6-compat
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
