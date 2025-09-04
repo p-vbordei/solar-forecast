@@ -185,10 +185,15 @@
 		formErrors = {};
 		formTouched = {};
 		gpsValidationResult = null;
-		// Reset all advanced sections to collapsed
-		Object.keys(showAdvancedSections).forEach(key => {
-			showAdvancedSections[key as keyof typeof showAdvancedSections] = false;
-		});
+		// Reset all advanced sections to collapsed (using proper Svelte reactivity)
+		showAdvancedSections = {
+			clientInfo: false,
+			plantSpecs: false,
+			performance: false,
+			losses: false,
+			calibration: false,
+			output: false
+		};
 	}
 
 	// Smart GPS validation and optimization
@@ -457,10 +462,12 @@
 			<h1 class="text-3xl font-bold text-soft-blue">Solar Locations</h1>
 			<p class="text-soft-blue/60 mt-2">Manage solar farm locations with intelligent technical configuration</p>
 		</div>
-		<button on:click={openLocationModal} class="btn btn-primary">
-			<PlusIcon className="w-5 h-5 mr-2" />
-			Add Location
-		</button>
+		<div class="flex items-center space-x-4">
+			<button on:click={openLocationModal} class="btn btn-primary">
+				<PlusIcon className="w-5 h-5 mr-2" />
+				Add Location
+			</button>
+		</div>
 	</div>
 
 	<!-- Locations Display -->
