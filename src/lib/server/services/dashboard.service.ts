@@ -64,11 +64,11 @@ export class DashboardService {
     // Transform the time series data
     const timeSeries: WeatherTimePoint[] = timeSeriesData.map(point => ({
       timestamp: point.bucket,
-      solarRadiation: Math.round(point.avg_ghi_w_m2 || 0),
-      temperature: Math.round((point.avg_temperature_c || 0) * 10) / 10,
-      cloudCoverage: Math.round(point.avg_cloud_coverage_percent || 0),
-      windSpeed: Math.round((point.avg_wind_speed_ms || 0) * 10) / 10,
-      humidity: Math.round(point.avg_humidity_percent || 0)
+      solarRadiation: Math.round(point.avg_ghi || 0),
+      temperature: Math.round((point.avg_temperature || 0) * 10) / 10,
+      cloudCoverage: Math.round(point.avg_cloudCover || 0),
+      windSpeed: Math.round((point.avg_windSpeed || 0) * 10) / 10,
+      humidity: Math.round(point.avg_humidity || 0)
     }));
 
     // Define available weather parameters
@@ -76,7 +76,7 @@ export class DashboardService {
       {
         id: 'solarRadiation',
         name: 'Solar Radiation',
-        value: currentWeather?.ghi_w_m2 || 0,
+        value: currentWeather?.ghi || 0,
         unit: 'W/m²',
         selected: true,
         color: '#FCD34D' // Yellow
@@ -84,7 +84,7 @@ export class DashboardService {
       {
         id: 'temperature',
         name: 'Temperature',
-        value: currentWeather?.temperature_c || 0,
+        value: currentWeather?.temperature || 0,
         unit: '°C',
         selected: true,
         color: '#EF4444' // Red
@@ -92,7 +92,7 @@ export class DashboardService {
       {
         id: 'cloudCoverage',
         name: 'Cloud Coverage',
-        value: currentWeather?.cloud_coverage_percent || 0,
+        value: currentWeather?.cloudCover || 0,
         unit: '%',
         selected: true,
         color: '#9CA3AF' // Gray
@@ -100,7 +100,7 @@ export class DashboardService {
       {
         id: 'windSpeed',
         name: 'Wind Speed',
-        value: currentWeather?.wind_speed_ms || 0,
+        value: currentWeather?.windSpeed || 0,
         unit: 'm/s',
         selected: false,
         color: '#10B981' // Green
@@ -108,7 +108,7 @@ export class DashboardService {
       {
         id: 'humidity',
         name: 'Humidity',
-        value: currentWeather?.humidity_percent || 0,
+        value: currentWeather?.humidity || 0,
         unit: '%',
         selected: false,
         color: '#3B82F6' // Blue

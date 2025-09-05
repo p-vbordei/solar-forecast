@@ -12,10 +12,10 @@ export class DashboardRepository {
       timestamp: Date;
     }>>`
       SELECT 
-        power_mw as current_power_mw,
+        "powerMW" as current_power_mw,
         timestamp
       FROM production 
-      WHERE location_id = ${locationId}
+      WHERE "locationId" = ${locationId}
         AND timestamp >= NOW() - INTERVAL '1 hour'
       ORDER BY timestamp DESC 
       LIMIT 1
@@ -31,9 +31,9 @@ export class DashboardRepository {
     const result = await db.$queryRaw<Array<{
       avg_power_mw: number;
     }>>`
-      SELECT AVG(power_mw) as avg_power_mw
+      SELECT AVG("powerMW") as avg_power_mw
       FROM production 
-      WHERE location_id = ${locationId}
+      WHERE "locationId" = ${locationId}
         AND timestamp >= NOW() - INTERVAL '2 days'
         AND timestamp < NOW() - INTERVAL '1 day'
     `;
@@ -49,9 +49,9 @@ export class DashboardRepository {
       total_energy_mwh: number;
     }>>`
       SELECT 
-        COALESCE(SUM(energy_mwh), 0) as total_energy_mwh
+        COALESCE(SUM("energyMWh"), 0) as total_energy_mwh
       FROM production 
-      WHERE location_id = ${locationId}
+      WHERE "locationId" = ${locationId}
         AND DATE(timestamp) = CURRENT_DATE
     `;
 
@@ -66,9 +66,9 @@ export class DashboardRepository {
       total_energy_mwh: number;
     }>>`
       SELECT 
-        COALESCE(SUM(energy_mwh), 0) as total_energy_mwh
+        COALESCE(SUM("energyMWh"), 0) as total_energy_mwh
       FROM production 
-      WHERE location_id = ${locationId}
+      WHERE "locationId" = ${locationId}
         AND DATE(timestamp) = CURRENT_DATE - INTERVAL '1 day'
     `;
 
@@ -83,10 +83,10 @@ export class DashboardRepository {
       avg_accuracy: number;
     }>>`
       SELECT 
-        AVG(accuracy_score * 100) as avg_accuracy
+        AVG((100 - mape)) as avg_accuracy
       FROM forecast_accuracy 
-      WHERE location_id = ${locationId}
-        AND timestamp >= NOW() - INTERVAL '24 hours'
+      WHERE "locationId" = ${locationId}
+        AND date >= CURRENT_DATE - INTERVAL '7 days'
     `;
 
     return result[0]?.avg_accuracy || 0;
@@ -100,11 +100,11 @@ export class DashboardRepository {
       avg_accuracy: number;
     }>>`
       SELECT 
-        AVG(accuracy_score * 100) as avg_accuracy
+        AVG((100 - mape)) as avg_accuracy
       FROM forecast_accuracy 
-      WHERE location_id = ${locationId}
-        AND timestamp >= NOW() - INTERVAL '2 days'
-        AND timestamp < NOW() - INTERVAL '1 day'
+      WHERE "locationId" = ${locationId}
+        AND date >= CURRENT_DATE - INTERVAL '14 days'
+        AND date < CURRENT_DATE - INTERVAL '7 days'
     `;
 
     return result[0]?.avg_accuracy || 0;
@@ -139,10 +139,10 @@ export class DashboardRepository {
       interval: interval as any,
       table: 'weather_data',
       aggregations: {
-        avg: ['temperature_c', 'humidity_percent', 'ghi_w_m2', 'wind_speed_ms', 'cloud_coverage_percent']
+        avg: ['temperature', 'humidity', 'ghi', 'windSpeed', 'cloudCover']
       },
-      where: `location_id = ${locationId} AND ${timeFilter}`,
-      groupBy: ['location_id'],
+      where: `"locationId" = ${locationId} AND ${timeFilter}`,
+      groupBy: ['locationId'],
       limit: timeRange === '7days' ? 28 : 24 // 7 days * 4 intervals or 24 hours
     });
   }
@@ -152,22 +152,22 @@ export class DashboardRepository {
    */
   async getCurrentWeather(locationId: number) {
     const result = await db.$queryRaw<Array<{
-      temperature_c: number;
-      humidity_percent: number;
-      ghi_w_m2: number;
-      wind_speed_ms: number;
-      cloud_coverage_percent: number;
+      temperature: number;
+      humidity: number;
+      ghi: number;
+      windSpeed: number;
+      cloudCover: number;
       timestamp: Date;
     }>>`
       SELECT 
-        temperature_c,
-        humidity_percent,
-        ghi_w_m2,
-        wind_speed_ms,
-        cloud_coverage_percent,
+        temperature,
+        humidity,
+        ghi,
+        "windSpeed",
+        "cloudCover",
         timestamp
       FROM weather_data 
-      WHERE location_id = ${locationId}
+      WHERE "locationId" = ${locationId}
         AND timestamp >= NOW() - INTERVAL '2 hours'
       ORDER BY timestamp DESC 
       LIMIT 1
