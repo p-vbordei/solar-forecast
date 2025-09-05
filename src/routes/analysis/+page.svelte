@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import ForecastChart from '$lib/components/analysis/ForecastChart.svelte';
+  import EnhancedForecastChart from '$lib/components/analysis/EnhancedForecastChart.svelte';
   import AggregationSelector from '$lib/components/analysis/AggregationSelector.svelte';
   import AccuracyMetrics from '$lib/components/analysis/AccuracyMetrics.svelte';
   import TrendingUpIcon from '$lib/components/icons/TrendingUpIcon.svelte';
@@ -17,10 +18,17 @@
   let selectedInterval: '15min' | 'hourly' | 'daily' | 'weekly' = 'hourly';
   let showConfidenceBands = true;
   let showActual = false;
+  let showWeather = false;
+  let showHistorical = false;
+  let showMeasured = false;
+  let chartType: 'production' | 'weather' | 'comparison' = 'production';
+  let comparisonMode: 'forecast-actual' | 'forecast-measured' | 'historical-current' = 'forecast-actual';
   let autoRefresh = false;
   let refreshInterval: number;
   let isLoading = false;
   let forecastData: any[] = [];
+  let weatherData: any[] = [];
+  let historicalData: any[] = [];
   let accuracyMetrics = {
     accuracy: 92.5,
     mape: 7.8,
@@ -51,11 +59,42 @@
       if (result.success) {
         forecastData = result.data;
         showActual = result.hasActual || false;
+        showMeasured = result.hasMeasured || false;
       }
     } catch (error) {
       console.error('Error loading forecast data:', error);
     } finally {
       isLoading = false;
+    }
+  }
+  
+  async function loadWeatherData() {
+    if (!selectedLocation) return;
+    
+    try {
+      const response = await fetch(`/api/analysis/weather?location=${selectedLocation}&interval=${selectedInterval}&start=${dateRange.start}&end=${dateRange.end}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        weatherData = result.data;
+      }
+    } catch (error) {
+      console.error('Error loading weather data:', error);
+    }
+  }
+  
+  async function loadHistoricalData() {
+    if (!selectedLocation) return;
+    
+    try {
+      const response = await fetch(`/api/analysis/historical?location=${selectedLocation}&interval=${selectedInterval}&start=${dateRange.start}&end=${dateRange.end}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        historicalData = result.data;
+      }
+    } catch (error) {
+      console.error('Error loading historical data:', error);
     }
   }
 
@@ -120,6 +159,12 @@
   function handleRefresh() {
     loadForecastData();
     loadAccuracyMetrics();
+    if (showWeather || chartType === 'weather' || chartType === 'comparison') {
+      loadWeatherData();
+    }
+    if (showHistorical) {
+      loadHistoricalData();
+    }
   }
 
   function toggleAutoRefresh() {
@@ -137,6 +182,8 @@
       selectedLocation = locations[0].id;
       loadForecastData();
       loadAccuracyMetrics();
+      loadWeatherData();
+      loadHistoricalData();
     }
 
     return () => {
@@ -149,6 +196,8 @@
   $: if (selectedLocation && dateRange.start && dateRange.end) {
     loadForecastData();
     loadAccuracyMetrics();
+    loadWeatherData();
+    loadHistoricalData();
   }
 </script>
 
@@ -227,9 +276,21 @@
         />
       </div>
 
-      <!-- Options -->
+      <!-- Chart Type -->
       <div>
-        <label class="label">Display Options</label>
+        <label class="label">Chart Type</label>
+        <select class="select" bind:value={chartType}>
+          <option value="production">Production Analysis</option>
+          <option value="weather">Weather Data</option>
+          <option value="comparison">Combined Comparison</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Display Options -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div>
+        <label class="label">Production Options</label>
         <div class="space-y-2">
           <label class="flex items-center gap-2 text-sm text-soft-blue cursor-pointer">
             <input
@@ -248,10 +309,50 @@
             />
             Show Actual Values
           </label>
+          <label class="flex items-center gap-2 text-sm text-soft-blue cursor-pointer">
+            <input
+              type="checkbox"
+              bind:checked={showMeasured}
+              disabled={!forecastData.some(d => d.measured)}
+              class="w-4 h-4 rounded border-glass-border bg-glass-white text-cyan focus:ring-cyan focus:ring-2"
+            />
+            Show Measured Data
+          </label>
         </div>
       </div>
+      
+      <div>
+        <label class="label">Additional Data</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm text-soft-blue cursor-pointer">
+            <input
+              type="checkbox"
+              bind:checked={showWeather}
+              class="w-4 h-4 rounded border-glass-border bg-glass-white text-cyan focus:ring-cyan focus:ring-2"
+            />
+            Show Weather Data
+          </label>
+          <label class="flex items-center gap-2 text-sm text-soft-blue cursor-pointer">
+            <input
+              type="checkbox"
+              bind:checked={showHistorical}
+              class="w-4 h-4 rounded border-glass-border bg-glass-white text-cyan focus:ring-cyan focus:ring-2"
+            />
+            Show Historical Data
+          </label>
+        </div>
+      </div>
+      
+      <div>
+        <label class="label">Comparison Mode</label>
+        <select class="select" bind:value={comparisonMode}>
+          <option value="forecast-actual">Forecast vs Actual</option>
+          <option value="forecast-measured">Forecast vs Measured</option>
+          <option value="historical-current">Historical vs Current</option>
+        </select>
+      </div>
     </div>
-
+    
     <!-- Aggregation Selector -->
     <div class="mb-4">
       <label class="label mb-3">Time Aggregation</label>
@@ -295,34 +396,56 @@
     mae={accuracyMetrics.mae}
   />
 
-  <!-- Forecast Chart -->
+  <!-- Enhanced Analysis Chart -->
   <div class="card-glass">
-    <h2 class="text-xl font-semibold text-soft-blue mb-4">
-      Production Forecast
-      {#if selectedInterval === '15min'}
-        - 15-Minute Resolution
-      {:else if selectedInterval === 'hourly'}
-        - Hourly Average
-      {:else if selectedInterval === 'daily'}
-        - Daily Total
-      {:else}
-        - Weekly Summary
-      {/if}
-    </h2>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-semibold text-soft-blue">
+        {#if chartType === 'production'}
+          Production Analysis
+        {:else if chartType === 'weather'}
+          Weather Data Analysis
+        {:else}
+          Combined Data Comparison
+        {/if}
+        {#if selectedInterval === '15min'}
+          - 15-Minute Resolution
+        {:else if selectedInterval === 'hourly'}
+          - Hourly Average
+        {:else if selectedInterval === 'daily'}
+          - Daily Total
+        {:else}
+          - Weekly Summary
+        {/if}
+      </h2>
+      
+      <!-- Chart type indicators -->
+      <div class="flex gap-2 text-sm">
+        {#if showActual}<span class="px-2 py-1 bg-soft-blue/20 text-soft-blue rounded">Actual</span>{/if}
+        {#if showMeasured}<span class="px-2 py-1 bg-alert-red/20 text-alert-red rounded">Measured</span>{/if}
+        {#if showWeather}<span class="px-2 py-1 bg-alert-orange/20 text-alert-orange rounded">Weather</span>{/if}
+        {#if showHistorical}<span class="px-2 py-1 bg-cyan/20 text-cyan rounded">Historical</span>{/if}
+      </div>
+    </div>
     
     {#if isLoading}
       <div class="flex items-center justify-center h-96">
         <div class="text-center">
           <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan"></div>
-          <p class="mt-4 text-soft-blue">Loading forecast data...</p>
+          <p class="mt-4 text-soft-blue">Loading analysis data...</p>
         </div>
       </div>
     {:else if forecastData.length > 0}
-      <ForecastChart 
+      <EnhancedForecastChart 
         data={forecastData}
+        weatherData={weatherData}
+        historicalData={historicalData}
         interval={selectedInterval}
         showConfidenceBands={showConfidenceBands}
         showActual={showActual}
+        showWeather={showWeather}
+        showHistorical={showHistorical}
+        showMeasured={showMeasured}
+        chartType={chartType}
         height={450}
       />
     {:else}
@@ -331,8 +454,8 @@
           <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
-          <p>No forecast data available</p>
-          <p class="text-sm mt-2">Select a location and date range to view forecasts</p>
+          <p>No analysis data available</p>
+          <p class="text-sm mt-2">Select a location and date range to view analysis</p>
         </div>
       </div>
     {/if}

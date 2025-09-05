@@ -32,12 +32,14 @@ class ForecastService {
     // Process and format data based on interval
     const processedData = this.processForecastData(rawData, interval);
     
-    // Check if actual data is available
+    // Check if actual and measured data are available
     const hasActual = processedData.some(d => d.actual !== null && d.actual !== undefined);
+    const hasMeasured = processedData.some(d => d.measured !== null && d.measured !== undefined);
     
     return {
       data: processedData,
       hasActual,
+      hasMeasured,
       metadata: {
         locationId,
         interval,
@@ -96,6 +98,10 @@ class ForecastService {
       
       if (point.actual !== undefined) {
         processed.actual = point.actual;
+      }
+      
+      if (point.measured !== undefined) {
+        processed.measured = point.measured;
       }
       
       return processed;

@@ -25,7 +25,8 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({
       success: true,
       data: forecastData.data,
-      hasActual: forecastData.hasActual
+      hasActual: forecastData.hasActual,
+      hasMeasured: forecastData.hasMeasured || false
     });
   } catch (error) {
     console.error('Error fetching forecast data:', error);

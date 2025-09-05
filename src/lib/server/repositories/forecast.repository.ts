@@ -82,10 +82,15 @@ class ForecastRepository {
         baseProduction *= 70; // Approximate weekly total
       }
       
+      // Generate measured data (from physical sensors) with different accuracy than actual
+      const measuredData = Math.random() > 0.2 ? parseFloat((baseProduction * (0.85 + Math.random() * 0.3)).toFixed(2)) : null;
+      const actualData = Math.random() > 0.3 ? parseFloat((baseProduction * (0.9 + Math.random() * 0.2)).toFixed(2)) : null;
+      
       data.push({
         timestamp: current.toISOString(),
         forecast: parseFloat(baseProduction.toFixed(2)),
-        actual: Math.random() > 0.3 ? parseFloat((baseProduction * (0.9 + Math.random() * 0.2)).toFixed(2)) : null
+        actual: actualData,
+        measured: measuredData
       });
       
       current.setTime(current.getTime() + intervalMs);
