@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { forecastService } from '$lib/server/services/forecast.service';
+import { AnalysisService } from '$lib/server/services/analysis.service';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
@@ -8,31 +8,57 @@ export const GET: RequestHandler = async ({ url }) => {
     const start = url.searchParams.get('start');
     const end = url.searchParams.get('end');
 
+    // Validate required parameters
     if (!location) {
-      return json(
-        { success: false, error: 'Location is required' },
-        { status: 400 }
-      );
+      return json({ 
+        success: false, 
+        error: 'Location parameter is required' 
+      }, { status: 400 });
     }
 
-    const forecastData = await forecastService.getForecast({
-      locationId: location,
-      interval: interval as '15min' | 'hourly' | 'daily' | 'weekly',
-      startDate: start || undefined,
-      endDate: end || undefined
-    });
+    if (!start || !end) {
+      return json({ 
+        success: false, 
+        error: 'Start and end date parameters are required' 
+      }, { status: 400 });
+    }
+
+    // Validate interval parameter
+    const validIntervals = ['15min', 'hourly', 'daily', 'weekly'];
+    if (!validIntervals.includes(interval)) {
+      return json({ 
+        success: false, 
+        error: 'Invalid interval. Must be: 15min, hourly, daily, or weekly' 
+      }, { status: 400 });
+    }
+
+    // Validate date format
+    if (isNaN(Date.parse(start)) || isNaN(Date.parse(end))) {
+      return json({ 
+        success: false, 
+        error: 'Invalid date format' 
+      }, { status: 400 });
+    }
+
+    const service = new AnalysisService();
+    const result = await service.getForecastAnalysis(location, interval, start, end);
 
     return json({
       success: true,
-      data: forecastData.data,
-      hasActual: forecastData.hasActual,
-      hasMeasured: forecastData.hasMeasured || false
+      ...result
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=300', // 5 minutes cache
+        'Content-Type': 'application/json'
+      }
     });
+
   } catch (error) {
-    console.error('Error fetching forecast data:', error);
-    return json(
-      { success: false, error: 'Failed to fetch forecast data' },
-      { status: 500 }
-    );
+    console.error('Analysis forecast API error:', error);
+    
+    return json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch forecast analysis',
+    }, { status: 500 });
   }
 };

@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { forecastService } from '$lib/server/services/forecast.service';
+import { AnalysisService } from '$lib/server/services/analysis.service';
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
@@ -7,28 +7,48 @@ export const GET: RequestHandler = async ({ url }) => {
     const start = url.searchParams.get('start');
     const end = url.searchParams.get('end');
 
+    // Validate required parameters
     if (!location) {
-      return json(
-        { success: false, error: 'Location is required' },
-        { status: 400 }
-      );
+      return json({ 
+        success: false, 
+        error: 'Location parameter is required' 
+      }, { status: 400 });
     }
 
-    const accuracyData = await forecastService.getAccuracyMetrics({
-      locationId: location,
-      startDate: start || undefined,
-      endDate: end || undefined
-    });
+    if (!start || !end) {
+      return json({ 
+        success: false, 
+        error: 'Start and end date parameters are required' 
+      }, { status: 400 });
+    }
+
+    // Validate date format
+    if (isNaN(Date.parse(start)) || isNaN(Date.parse(end))) {
+      return json({ 
+        success: false, 
+        error: 'Invalid date format' 
+      }, { status: 400 });
+    }
+
+    const service = new AnalysisService();
+    const result = await service.getAccuracyMetrics(location, start, end);
 
     return json({
       success: true,
-      data: accuracyData
+      data: result
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=600', // 10 minutes cache
+        'Content-Type': 'application/json'
+      }
     });
+
   } catch (error) {
-    console.error('Error fetching accuracy metrics:', error);
-    return json(
-      { success: false, error: 'Failed to fetch accuracy metrics' },
-      { status: 500 }
-    );
+    console.error('Analysis accuracy API error:', error);
+    
+    return json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch accuracy metrics',
+    }, { status: 500 });
   }
 };

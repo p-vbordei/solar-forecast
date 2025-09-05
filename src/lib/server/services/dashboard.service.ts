@@ -119,11 +119,11 @@ export class DashboardService {
       parameters,
       timeSeries,
       currentValues: {
-        solarRadiation: Math.round(currentWeather?.ghi_w_m2 || 0),
-        temperature: Math.round((currentWeather?.temperature_c || 0) * 10) / 10,
-        cloudCoverage: Math.round(currentWeather?.cloud_coverage_percent || 0),
-        windSpeed: Math.round((currentWeather?.wind_speed_ms || 0) * 10) / 10,
-        humidity: Math.round(currentWeather?.humidity_percent || 0)
+        solarRadiation: Math.round(currentWeather?.ghi || 0),
+        temperature: Math.round((currentWeather?.temperature || 0) * 10) / 10,
+        cloudCoverage: Math.round(currentWeather?.cloudCover || 0),
+        windSpeed: Math.round((currentWeather?.windSpeed || 0) * 10) / 10,
+        humidity: Math.round(currentWeather?.humidity || 0)
       }
     };
   }
@@ -138,7 +138,7 @@ export class DashboardService {
       id: location.id,
       name: location.name,
       city: location.city,
-      isActive: location.isActive
+      isActive: location.status === 'ACTIVE'
     }));
   }
 
@@ -200,7 +200,7 @@ export class DashboardService {
   async validateLocationAccess(locationId: number, clientId?: number): Promise<boolean> {
     const location = await this.repository.getLocationById(locationId);
     
-    if (!location || !location.isActive) {
+    if (!location || location.status !== 'ACTIVE') {
       return false;
     }
 

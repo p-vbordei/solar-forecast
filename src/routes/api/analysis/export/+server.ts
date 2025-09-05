@@ -1,45 +1,68 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { forecastService } from '$lib/server/services/forecast.service';
+import { AnalysisService } from '$lib/server/services/analysis.service';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const data = await request.json();
     const { location, interval, start, end, format } = data;
 
-    if (!location || !format) {
-      return json(
-        { success: false, error: 'Location and format are required' },
-        { status: 400 }
-      );
+    // Validate required parameters
+    if (!location) {
+      return json({ 
+        success: false, 
+        error: 'Location parameter is required' 
+      }, { status: 400 });
     }
 
-    const exportData = await forecastService.exportForecast({
-      locationId: location,
-      interval: interval || 'hourly',
-      startDate: start,
-      endDate: end,
-      format
-    });
+    if (!format) {
+      return json({ 
+        success: false, 
+        error: 'Format parameter is required' 
+      }, { status: 400 });
+    }
 
-    const contentType = format === 'pdf' 
-      ? 'application/pdf'
-      : format === 'excel'
-      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      : 'text/csv';
+    if (!start || !end) {
+      return json({ 
+        success: false, 
+        error: 'Start and end date parameters are required' 
+      }, { status: 400 });
+    }
 
-    const filename = `forecast_${location}_${interval}_${new Date().toISOString().split('T')[0]}.${format}`;
+    // Validate format parameter
+    const validFormats = ['csv', 'excel', 'pdf'];
+    if (!validFormats.includes(format)) {
+      return json({ 
+        success: false, 
+        error: 'Invalid format. Must be: csv, excel, or pdf' 
+      }, { status: 400 });
+    }
 
-    return new Response(exportData, {
+    // Validate interval parameter
+    const validIntervals = ['15min', 'hourly', 'daily', 'weekly'];
+    const intervalParam = interval || 'hourly';
+    if (!validIntervals.includes(intervalParam)) {
+      return json({ 
+        success: false, 
+        error: 'Invalid interval. Must be: 15min, hourly, daily, or weekly' 
+      }, { status: 400 });
+    }
+
+    const service = new AnalysisService();
+    const exportResult = await service.generateExportData(location, intervalParam, start, end, format);
+
+    return new Response(exportResult.content, {
       headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`
+        'Content-Type': exportResult.mimeType,
+        'Content-Disposition': `attachment; filename="${exportResult.filename}"`
       }
     });
+
   } catch (error) {
-    console.error('Error exporting forecast:', error);
-    return json(
-      { success: false, error: 'Failed to export forecast' },
-      { status: 500 }
-    );
+    console.error('Analysis export API error:', error);
+    
+    return json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to export analysis data',
+    }, { status: 500 });
   }
 };

@@ -182,13 +182,13 @@ export class DashboardRepository {
   async getActiveLocations() {
     return await db.location.findMany({
       where: {
-        isActive: true
+        status: 'ACTIVE'
       },
       select: {
         id: true,
         name: true,
         city: true,
-        isActive: true
+        status: true
       },
       orderBy: {
         name: 'asc'
@@ -208,7 +208,7 @@ export class DashboardRepository {
         id: true,
         name: true,
         city: true,
-        isActive: true
+        status: true
       }
     });
   }
