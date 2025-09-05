@@ -35,7 +35,7 @@
 		</div>
 		
 		<!-- User Section -->
-		<div class="absolute bottom-0 left-0 right-0 p-6 border-t border-glass-border">
+		<div class="absolute bottom-0 left-0 right-0 p-6">
 			<div class="flex items-center gap-3">
 				<div class="w-10 h-10 bg-glass-white rounded-full flex items-center justify-center">
 					<svg class="w-6 h-6 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
