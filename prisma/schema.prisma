@@ -1,15 +1,19 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your Prisma schema file for TimescaleDB
+// TimescaleDB is a PostgreSQL extension optimized for time-series data
+// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
+  // Enable experimental features for better TimescaleDB support
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql" // TimescaleDB is compatible with PostgreSQL
+  provider  = "postgresql" // TimescaleDB extends PostgreSQL
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  // TimescaleDB extension is enabled via init.sql
 }
 
 // ========================================
@@ -260,7 +264,9 @@ model Plant {
 // TIME SERIES DATA MODELS
 // ========================================
 
-// Forecast Data (TimescaleDB hypertable - converted automatically)  
+// Forecast Data - Primary TimescaleDB Hypertable
+// This table will be converted to a TimescaleDB hypertable partitioned by timestamp
+// Optimized for time-series queries with 15-minute to daily aggregations
 model Forecast {
   id                String    @id @default(uuid())
   timestamp         DateTime
@@ -324,13 +330,15 @@ model Forecast {
   location          Location  @relation(fields: [locationId], references: [id])
   user              User?     @relation(fields: [createdBy], references: [id])
   
-  @@index([locationId, timestamp])
-  @@index([timestamp])
-  @@index([modelType])
-  @@index([horizonMinutes])
-  @@index([runId])
-  @@index([resolution])
-  @@index([forecastType])
+  // TimescaleDB optimized indexes - time dimension first for hypertables
+  @@index([timestamp, locationId], name: "forecasts_time_location_idx")
+  @@index([timestamp, modelType], name: "forecasts_time_model_idx") 
+  @@index([locationId, timestamp(sort: Desc)], name: "forecasts_location_time_desc_idx")
+  @@index([modelType, timestamp(sort: Desc)], name: "forecasts_model_time_desc_idx")
+  @@index([horizonMinutes, timestamp], name: "forecasts_horizon_time_idx")
+  @@index([runId, timestamp], name: "forecasts_run_time_idx")
+  @@index([resolution, timestamp], name: "forecasts_resolution_time_idx")
+  @@index([forecastType, timestamp], name: "forecasts_type_time_idx")
   @@map("forecasts")
 }
 
@@ -364,7 +372,9 @@ enum ModelType {
   STATISTICAL
 }
 
-// Actual Production Data (TimescaleDB hypertable - converted automatically)
+// Production Data - TimescaleDB Hypertable  
+// Actual solar production measurements converted to hypertable
+// Supports compression and retention policies for efficient storage
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
@@ -411,9 +421,11 @@ model Production {
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])
   
-  @@index([locationId, timestamp])
-  @@index([timestamp])
-  @@index([dataQuality])
+  // TimescaleDB optimized indexes - time dimension first for hypertables
+  @@index([timestamp, locationId], name: "production_time_location_idx")
+  @@index([locationId, timestamp(sort: Desc)], name: "production_location_time_desc_idx")
+  @@index([timestamp, dataQuality], name: "production_time_quality_idx")
+  @@index([dataQuality, timestamp], name: "production_quality_time_idx")
   @@map("production")
 }
 
@@ -426,7 +438,9 @@ enum DataQuality {
   INVALID
 }
 
-// Weather Data (TimescaleDB hypertable - converted automatically)
+// Weather Data - TimescaleDB Hypertable
+// Meteorological data converted to hypertable for efficient time-series storage
+// Includes solar irradiance components optimized for solar forecasting
 model WeatherData {
   id                String    @id @default(uuid())
   timestamp         DateTime
@@ -471,9 +485,11 @@ model WeatherData {
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])
   
-  @@index([locationId, timestamp])
-  @@index([timestamp])
-  @@index([source])
+  // TimescaleDB optimized indexes - time dimension first for hypertables
+  @@index([timestamp, locationId], name: "weather_time_location_idx")
+  @@index([locationId, timestamp(sort: Desc)], name: "weather_location_time_desc_idx")
+  @@index([timestamp, source], name: "weather_time_source_idx")
+  @@index([source, timestamp], name: "weather_source_time_idx")
   @@map("weather_data")
 }
 

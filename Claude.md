@@ -234,7 +234,7 @@ Before any frontend commit, verify:
 
 
 
-Database is PostgreSQL
+Database is TimescaleDB (PostgreSQL extension for time-series)
 Implementation ( Deployment) will be done on Railway.
 
 Tot ce tine de python se va instala folosind uv: UV (Uniform Version Manager) is an all-in-one, ultra-fast Python package and project manager developed by Astral, aiming to replace tools like pip, venv, pipx, and poetry with a single, faster solution written in Rust.
@@ -348,7 +348,7 @@ solar/
 - [x] Database integration with Prisma
 - [x] CSR Architecture in SvelteKit (Controller/Service/Repository)
 - [x] Python worker as ML microservice
-- [x] PostgreSQL database schema
+- [x] TimescaleDB database schema
 - [x] Reports page with 8 report types
 - [x] Advanced analysis page with forecast visualization
 - [x] Comprehensive Prisma schema (16 models)
@@ -396,10 +396,13 @@ solar/
 
 ### **Running the Application**
 
-#### 1. Start PostgreSQL Database
+#### 1. Start TimescaleDB Database
 ```bash
-# Ensure PostgreSQL is running
+# Ensure TimescaleDB is running (PostgreSQL with TimescaleDB extension)
 # Database: solar_forecast
+# 
+# Health check endpoint: GET /api/timescale/health
+# Performance stats: GET /api/timescale/stats?location_id=1&hours=24
 ```
 
 #### 2. Start Python Worker (ML Microservice)
@@ -431,5 +434,413 @@ npm run dev
 ### **Architecture Summary**
 - **SvelteKit Backend**: Handles all business logic, database operations, API routes
 - **Python Worker**: ML microservice for forecasting, weather data, and analytics
-- **Database**: PostgreSQL with Prisma ORM for type-safe queries
+- **Database**: TimescaleDB (PostgreSQL extension) with Prisma ORM for time-series data
 - **Communication**: SvelteKit services call Python worker via HTTP for ML tasks
+
+## 🏗️ **TIMESCALEDB & PRISMA ORM INTEGRATION**
+
+### **Complete TimescaleDB Optimization Stack**
+The Solar Forecast Platform is fully optimized for time-series data with comprehensive TimescaleDB integration:
+
+#### **Enhanced Prisma Client Configuration** (`src/lib/server/database.ts:10-48`)
+```typescript
+// Production-ready Prisma Client with TimescaleDB optimizations
+export const db = new PrismaClient({
+  // Enhanced logging for TimescaleDB monitoring
+  log: [
+    { emit: 'event', level: 'query' },
+    { emit: 'event', level: 'error' },
+    { emit: 'event', level: 'info' },
+    { emit: 'event', level: 'warn' }
+  ],
+  
+  // Transaction optimization for time-series workloads
+  transactionOptions: {
+    maxWait: 5000,      // 5 seconds max wait
+    timeout: 30000,     // 30 seconds timeout (bulk inserts)
+    isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted
+  }
+});
+```
+
+#### **Intelligent Prisma Middleware** (`src/lib/server/database.ts:83-135`)
+**Automatic Query Optimization for Time-Series Tables:**
+- **Auto-ordering** by `timestamp DESC` for better chunk scanning
+- **Automatic recent data filtering** (7 days) to prevent full table scans
+- **Bulk insert optimization** with timestamp sorting for chunk alignment
+- **Performance monitoring** with slow query detection (>500ms)
+
+**Target Tables:** `forecasts`, `production`, `weather_data`
+
+```typescript
+// Example: Automatic optimization applied to queries
+db.forecast.findMany() 
+// Automatically becomes:
+// db.forecast.findMany({ 
+//   orderBy: { timestamp: 'desc' },
+//   where: { timestamp: { gte: new Date(Date.now() - 7*24*60*60*1000) } }
+// })
+```
+
+#### **Type-Safe TimescaleDB Query Helpers** (`src/lib/server/database.ts:166-360`)
+
+**1. Advanced Time-Bucket Queries:**
+```typescript
+// Aggregated solar production by hour with multiple metrics
+const hourlyProduction = await TimescaleQueries.timeBucket({
+  interval: '1 hour',
+  table: 'production',
+  aggregations: {
+    avg: ['power_mw', 'capacity_factor'],
+    max: ['power_mw'],
+    sum: ['energy_mwh']
+  },
+  where: 'location_id = 1 AND timestamp >= NOW() - INTERVAL \'24 hours\'',
+  limit: 24
+});
+```
+
+**2. Optimized Bulk Inserts:**
+```typescript
+// High-performance bulk insert with validation and sorting
+const result = await TimescaleQueries.bulkInsert('forecasts', forecastData, {
+  batchSize: 1000,
+  onConflict: 'ignore',
+  validateTimestamps: true
+});
+// Returns: { inserted: 5000, batches: 5, table: 'forecasts' }
+```
+
+**3. Continuous Aggregates Integration:**
+```typescript
+// Fast dashboard queries using pre-computed aggregates
+const dailyStats = await TimescaleQueries.getProductionDaily(locationId, 30);
+const hourlyStats = await TimescaleQueries.getProductionHourly(locationId, 24);
+```
+
+#### **Production Monitoring & Health Checks**
+
+**1. Real-time Health Monitoring** (`src/routes/api/timescale/health/+server.ts`)
+```typescript
+GET /api/timescale/health
+// Returns comprehensive TimescaleDB status:
+{
+  "connected": true,
+  "timescaleEnabled": true,
+  "hypertables": 3,
+  "compressionEnabled": true,
+  "stats": {
+    "forecasts": { "chunks": 45, "compressed": 12 },
+    "production": { "chunks": 38, "compressed": 10 },
+    "weather_data": { "chunks": 52, "compressed": 18 }
+  }
+}
+```
+
+**2. Performance Statistics API** (`src/routes/api/timescale/stats/+server.ts`)
+```typescript
+GET /api/timescale/stats?location_id=1&hours=24
+// Returns optimized time-series analytics using continuous aggregates
+```
+
+#### **Advanced TimescaleDB Features**
+
+**1. Automatic Hypertable Conversion** (`prisma/migrations/timescaledb_setup.sql`)
+- Converts time-series tables to hypertables with optimal chunk intervals
+- **Forecasts**: 1 day chunks (high-frequency predictions)
+- **Production**: 7 day chunks (actual production data)
+- **Weather**: 1 day chunks (meteorological data)
+
+**2. Continuous Aggregates for Fast Dashboards**
+```sql
+-- Pre-computed hourly production metrics
+CREATE MATERIALIZED VIEW production_hourly AS
+SELECT 
+  time_bucket('1 hour', timestamp) as bucket,
+  location_id,
+  AVG(power_mw) as avg_power_mw,
+  MAX(power_mw) as max_power_mw,
+  AVG(capacity_factor) as avg_capacity_factor,
+  COUNT(*) as sample_count
+FROM production
+GROUP BY bucket, location_id;
+```
+
+**3. Compression & Retention Policies**
+```sql
+-- Automatic compression after 7 days
+SELECT add_compression_policy('forecasts', INTERVAL '7 days');
+
+-- Data retention: 2 years for forecasts, 5 years for production
+SELECT add_retention_policy('forecasts', INTERVAL '2 years');
+SELECT add_retention_policy('production', INTERVAL '5 years');
+```
+
+#### **Performance Optimizations**
+
+**1. Query Optimization:**
+- **Index strategy**: Composite indexes on (location_id, timestamp DESC)
+- **Chunk exclusion**: Automatic time-based partition pruning
+- **Parallel processing**: Chunk-aware parallel query execution
+
+**2. Insert Performance:**
+- **Sorted inserts**: Automatic timestamp ordering for chunk alignment
+- **Batch processing**: Configurable batch sizes (default: 1000 records)
+- **Conflict handling**: Efficient duplicate detection and handling
+
+**3. Memory Management:**
+- **Connection pooling**: Optimized for concurrent time-series workloads
+- **Query caching**: Prisma query result caching
+- **Chunk caching**: TimescaleDB chunk metadata caching
+
+### **Database Commands**
+```bash
+# Initialize TimescaleDB hypertables and optimizations
+npm run db:migrate-timescale
+
+# Validate TimescaleDB configuration and performance
+npm run db:validate-timescale
+
+# Apply production optimizations (compression, retention)
+npm run db:optimize-timescale
+```
+
+### **Monitoring & Observability**
+- **Query performance logging**: Development and production query monitoring
+- **Slow query alerts**: Automatic detection of queries >1000ms in production
+- **Hypertable statistics**: Real-time chunk and compression metrics
+- **Health check endpoints**: Comprehensive TimescaleDB status monitoring
+
+### **Production Readiness Features**
+- **Multi-tenant support**: Isolated data by client_id across all models
+- **Audit logging**: Complete operation tracking in `audit_logs` table  
+- **Data validation**: Timestamp validation and data quality checks
+- **Error handling**: Comprehensive error logging and recovery
+- **Scalability**: Designed for 100 locations × 5 clients × 10 concurrent users
+
+## 🔧 **REPLICATING TIMESCALEDB PATTERNS FOR NEW ENDPOINTS**
+
+### **Step-by-Step Guide to Create TimescaleDB-Optimized API Endpoints**
+
+#### **1. Follow the Established CSR Pattern**
+```
+src/routes/api/[endpoint]/
+├── +server.ts           # Controller (HTTP handling)
+└── service.ts           # Service (business logic)
+└── repository.ts        # Repository (database access)
+```
+
+#### **2. Controller Layer Example** (`src/routes/api/weather/+server.ts`)
+```typescript
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { WeatherService } from '$lib/server/services/weather.service';
+
+export const GET: RequestHandler = async ({ url }) => {
+  try {
+    const locationId = parseInt(url.searchParams.get('location_id') ?? '1');
+    const hours = parseInt(url.searchParams.get('hours') ?? '24');
+    
+    const service = new WeatherService();
+    const weatherData = await service.getRecentWeather(locationId, hours);
+    
+    return json(weatherData);
+  } catch (error) {
+    console.error('Weather API error:', error);
+    return json({ error: 'Failed to fetch weather data' }, { status: 500 });
+  }
+};
+```
+
+#### **3. Service Layer with TimescaleDB Integration** (`src/lib/server/services/weather.service.ts`)
+```typescript
+import { WeatherRepository } from '../repositories/weather.repository';
+import { TimescaleQueries } from '../database';
+
+export class WeatherService {
+  private repository = new WeatherRepository();
+
+  async getRecentWeather(locationId: number, hours: number = 24) {
+    // Use TimescaleDB helper for optimized time-series queries
+    return await TimescaleQueries.timeBucket({
+      interval: '1 hour',
+      table: 'weather_data',
+      aggregations: {
+        avg: ['temperature_c', 'humidity_percent', 'ghi_w_m2'],
+        max: ['wind_speed_ms', 'ghi_w_m2'],
+        min: ['temperature_c']
+      },
+      where: `location_id = ${locationId} AND timestamp >= NOW() - INTERVAL '${hours} hours'`,
+      groupBy: ['location_id'],
+      limit: hours
+    });
+  }
+
+  async bulkInsertWeatherData(weatherData: WeatherData[]) {
+    // Use optimized bulk insert with automatic sorting
+    return await TimescaleQueries.bulkInsert('weather_data', weatherData, {
+      batchSize: 1000,
+      onConflict: 'ignore',
+      validateTimestamps: true
+    });
+  }
+}
+```
+
+#### **4. Repository Layer with Prisma Optimization** (`src/lib/server/repositories/weather.repository.ts`)
+```typescript
+import { db } from '../database';
+import type { WeatherData } from '$lib/types/weather';
+
+export class WeatherRepository {
+  async findRecentByLocation(locationId: number, hours: number = 24) {
+    // Prisma middleware will automatically optimize this query:
+    // - Add timestamp DESC ordering
+    // - Add recent data filter if none specified
+    // - Log performance metrics
+    return await db.weatherData.findMany({
+      where: {
+        locationId,
+        // Optional: explicit time filter (middleware adds default if missing)
+        timestamp: {
+          gte: new Date(Date.now() - hours * 60 * 60 * 1000)
+        }
+      },
+      // orderBy automatically added by middleware if missing
+      take: 1000 // Limit results for performance
+    });
+  }
+
+  async bulkCreate(data: WeatherData[]) {
+    // Middleware will automatically sort by timestamp for optimal chunk insertion
+    return await db.weatherData.createMany({
+      data,
+      skipDuplicates: true // Use for time-series data
+    });
+  }
+}
+```
+
+### **Standard TimescaleDB Query Patterns**
+
+#### **1. Time-Series Aggregations**
+```typescript
+// Hourly aggregations with multiple metrics
+const hourlyStats = await TimescaleQueries.timeBucket({
+  interval: '1 hour',
+  table: 'production',
+  aggregations: {
+    avg: ['power_mw', 'capacity_factor'],
+    max: ['power_mw'],
+    sum: ['energy_mwh'],
+    count: ['*']
+  },
+  where: 'location_id = ? AND timestamp >= ?',
+  groupBy: ['location_id'],
+  limit: 24
+});
+```
+
+#### **2. Recent Data Queries (Leverages Prisma Middleware)**
+```typescript
+// This query is automatically optimized by middleware
+const recentForecasts = await db.forecast.findMany({
+  where: { locationId }
+  // Middleware adds:
+  // - orderBy: { timestamp: 'desc' }
+  // - where.timestamp: { gte: 7 days ago }
+});
+```
+
+#### **3. High-Performance Bulk Operations**
+```typescript
+// Optimized bulk insert with validation
+const result = await TimescaleQueries.bulkInsert('forecasts', data, {
+  batchSize: 2000,      // Larger batches for forecasts
+  onConflict: 'update', // Update existing records
+  validateTimestamps: true
+});
+```
+
+#### **4. Continuous Aggregates for Dashboards**
+```typescript
+// Fast dashboard queries using pre-computed views
+const dailyProduction = await TimescaleQueries.getProductionDaily(locationId, 30);
+const hourlyProduction = await TimescaleQueries.getProductionHourly(locationId, 24);
+```
+
+### **Essential Patterns for New Endpoints**
+
+#### **Always Use These Patterns:**
+1. **Import the enhanced db client**: `import { db, TimescaleQueries } from '$lib/server/database';`
+2. **Leverage automatic optimizations**: Let Prisma middleware optimize your time-series queries
+3. **Use TimescaleQueries for complex operations**: Time buckets, bulk inserts, aggregations
+4. **Add proper error handling**: Catch and log TimescaleDB-specific errors
+5. **Include performance monitoring**: Log slow operations for optimization
+
+#### **Time-Series Table Detection:**
+The middleware automatically detects these tables and applies optimizations:
+- `forecasts` - Solar production forecasts
+- `production` - Actual production data  
+- `weather_data` - Meteorological measurements
+
+#### **Example: Complete Weather Data Endpoint**
+```typescript
+// GET /api/weather/aggregated?location_id=1&interval=1hour&hours=24
+export const GET: RequestHandler = async ({ url }) => {
+  const locationId = parseInt(url.searchParams.get('location_id') ?? '1');
+  const interval = url.searchParams.get('interval') ?? '1 hour';
+  const hours = parseInt(url.searchParams.get('hours') ?? '24');
+
+  try {
+    const aggregatedData = await TimescaleQueries.timeBucket({
+      interval: interval as TimeInterval,
+      table: 'weather_data',
+      aggregations: {
+        avg: ['temperature_c', 'humidity_percent', 'ghi_w_m2', 'dni_w_m2'],
+        max: ['ghi_w_m2', 'wind_speed_ms'],
+        min: ['temperature_c']
+      },
+      where: `location_id = ${locationId} AND timestamp >= NOW() - INTERVAL '${hours} hours'`,
+      groupBy: ['location_id'],
+      limit: hours
+    });
+
+    return json({
+      success: true,
+      data: aggregatedData,
+      metadata: {
+        locationId,
+        interval,
+        hours,
+        recordCount: aggregatedData.length
+      }
+    });
+  } catch (error) {
+    console.error('Weather aggregation error:', error);
+    return json({ 
+      success: false, 
+      error: 'Failed to aggregate weather data' 
+    }, { status: 500 });
+  }
+};
+```
+
+### **Performance Best Practices**
+1. **Always specify time ranges** to leverage chunk exclusion
+2. **Use appropriate aggregation intervals** (15min, 1hour, 1day)
+3. **Limit result sets** with reasonable `take` or `limit` values
+4. **Batch bulk operations** using `TimescaleQueries.bulkInsert()`
+5. **Monitor query performance** through the built-in logging
+
+### **Health Check Integration**
+Add health checks for new time-series tables in `/api/timescale/health`:
+```typescript
+// Add to existing health check endpoint
+const customTableStats = await db.$queryRawUnsafe(`
+  SELECT COUNT(*) as record_count, 
+         MAX(timestamp) as latest_record
+  FROM your_new_table 
+  WHERE timestamp >= NOW() - INTERVAL '24 hours'
+`);
+```

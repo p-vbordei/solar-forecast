@@ -9,7 +9,7 @@
 
 | Component | Status | Port | Notes |
 |-----------|--------|------|-------|
-| PostgreSQL Database | ✅ Running | 5432 | Database created and schema synced |
+| TimescaleDB Database | ✅ Running | 5432 | Database created and schema synced |
 | SvelteKit Application | ✅ Running | 5173 | Frontend and API routes operational |
 | Python Worker | ✅ Running | 8001 | ML microservice ready (models not trained) |
 | Prisma ORM | ✅ Connected | - | Schema generated and synced |
@@ -92,7 +92,7 @@ graph LR
     SK --> Controller[Controller Layer]
     Controller --> Service[Service Layer]
     Service --> Repository[Repository Layer]
-    Repository --> DB[(PostgreSQL:5432)]
+    Repository --> DB[(TimescaleDB:5432)]
     Service --> PW[Python Worker:8001]
     PW --> ML[ML Models]
 ```
@@ -145,7 +145,7 @@ None - System is operational for current phase
 - RESTful API interface
 
 **Database (Port 5432)**
-- PostgreSQL with Prisma ORM
+- TimescaleDB with Prisma ORM
 - Type-safe queries
 - Managed migrations
 - Connection pooling

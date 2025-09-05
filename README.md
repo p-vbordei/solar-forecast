@@ -20,7 +20,7 @@ A modern solar energy forecasting platform built with SvelteKit, featuring real-
 - **Frontend**: SvelteKit 2.0 + TypeScript
 - **Styling**: Tailwind CSS (Dark theme)
 - **Backend**: SvelteKit API Routes (CSR Pattern)
-- **Database**: PostgreSQL + Prisma ORM
+- **Database**: TimescaleDB + Prisma ORM
 - **ML Microservice**: FastAPI (Python) - ML/Analytics only
 - **Architecture**: 
   - **SvelteKit**: Full-stack with Controller/Service/Repository layers
@@ -30,7 +30,7 @@ A modern solar energy forecasting platform built with SvelteKit, featuring real-
 
 - Node.js 18+ 
 - Python 3.11+
-- PostgreSQL 14+
+- TimescaleDB (PostgreSQL 14+ with TimescaleDB extension)
 - Redis (optional, for caching)
 - UV (Python package manager)
 
@@ -54,12 +54,23 @@ cp .env.example .env
 
 4. **Setup database**
 ```bash
-# Create PostgreSQL database
+# Create TimescaleDB database
 createdb solar_forecast
+# Enable TimescaleDB extension
+psql -d solar_forecast -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
 
 # Run Prisma migrations
 npx prisma generate
 npx prisma db push
+
+# Initialize TimescaleDB (convert tables to hypertables)
+npm run db:migrate-timescale
+
+# Validate TimescaleDB configuration
+npm run db:validate-timescale
+
+# Apply production optimizations (optional but recommended)
+npm run db:optimize-timescale
 ```
 
 5. **Setup Python Worker** (in separate terminal)

@@ -29,7 +29,7 @@ The Solar Forecast Platform is a modern, microservices-based application for sol
 └─────────────┼───────────────────────┼───────────────────────────┘
               │                       │ HTTP (Port 8001)
 ┌─────────────▼───────────┐  ┌───────▼────────────────────────────┐
-│   PostgreSQL Database   │  │   Python Worker Microservice       │
+│   TimescaleDB Database  │  │   Python Worker Microservice       │
 │     (Port 5432)         │  │        (FastAPI - Port 8001)       │
 │  ┌──────────────────┐   │  │  ┌─────────────────────────────┐  │
 │  │ Tables:          │   │  │  │ ML Modules:                 │  │
@@ -147,7 +147,7 @@ Pure microservice for ML and analytics tasks. It does NOT handle business logic 
 - Does not directly access the database
 - Stateless operations
 
-### 3. Database (PostgreSQL with Prisma)
+### 3. Database (TimescaleDB with Prisma)
 
 #### Schema Management
 - **Prisma Schema**: `prisma/schema.prisma`
@@ -172,7 +172,7 @@ Pure microservice for ML and analytics tasks. It does NOT handle business logic 
    - Calls Repository for location data
    - Calls Python Worker for forecast
    - Combines results
-4. **Repository**: Queries PostgreSQL via Prisma
+4. **Repository**: Queries TimescaleDB via Prisma
 5. **Python Worker**: Generates ML prediction
 6. **Response**: Combined data returned to client
 
@@ -184,7 +184,7 @@ Pure microservice for ML and analytics tasks. It does NOT handle business logic 
    - Validates business rules
    - Creates location via Repository
    - Initializes ML model in Python Worker
-4. **Repository**: Inserts into PostgreSQL
+4. **Repository**: Inserts into TimescaleDB
 5. **Python Worker**: Prepares model for new location
 6. **Response**: Created location returned
 
@@ -210,7 +210,7 @@ PORT=8001
 
 1. **Database**:
 ```bash
-# Ensure PostgreSQL is running
+# Ensure TimescaleDB is running (PostgreSQL with TimescaleDB extension)
 psql -U postgres -c "CREATE DATABASE solar_forecast;" 2>/dev/null || true
 ```
 
@@ -303,7 +303,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
 ### Recommended Setup
 - **SvelteKit**: Vercel/Netlify or containerized
 - **Python Worker**: Docker container on Railway/Fly.io
-- **Database**: Railway PostgreSQL or Supabase
+- **Database**: Railway TimescaleDB (PostgreSQL + TimescaleDB extension)
 - **Redis**: Railway Redis (for caching)
 
 ### Scaling Considerations
@@ -342,7 +342,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
 ### Common Issues
 
 1. **Database Connection Failed**:
-   - Check PostgreSQL is running
+   - Check TimescaleDB is running
    - Verify DATABASE_URL in .env
    - Run `npx prisma db push`
 

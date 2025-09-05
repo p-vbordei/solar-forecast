@@ -17,7 +17,10 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "db:init-timescale": "psql $DATABASE_URL -f scripts/init-timescaledb.sql"
+    "db:init-timescale": "psql $DATABASE_URL -f scripts/init-timescaledb.sql",
+    "db:migrate-timescale": "psql $DATABASE_URL -f prisma/migrations/timescaledb_setup.sql",
+    "db:validate-timescale": "node scripts/validate-timescaledb.js",
+    "db:optimize-timescale": "psql $DATABASE_URL -f scripts/optimize-timescaledb.sql"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.0.0",

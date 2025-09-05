@@ -1,0 +1,88 @@
+# Railway configuration for Solar Forecast Platform with TimescaleDB
+version: "2"
+
+services:
+  # Main SvelteKit Application
+  app:
+    build:
+      builder: dockerfile
+      dockerfilePath: Dockerfile
+    
+    # Health check configuration
+    healthcheck:
+      path: /health
+      timeout: 30
+      interval: 30
+      retries: 3
+      start_period: 10
+
+    # Deployment configuration
+    deploy:
+      replicas: 1
+      strategy: rolling
+      restart_policy: on_failure
+      max_retries: 10
+
+    # Required environment variables
+    variables:
+      NODE_ENV: production
+      PORT: ${{ PORT }}
+      
+      # TimescaleDB connection from Railway service
+      DATABASE_URL: ${{ TimescaleDB.DATABASE_URL }}
+      DIRECT_URL: ${{ TimescaleDB.DATABASE_URL }}
+      
+      # Optional: Public database URL for external tools
+      DATABASE_PUBLIC_URL: ${{ TimescaleDB.DATABASE_PUBLIC_URL }}
+      
+      # Application secrets (set in Railway dashboard)
+      JWT_SECRET: ${{ JWT_SECRET }}
+      OPENWEATHER_API_KEY: ${{ OPENWEATHER_API_KEY }}
+      
+      # Optional: Python worker URL (if deployed separately)  
+      PYTHON_WORKER_URL: ${{ PYTHON_WORKER_URL }}
+
+  # TimescaleDB Database Service
+  # This will be created automatically when you deploy the TimescaleDB template
+  # The template creates a service named "TimescaleDB" that provides:
+  # - DATABASE_URL: postgresql://railway:password@host:5432/railway
+  # - DATABASE_PUBLIC_URL: for external connections
+  # - All PostgreSQL environment variables (POSTGRES_*, PG*)
+
+# Deployment hooks and scripts
+hooks:
+  # Pre-deployment: Ensure database is ready
+  pre_deploy:
+    - echo "Starting deployment process..."
+    
+  # Post-deployment: Verify services
+  post_deploy:
+    - echo "Deployment completed successfully"
+
+# Volume configuration (TimescaleDB handles this automatically)
+volumes:
+  # TimescaleDB service automatically creates and manages:
+  # - timescale_data: /var/lib/postgresql/data
+  
+# Network configuration
+networks:
+  # Railway automatically creates private network between services
+  # TimescaleDB and App communicate over private network
+  private:
+    driver: railway
+
+# Service dependencies
+dependencies:
+  # App depends on TimescaleDB being ready
+  app:
+    depends_on:
+      - TimescaleDB
+
+# Resource limits (adjust based on needs)
+resources:
+  app:
+    memory: 512M
+    cpu: 0.5
+    
+  # TimescaleDB resource limits are managed by the template
+  # Default: 1GB RAM, shared CPU

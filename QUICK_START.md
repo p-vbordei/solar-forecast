@@ -4,7 +4,7 @@
 
 ### Step 1: Start Database
 ```bash
-# Ensure PostgreSQL is running
+# Ensure TimescaleDB is running (PostgreSQL with TimescaleDB extension)
 # If not installed: brew install postgresql@14 && brew services start postgresql@14
 psql -U postgres -c "SELECT 1;" # Test connection
 ```
@@ -53,7 +53,7 @@ solar/
 ## 🏗️ Architecture Summary
 
 ```
-Browser → SvelteKit (5173) → Service Layer → Repository (Prisma) → PostgreSQL
+Browser → SvelteKit (5173) → Service Layer → Repository (Prisma) → TimescaleDB
                             ↓
                       Python Worker (8001)
                       (ML/Analytics only)
@@ -73,6 +73,9 @@ Browser → SvelteKit (5173) → Service Layer → Repository (Prisma) → Postg
 npx prisma studio          # Visual database browser
 npx prisma db push        # Sync schema with database
 npx prisma generate       # Regenerate Prisma client
+npm run db:migrate-timescale # Initialize TimescaleDB hypertables
+npm run db:validate-timescale # Validate TimescaleDB setup
+npm run db:optimize-timescale # Apply production optimizations
 ```
 
 ### Development
@@ -95,7 +98,7 @@ curl http://localhost:8001/health        # Test Python worker
 
 ### Problem: "Database connection failed"
 ```bash
-# Check PostgreSQL is running
+# Check TimescaleDB is running
 pg_isready
 # If not: brew services start postgresql@14
 

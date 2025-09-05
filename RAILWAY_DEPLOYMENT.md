@@ -57,11 +57,46 @@ railway up
 
 ## Step 3: Configure Database
 
-### Automatic PostgreSQL Setup
+### TimescaleDB Setup (Required for Time-Series Data)
 
-1. In Railway dashboard, click **"New"** → **"Database"** → **"Add PostgreSQL"**
-2. Railway automatically injects `DATABASE_URL` environment variable
-3. Database migrations run automatically on deploy
+**Method 1: Railway TimescaleDB Template (Recommended)**
+1. In Railway dashboard, click **"New Project"**
+2. Select **"Deploy a Template"**  
+3. Search for "TimescaleDB" and select the official template
+4. Deploy using `timescale/timescaledb:latest-pg16` image
+5. Railway automatically provides:
+   - `DATABASE_URL` - Full connection string for Prisma
+   - `POSTGRES_DB=railway` - Database name
+   - `POSTGRES_USER=postgres` - Username
+   - `POSTGRES_PASSWORD` - Auto-generated secure password
+   - `POSTGRES_HOST` - Internal hostname
+   - `POSTGRES_PORT=5432` - Port
+
+**Method 2: Custom TimescaleDB Service**
+```yaml
+# Add this service to your Railway project
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: solar_forecast
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    restart: always
+```
+
+**Method 3: PostgreSQL + TimescaleDB Extension**
+1. Add PostgreSQL database in Railway
+2. Connect via Railway CLI and enable TimescaleDB:
+   ```sql
+   -- Connect: railway connect
+   CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+   SELECT timescaledb_version();
+   ```
+
+**⚠️ Important:** TimescaleDB is required for optimal time-series performance with forecast and production data. Regular PostgreSQL will work but won't have the time-series optimizations.
 
 ### Manual Database (if needed)
 
@@ -80,6 +115,10 @@ In Railway project settings → Variables, add:
 NODE_ENV=production
 JWT_SECRET=<generate-32-char-random-string>
 OPENWEATHER_API_KEY=<your-openweather-api-key>
+
+# TimescaleDB Connection (auto-provided by Railway TimescaleDB service)
+DATABASE_URL=${{TimescaleDB.DATABASE_URL}}
+DIRECT_URL=${{TimescaleDB.DATABASE_URL}}
 ```
 
 ### Optional Variables
@@ -89,6 +128,9 @@ PYTHON_WORKER_URL=https://your-python-worker.railway.app
 
 # Public API URL (auto-set by Railway)
 PUBLIC_API_URL=https://your-app.railway.app
+
+# TimescaleDB Public URL (if external connections needed)
+DATABASE_PUBLIC_URL=${{TimescaleDB.DATABASE_PUBLIC_URL}}
 ```
 
 ### Generate Secure Keys
@@ -188,6 +230,9 @@ npx prisma migrate deploy
 
 # Generate Prisma client (if needed)
 npx prisma generate
+
+# Initialize TimescaleDB hypertables (IMPORTANT for time-series performance)
+npm run db:init-timescale
 
 # Seed database (if you have seed data)
 npm run db:seed
@@ -305,7 +350,7 @@ Before going live:
 Railway Service 1: SvelteKit App + Python Worker
 ├── Frontend (SvelteKit)
 ├── API Routes (/src/routes/api/)
-├── Database (PostgreSQL)
+├── Database (TimescaleDB)
 └── Python Worker (subprocess/integrated)
 ```
 
@@ -313,7 +358,7 @@ Railway Service 1: SvelteKit App + Python Worker
 ```
 Railway Service 1: SvelteKit Frontend + API
 Railway Service 2: Python Worker (FastAPI)
-Railway Service 3: PostgreSQL Database
+Railway Service 3: TimescaleDB Database
 ```
 
 ## Support Resources
@@ -341,14 +386,26 @@ railway connect           # Connect to database
 
 ### Environment Variables
 ```bash
-DATABASE_URL              # Auto-provided by Railway
+DATABASE_URL              # Auto-provided by TimescaleDB service
 DIRECT_URL                # Same as DATABASE_URL for Prisma
+DATABASE_PUBLIC_URL       # Public URL for external connections
 PORT                      # Auto-provided by Railway (3000)
 NODE_ENV                  # Set to "production"
 JWT_SECRET                # Your secret key
 OPENWEATHER_API_KEY       # Weather data API key
 PUBLIC_API_URL            # Auto-set to Railway domain
 PYTHON_WORKER_URL         # If using separate worker service
+
+# TimescaleDB specific (auto-configured)
+PGDATA                    # PostgreSQL data directory
+PGHOST                    # Database host (private network)
+PGPORT                    # Database port (5432)
+PGUSER                    # Database username (railway)
+PGDATABASE                # Database name (railway)
+PGPASSWORD                # Auto-generated secure password
+POSTGRES_DB               # Same as PGDATABASE
+POSTGRES_USER             # Same as PGUSER
+POSTGRES_PASSWORD         # Same as PGPASSWORD
 ```
 
 ### Solar Platform Specific
@@ -358,7 +415,7 @@ PYTHON_WORKER_URL         # If using separate worker service
 2. **Reports** - 8 report types with filtering
 3. **Analysis** - Forecast visualization with ECharts
 4. **Health Check** - `/health` endpoint monitoring
-5. **Database** - Prisma ORM with PostgreSQL
+5. **Database** - Prisma ORM with TimescaleDB
 
 #### Performance Expectations
 - **Build Time**: 2-3 minutes (includes Prisma generation)

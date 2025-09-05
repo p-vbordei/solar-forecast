@@ -1,116 +1,287 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { HistoricalService } from '$lib/server/services/historical.service';
+import { HistoricalRepository } from '$lib/server/repositories/historical.repository';
+import type { HistoricalDataRequest } from '$lib/types/historical';
+import { AggregationType, DataQualityFilter } from '$lib/types/historical';
+
+// Initialize service with CSR pattern
+const historicalRepository = new HistoricalRepository();
+const historicalService = new HistoricalService(historicalRepository);
 
 export const GET: RequestHandler = async ({ url }) => {
   try {
+    // Extract and validate query parameters
     const location = url.searchParams.get('location');
+    const locationIds = url.searchParams.get('locationIds');
     const interval = url.searchParams.get('interval') || 'hourly';
     const start = url.searchParams.get('start');
     const end = url.searchParams.get('end');
+    const timezone = url.searchParams.get('timezone') || 'UTC';
+    const includeWeather = url.searchParams.get('includeWeather') === 'true';
+    const includeForecast = url.searchParams.get('includeForecast') === 'true';
+    const includeStatistics = url.searchParams.get('includeStatistics') === 'true';
+    const dataQuality = url.searchParams.get('dataQuality') || 'exclude_poor';
 
-    if (!location || !start || !end) {
+    // Validate required parameters
+    if ((!location && !locationIds) || !start || !end) {
       return json(
-        { success: false, error: 'Missing required parameters: location, start, end' },
+        { 
+          success: false, 
+          error: 'Missing required parameters. Provide location/locationIds, start, and end dates.'
+        },
         { status: 400 }
       );
     }
 
-    // Mock historical data - replace with actual database query
-    const historicalData = generateMockHistoricalData(start, end, interval);
-
-    return json({
-      success: true,
-      data: historicalData,
-      metadata: {
-        location,
-        interval,
-        start,
-        end,
-        dataPoints: historicalData.length,
-        dataType: 'historical_production'
+    // Parse location IDs
+    let parsedLocationIds: number[] = [];
+    try {
+      if (locationIds) {
+        parsedLocationIds = locationIds.split(',').map(id => parseInt(id.trim()));
+      } else if (location) {
+        parsedLocationIds = [parseInt(location)];
       }
-    });
+
+      // Validate location IDs are numbers
+      if (parsedLocationIds.some(id => isNaN(id))) {
+        throw new Error('Invalid location ID format');
+      }
+    } catch (error) {
+      return json(
+        { success: false, error: 'Invalid location ID format. Use comma-separated integers.' },
+        { status: 400 }
+      );
+    }
+
+    // Map interval parameter to AggregationType
+    let aggregationType: AggregationType;
+    switch (interval.toLowerCase()) {
+      case '15min':
+      case 'fifteen_minutes':
+        aggregationType = AggregationType.FIFTEEN_MINUTES;
+        break;
+      case '30min':
+      case 'thirty_minutes':
+        aggregationType = AggregationType.THIRTY_MINUTES;
+        break;
+      case 'hourly':
+      case '1h':
+        aggregationType = AggregationType.HOURLY;
+        break;
+      case 'daily':
+      case '1d':
+        aggregationType = AggregationType.DAILY;
+        break;
+      case 'weekly':
+      case '1w':
+        aggregationType = AggregationType.WEEKLY;
+        break;
+      case 'monthly':
+      case '1m':
+        aggregationType = AggregationType.MONTHLY;
+        break;
+      case 'raw':
+        aggregationType = AggregationType.RAW;
+        break;
+      default:
+        aggregationType = AggregationType.HOURLY;
+    }
+
+    // Map data quality filter
+    let qualityFilter: DataQualityFilter[];
+    switch (dataQuality) {
+      case 'good_only':
+        qualityFilter = [DataQualityFilter.GOOD_ONLY];
+        break;
+      case 'include_all':
+        qualityFilter = [DataQualityFilter.INCLUDE_ALL];
+        break;
+      case 'exclude_poor':
+      default:
+        qualityFilter = [DataQualityFilter.EXCLUDE_POOR];
+    }
+
+    // Build request object
+    const request: HistoricalDataRequest = {
+      locationIds: parsedLocationIds,
+      startDate: start,
+      endDate: end,
+      timezone,
+      aggregation: aggregationType,
+      includeProduction: true, // Always include production data
+      includeWeather,
+      includeForecast,
+      includeAccuracy: includeForecast, // Include accuracy if forecast is requested
+      includeMetadata: includeStatistics,
+      dataQualityFilter: qualityFilter
+    };
+
+    // Get historical data using service (CSR pattern)
+    const response = await historicalService.getHistoricalData(request);
+
+    // Transform response for backward compatibility with existing frontend
+    if (response.success) {
+      const transformedData = response.data.map(point => ({
+        timestamp: point.timestamp,
+        location_id: point.locationId,
+        location_name: point.locationName,
+        production: point.production?.powerMW || 0,
+        efficiency: point.production?.efficiency || 0,
+        availability: point.production?.availability || 0,
+        capacity_factor: point.production?.capacityFactor || 0,
+        performance_ratio: point.production?.performanceRatio || 0,
+        energy_yield: point.production?.energyMWh || 0,
+        // Weather data (if included)
+        ...(point.weather && {
+          irradiance_actual: point.weather.ghi || 0,
+          temperature_avg: point.weather.temperature || 0,
+          wind_speed_avg: point.weather.windSpeed || 0
+        }),
+        // Forecast data (if included)
+        ...(point.forecast && {
+          forecast_production: point.forecast.powerMW || 0,
+          forecast_confidence: point.forecast.confidenceLevel || 0
+        }),
+        // Data quality
+        data_quality: point.dataQuality.overall,
+        maintenance_flag: false, // Would be derived from alerts/maintenance logs
+        anomaly_detected: point.dataQuality.overall === 'poor'
+      }));
+
+      return json({
+        success: true,
+        data: transformedData,
+        metadata: {
+          ...response.metadata,
+          // Legacy compatibility fields
+          location: parsedLocationIds.length === 1 ? parsedLocationIds[0].toString() : 'multiple',
+          interval,
+          dataPoints: transformedData.length,
+          dataType: 'historical_production'
+        },
+        statistics: response.statistics
+      });
+    } else {
+      return json(response, { status: 500 });
+    }
+
   } catch (error) {
-    console.error('Error fetching historical data:', error);
+    console.error('Historical data API error:', error);
+    
+    // Provide specific error messages for common issues
+    let errorMessage = 'Failed to fetch historical data';
+    if (error instanceof Error) {
+      if (error.message.includes('Invalid date range')) {
+        errorMessage = 'Invalid date range. Ensure start date is before end date and within 5-year limit.';
+      } else if (error.message.includes('location ID')) {
+        errorMessage = 'Invalid location ID. Ensure location exists and you have access.';
+      } else if (error.message.includes('Raw data queries')) {
+        errorMessage = 'Raw data requests are limited to 30 days maximum. Use aggregated data for longer periods.';
+      } else if (error.message.includes('Maximum')) {
+        errorMessage = error.message; // Pass through limit messages
+      } else {
+        errorMessage = error.message;
+      }
+    }
+
     return json(
-      { success: false, error: 'Failed to fetch historical data' },
+      { 
+        success: false, 
+        error: errorMessage,
+        data: [],
+        metadata: {
+          request: {
+            locationIds: [],
+            startDate: url.searchParams.get('start') || '',
+            endDate: url.searchParams.get('end') || '',
+            aggregation: AggregationType.HOURLY,
+            timezone: 'UTC'
+          },
+          response: {
+            totalRecords: 0,
+            locations: [],
+            dateRange: {
+              start: url.searchParams.get('start') || '',
+              end: url.searchParams.get('end') || '',
+              dayCount: 0
+            },
+            processing: {
+              queryTimeMs: 0,
+              generatedAt: new Date().toISOString()
+            }
+          }
+        }
+      },
       { status: 500 }
     );
   }
 };
 
-function generateMockHistoricalData(start: string, end: string, interval: string) {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  const data = [];
-  
-  let currentDate = new Date(startDate);
-  let intervalMs: number;
-  
-  switch (interval) {
-    case '15min':
-      intervalMs = 15 * 60 * 1000;
-      break;
-    case 'hourly':
-      intervalMs = 60 * 60 * 1000;
-      break;
-    case 'daily':
-      intervalMs = 24 * 60 * 60 * 1000;
-      break;
-    case 'weekly':
-      intervalMs = 7 * 24 * 60 * 60 * 1000;
-      break;
-    default:
-      intervalMs = 60 * 60 * 1000;
-  }
-  
-  // Base capacity for the location (MW)
-  const baseCapacity = 50;
-  
-  while (currentDate <= endDate) {
-    const hour = currentDate.getHours();
-    const dayOfYear = Math.floor((currentDate.getTime() - new Date(currentDate.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
+export const POST: RequestHandler = async ({ request }) => {
+  try {
+    const body = await request.json();
     
-    let production = 0;
-    let efficiency = 0;
-    let availability = 0.95 + Math.random() * 0.05; // 95-100% availability
-    
-    // Simulate historical production patterns
-    if (hour >= 6 && hour <= 18) {
-      const solarFactor = Math.sin((hour - 6) / 12 * Math.PI);
-      const seasonalFactor = 0.7 + 0.3 * Math.sin((dayOfYear - 80) / 365 * 2 * Math.PI); // Peak in summer
-      const weatherVariability = 0.7 + Math.random() * 0.6; // Weather impact
-      const degradationFactor = 0.98; // Slight degradation over time
-      
-      production = baseCapacity * solarFactor * seasonalFactor * weatherVariability * degradationFactor * availability;
-      efficiency = (production / baseCapacity) * 100;
+    // Validate request body
+    if (!body || typeof body !== 'object') {
+      return json(
+        { success: false, error: 'Invalid request body' },
+        { status: 400 }
+      );
     }
-    
-    // Add some realistic variations and occasional maintenance periods
-    if (Math.random() < 0.01) { // 1% chance of maintenance
-      production *= 0.1;
-      availability *= 0.5;
-      efficiency *= 0.1;
-    }
-    
-    data.push({
-      timestamp: currentDate.toISOString(),
-      production: Math.max(0, Math.round(production * 100) / 100),
-      efficiency: Math.max(0, Math.round(efficiency * 100) / 100),
-      availability: Math.round(availability * 1000) / 1000,
-      capacity_factor: Math.round((production / baseCapacity) * 10000) / 100,
-      performance_ratio: Math.round((efficiency / 85) * 1000) / 1000, // Assuming 85% expected efficiency
-      energy_yield: interval === 'daily' ? production * 24 : interval === 'hourly' ? production : production / 4,
-      irradiance_actual: 200 + Math.random() * 800, // Historical irradiance
-      temperature_avg: 15 + Math.sin(dayOfYear / 365 * 2 * Math.PI) * 20 + (Math.random() - 0.5) * 10,
-      wind_speed_avg: 5 + Math.random() * 10,
-      data_quality: Math.random() > 0.05 ? 'good' : 'fair', // 95% good quality
-      maintenance_flag: Math.random() < 0.005, // 0.5% maintenance events
-      anomaly_detected: Math.random() < 0.02 // 2% anomaly detection
+
+    // Use POST body directly as HistoricalDataRequest
+    const historicalRequest: HistoricalDataRequest = {
+      locationIds: body.locationIds,
+      locationId: body.locationId,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      timezone: body.timezone || 'UTC',
+      aggregation: body.aggregation || AggregationType.HOURLY,
+      includeProduction: body.includeProduction !== false, // Default true
+      includeWeather: body.includeWeather || false,
+      includeForecast: body.includeForecast || false,
+      includeAccuracy: body.includeAccuracy || false,
+      includeMetadata: body.includeMetadata || false,
+      dataQualityFilter: body.dataQualityFilter || [DataQualityFilter.EXCLUDE_POOR],
+      minCapacityFactor: body.minCapacityFactor,
+      maxCapacityFactor: body.maxCapacityFactor
+    };
+
+    // Get historical data using service
+    const response = await historicalService.getHistoricalData(historicalRequest);
+
+    return json(response, { 
+      status: response.success ? 200 : 500 
     });
-    
-    currentDate = new Date(currentDate.getTime() + intervalMs);
+
+  } catch (error) {
+    console.error('Historical data POST API error:', error);
+    return json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to process request',
+        data: [],
+        metadata: {
+          request: {
+            locationIds: [],
+            startDate: '',
+            endDate: '',
+            aggregation: AggregationType.HOURLY,
+            timezone: 'UTC'
+          },
+          response: {
+            totalRecords: 0,
+            locations: [],
+            dateRange: { start: '', end: '', dayCount: 0 },
+            processing: {
+              queryTimeMs: 0,
+              generatedAt: new Date().toISOString()
+            }
+          }
+        }
+      },
+      { status: 500 }
+    );
   }
-  
-  return data;
-}
+};
