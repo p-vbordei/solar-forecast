@@ -1,7 +1,6 @@
 <script lang="ts">
 	import MetricCard from '$lib/components/dashboard/MetricCard.svelte';
-	import ProductionChart from '$lib/components/dashboard/ProductionChart.svelte';
-	import LocationsMap from '$lib/components/dashboard/LocationsMap.svelte';
+	import SolarForecast from '$lib/components/dashboard/SolarForecast.svelte';
 	import ForecastAccuracy from '$lib/components/dashboard/ForecastAccuracy.svelte';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
@@ -53,19 +52,14 @@
 	
 	<!-- Main Content Grid -->
 	<div class="grid grid-cols-1 gap-6">
-		<!-- Production Chart -->
+		<!-- Solar Forecast -->
 		<div>
-			<ProductionChart />
+			<SolarForecast />
 		</div>
 	</div>
 	
 	<!-- Secondary Grid -->
-	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-		<!-- Locations Map -->
-		<div>
-			<LocationsMap />
-		</div>
-		
+	<div class="grid grid-cols-1 gap-6">
 		<!-- Forecast Accuracy -->
 		<div>
 			<ForecastAccuracy />
@@ -173,20 +167,16 @@
 					<div>
 						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
 							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
-							<span>Interactive Charts & Maps</span>
+							<span>Interactive Charts & Analysis</span>
 						</h4>
 						<div class="space-y-2 text-sm">
 							<div class="flex justify-between">
-								<span class="text-cyan"><strong>Production Chart:</strong></span>
-								<span class="text-soft-blue/80">24-hour energy generation trends</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-cyan"><strong>Locations Map:</strong></span>
-								<span class="text-soft-blue/80">Geographic distribution of solar farms</span>
+								<span class="text-cyan"><strong>Solar Forecast:</strong></span>
+								<span class="text-soft-blue/80">Weather parameters driving production forecasts</span>
 							</div>
 							<div class="flex justify-between">
 								<span class="text-cyan"><strong>Forecast Accuracy:</strong></span>
-								<span class="text-soft-blue/80">Prediction vs actual performance</span>
+								<span class="text-soft-blue/80">Prediction vs actual performance analysis</span>
 							</div>
 						</div>
 					</div>
