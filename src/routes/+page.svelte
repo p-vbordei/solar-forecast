@@ -1,7 +1,6 @@
 <script lang="ts">
 	import MetricCard from '$lib/components/dashboard/MetricCard.svelte';
 	import SolarForecast from '$lib/components/dashboard/SolarForecast.svelte';
-	import ForecastAccuracy from '$lib/components/dashboard/ForecastAccuracy.svelte';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
 	
@@ -58,13 +57,6 @@
 		</div>
 	</div>
 	
-	<!-- Secondary Grid -->
-	<div class="grid grid-cols-1 gap-6">
-		<!-- Forecast Accuracy -->
-		<div>
-			<ForecastAccuracy />
-		</div>
-	</div>
 	
 	<!-- Quick Actions -->
 	<div class="card-glass">
@@ -173,10 +165,6 @@
 							<div class="flex justify-between">
 								<span class="text-cyan"><strong>Solar Forecast:</strong></span>
 								<span class="text-soft-blue/80">Weather parameters driving production forecasts</span>
-							</div>
-							<div class="flex justify-between">
-								<span class="text-cyan"><strong>Forecast Accuracy:</strong></span>
-								<span class="text-soft-blue/80">Prediction vs actual performance analysis</span>
 							</div>
 						</div>
 					</div>

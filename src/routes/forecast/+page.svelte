@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import ProductionChart from '$lib/components/dashboard/ProductionChart.svelte';
+	import SolarForecast from '$lib/components/dashboard/SolarForecast.svelte';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
 	
@@ -120,6 +121,11 @@
 				</div>
 			</div>
 		{/if}
+	</div>
+	
+	<!-- Weather Parameters Section -->
+	<div>
+		<SolarForecast />
 	</div>
 	
 	<!-- Forecast Visualization -->
