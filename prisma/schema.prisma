@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider  = "postgresql" // TimescaleDB is compatible with PostgreSQL
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -260,7 +260,7 @@ model Plant {
 // TIME SERIES DATA MODELS
 // ========================================
 
-// Forecast Data (TimescaleDB hypertable recommended)  
+// Forecast Data (TimescaleDB hypertable - converted automatically)  
 model Forecast {
   id                String    @id @default(uuid())
   timestamp         DateTime
@@ -364,7 +364,7 @@ enum ModelType {
   STATISTICAL
 }
 
-// Actual Production Data (TimescaleDB hypertable recommended)
+// Actual Production Data (TimescaleDB hypertable - converted automatically)
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
@@ -426,7 +426,7 @@ enum DataQuality {
   INVALID
 }
 
-// Weather Data (TimescaleDB hypertable recommended)
+// Weather Data (TimescaleDB hypertable - converted automatically)
 model WeatherData {
   id                String    @id @default(uuid())
   timestamp         DateTime

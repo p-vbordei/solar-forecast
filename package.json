@@ -16,7 +16,8 @@
     "db:push": "prisma db push",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:init-timescale": "psql $DATABASE_URL -f scripts/init-timescaledb.sql"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.0.0",
@@ -24,6 +25,7 @@
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.4",
     "@types/eslint": "^9.0.0",
+    "@types/node": "^24.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.1.0",

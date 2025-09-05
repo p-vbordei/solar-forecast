@@ -274,7 +274,7 @@ export class LocationService {
 			},
 			
 			// System fields
-			status: input.status || 'commissioning',
+			status: input.status || 'planned',
 			installation_date: input.installation_date ? new Date(input.installation_date) : new Date(),
 			notes: input.notes || [],
 			tags: input.tags || [],
@@ -346,21 +346,17 @@ export class LocationService {
 		return Math.max(0, Math.min(100, score));
 	}
 	
-	// Mock methods for real-time data - in production these would call actual APIs
+	// Real-time data methods using TimescaleDB repository
 	private async getCurrentProduction(locationId: string): Promise<number> {
-		// Mock current production based on capacity and time of day
-		// In production, this would call the Python worker or sensor APIs
-		return Math.random() * 5; // Random production 0-5 MW
+		return await this.repository.getCurrentProduction(locationId);
 	}
 
 	private async getTodayEnergy(locationId: string): Promise<number> {
-		// Mock today's energy production
-		return Math.random() * 40; // Random energy 0-40 MWh
+		return await this.repository.getTodayEnergy(locationId);
 	}
 
 	private async getAlertCount(locationId: string): Promise<number> {
-		// Mock alert count
-		return Math.floor(Math.random() * 3); // 0-2 alerts
+		return await this.repository.getActiveAlertCount(locationId);
 	}
 	
 	// Python worker integration
