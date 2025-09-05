@@ -12,6 +12,7 @@
 	let fileInput: HTMLInputElement;
 	let isUploading = false;
 	let uploadError = '';
+	let showExplanation = false;
 
 	// Available locations (from uploaded data)
 	let availableLocations: string[] = ['all'];
@@ -595,5 +596,323 @@
 		</div>
 	</div>
 
+	<!-- Understanding Historical Data -->
+	<div class="card-glass">
+		<button 
+			on:click={() => showExplanation = !showExplanation}
+			class="flex items-center justify-between w-full text-left"
+		>
+			<div class="flex items-center space-x-3">
+				<div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
+					<svg class="w-4 h-4 text-dark-petrol" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+				</div>
+				<div>
+					<h3 class="text-lg font-semibold text-white">Understanding Historical Data</h3>
+					<p class="text-sm text-soft-blue/80">Click to learn about historical data analysis and upload guide</p>
+				</div>
+			</div>
+			<div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
+				<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+				</svg>
+			</div>
+		</button>
+		
+		{#if showExplanation}
+			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-6">
+				<!-- Data Upload Guide -->
+				<div class="bg-gradient-to-br from-cyan/20 to-teal-dark/40 rounded-xl p-6 border border-cyan/40">
+					<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+						<div class="w-6 h-6 bg-cyan/30 rounded-full flex items-center justify-center">
+							<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+							</svg>
+						</div>
+						<span>Step-by-Step Upload Guide</span>
+					</h4>
+					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+						<div class="space-y-4">
+							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
+								<div class="flex items-center space-x-2 mb-2">
+									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">1</div>
+									<h5 class="font-medium text-cyan">Generate Template</h5>
+								</div>
+								<p class="text-sm text-soft-blue/80 mb-2">Use the Template Generator above to create a CSV template with your specific requirements:</p>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• Select your location(s)</li>
+									<li>• Choose time aggregation (15min, hourly, daily)</li>
+									<li>• Set your timezone</li>
+									<li>• Pick data types to include</li>
+									<li>• Download the generated template</li>
+								</ul>
+							</div>
+							
+							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
+								<div class="flex items-center space-x-2 mb-2">
+									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">2</div>
+									<h5 class="font-medium text-cyan">Fill Template</h5>
+								</div>
+								<p class="text-sm text-soft-blue/80 mb-2">Open the template in Excel or any CSV editor and fill in your historical data:</p>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• Keep the header row unchanged</li>
+									<li>• Use ISO datetime format (YYYY-MM-DDTHH:MM:SS)</li>
+									<li>• Enter numeric values without thousand separators</li>
+									<li>• Leave empty cells for missing data</li>
+								</ul>
+							</div>
+						</div>
+						
+						<div class="space-y-4">
+							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
+								<div class="flex items-center space-x-2 mb-2">
+									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">3</div>
+									<h5 class="font-medium text-cyan">Upload Data</h5>
+								</div>
+								<p class="text-sm text-soft-blue/80 mb-2">Upload your completed CSV file using the upload section above:</p>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• Click the upload button</li>
+									<li>• Select your completed CSV file</li>
+									<li>• Wait for automatic validation</li>
+									<li>• Check for any upload errors</li>
+								</ul>
+							</div>
+							
+							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
+								<div class="flex items-center space-x-2 mb-2">
+									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">4</div>
+									<h5 class="font-medium text-cyan">Analyze Results</h5>
+								</div>
+								<p class="text-sm text-soft-blue/80 mb-2">View and analyze your uploaded historical data:</p>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• Use the chart visualization above</li>
+									<li>• Apply different time aggregations</li>
+									<li>• Filter by location</li>
+									<li>• Export processed results</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Introduction Section -->
+				<div class="bg-gradient-to-br from-teal-dark/40 to-dark-petrol/60 rounded-xl p-6 border border-cyan/20">
+					<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+						<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+							<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+							</svg>
+						</div>
+						<span>Historical Data Analytics Platform</span>
+					</h4>
+					<p class="text-sm text-soft-blue/80 leading-relaxed mb-4">
+						The Historical Data Analysis module provides comprehensive tools for analyzing solar production patterns, validating forecast accuracy, and identifying operational optimization opportunities. This platform processes historical production data with multi-temporal granularity analysis, enabling data-driven insights for performance enhancement and predictive modeling improvements.
+					</p>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div class="bg-cyan/10 rounded-lg p-3 border border-cyan/30">
+							<p class="text-xs text-soft-blue/70">
+								<strong class="text-cyan">Data Processing:</strong> Multi-format data ingestion supporting CSV templates with automated validation, cleansing, and normalization for consistent analysis across different time periods and locations.
+							</p>
+						</div>
+						<div class="bg-cyan/10 rounded-lg p-3 border border-cyan/30">
+							<p class="text-xs text-soft-blue/70">
+								<strong class="text-cyan">Temporal Analysis:</strong> Advanced aggregation capabilities from 15-minute intervals to weekly summaries, with intelligent data interpolation and gap-filling for complete historical reconstruction.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					<!-- Data Types Section -->
+					<div class="lg:col-span-2">
+						<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+							<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+								<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+								</svg>
+							</div>
+							<span>Supported Data Categories</span>
+						</h4>
+						<div class="space-y-4">
+							<!-- Production Data -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+									</svg>
+									<span>Production Data</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>Production MW:</strong> Actual power generation in megawatts</li>
+									<li>• <strong>Capacity Factor:</strong> Ratio of actual to maximum possible output</li>
+									<li>• <strong>Performance Ratio:</strong> System efficiency considering environmental conditions</li>
+									<li>• <strong>Availability:</strong> Percentage of time system was operational</li>
+								</ul>
+							</div>
+
+							<!-- Weather Data -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path>
+									</svg>
+									<span>Environmental Data</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>Irradiance Metrics:</strong> GHI, DNI, DHI, and GTI measurements</li>
+									<li>• <strong>Temperature:</strong> Ambient and module temperature data</li>
+									<li>• <strong>Meteorological:</strong> Humidity, pressure, wind speed/direction</li>
+									<li>• <strong>Cloud Coverage:</strong> Low, mid, and high altitude cloud analysis</li>
+								</ul>
+							</div>
+
+							<!-- Forecast Data -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+									</svg>
+									<span>Forecast Analysis</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>Predicted Production:</strong> Forecasted power generation values</li>
+									<li>• <strong>Confidence Intervals:</strong> Statistical confidence bands for predictions</li>
+									<li>• <strong>Model Versioning:</strong> Track different forecast model iterations</li>
+									<li>• <strong>Accuracy Metrics:</strong> MAPE, RMSE, and MAE calculations</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+
+					<!-- Analysis Features -->
+					<div>
+						<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+							<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+								<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+								</svg>
+							</div>
+							<span>Analysis Capabilities</span>
+						</h4>
+						<div class="space-y-3">
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Time Aggregation</h6>
+								<p class="text-xs text-soft-blue/70">
+									Flexible temporal analysis from 15-minute granularity to weekly summaries with intelligent averaging algorithms.
+								</p>
+							</div>
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Multi-Location Analysis</h6>
+								<p class="text-xs text-soft-blue/70">
+									Comparative performance analysis across multiple solar installations with normalized metrics.
+								</p>
+							</div>
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Forecast Validation</h6>
+								<p class="text-xs text-soft-blue/70">
+									Statistical validation of forecast accuracy with detailed error analysis and model performance metrics.
+								</p>
+							</div>
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Data Export</h6>
+								<p class="text-xs text-soft-blue/70">
+									Export processed data in multiple formats (CSV, Excel, PDF) for external analysis and reporting.
+								</p>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Best Practices Section -->
+				<div class="bg-gradient-to-r from-cyan/10 via-teal-dark/20 to-cyan/10 rounded-xl p-6 border border-cyan/30">
+					<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+						<div class="w-6 h-6 bg-cyan/30 rounded-full flex items-center justify-center">
+							<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364-.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+							</svg>
+						</div>
+						<span>Data Upload Best Practices</span>
+					</h4>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div>
+							<h5 class="font-medium text-cyan mb-3">Data Quality Requirements</h5>
+							<ul class="text-sm text-soft-blue/80 space-y-2">
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Temporal Consistency:</strong> Ensure uniform time intervals without gaps</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Units Standardization:</strong> Use consistent units (MW, °C, W/m²)</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Timezone Management:</strong> Maintain consistent timezone throughout data</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Quality Flags:</strong> Include data quality indicators where available</span>
+								</li>
+							</ul>
+						</div>
+						<div>
+							<h5 class="font-medium text-cyan mb-3">Format Specifications</h5>
+							<ul class="text-sm text-soft-blue/80 space-y-2">
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>CSV Format:</strong> Use comma-separated values with header row</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>DateTime Format:</strong> ISO 8601 format (YYYY-MM-DDTHH:MM:SS)</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Numeric Values:</strong> Decimal point notation, no thousand separators</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Missing Data:</strong> Use empty cells or 'null' for missing values</span>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+
+				<!-- Technical Specifications -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+						<h5 class="font-medium text-cyan mb-3 flex items-center space-x-2">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.78 0-2.678-2.153-1.415-3.414l5-5A2 2 0 009 8.172V5L8 4z"></path>
+							</svg>
+							<span>Data Processing Pipeline</span>
+						</h5>
+						<ul class="text-xs text-soft-blue/80 space-y-1">
+							<li>• <strong>Validation:</strong> Automatic data type and range validation</li>
+							<li>• <strong>Cleansing:</strong> Outlier detection and anomaly flagging</li>
+							<li>• <strong>Normalization:</strong> Unit conversion and standardization</li>
+							<li>• <strong>Aggregation:</strong> Temporal rollup with statistical preservation</li>
+						</ul>
+					</div>
+					<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+						<h5 class="font-medium text-cyan mb-3 flex items-center space-x-2">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+							</svg>
+							<span>Quality Assurance</span>
+						</h5>
+						<ul class="text-xs text-soft-blue/80 space-y-1">
+							<li>• <strong>Completeness:</strong> Data gap identification and reporting</li>
+							<li>• <strong>Consistency:</strong> Cross-parameter validation checks</li>
+							<li>• <strong>Accuracy:</strong> Physics-based validation rules</li>
+							<li>• <strong>Traceability:</strong> Full audit trail for all data modifications</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
 
 </div>

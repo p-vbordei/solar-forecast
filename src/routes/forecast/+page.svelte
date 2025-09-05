@@ -23,6 +23,9 @@
 	let forecastAccuracy = 94.5;
 	let isLoadingChart = false;
 	
+	// Weather parameters location selection
+	let selectedWeatherLocation = 1;
+	
 	const locations = [
 		{ id: 1, name: 'Solar Farm Alpha' },
 		{ id: 2, name: 'Solar Station Beta' },
@@ -191,9 +194,27 @@
 		<p class="text-soft-blue/60 mt-2">Generate and analyze solar production forecasts</p>
 	</div>
 	
+	<!-- Weather Location Selector -->
+	<div class="card-glass">
+		<h2 class="text-lg font-semibold text-soft-blue mb-4">Weather Parameters Location</h2>
+		<div class="flex items-center gap-4">
+			<div class="flex-1">
+				<label class="label">Select Location for Weather Data</label>
+				<select class="select" bind:value={selectedWeatherLocation}>
+					{#each locations as location}
+						<option value={location.id}>{location.name}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="text-sm text-soft-blue/60 max-w-xs">
+				<p>Choose which location's weather data to display in the forecast parameters below.</p>
+			</div>
+		</div>
+	</div>
+	
 	<!-- Weather Parameters Section -->
 	<div>
-		<SolarForecast />
+		<SolarForecast locationId={selectedWeatherLocation} />
 	</div>
 	
 	<!-- Configuration Panel -->
@@ -573,7 +594,7 @@
 				</div>
 				<div>
 					<h3 class="text-lg font-semibold text-white">Understanding Solar Forecasting</h3>
-					<p class="text-sm text-soft-blue/80">Learn how to generate and interpret solar production forecasts</p>
+					<p class="text-sm text-soft-blue/80">Comprehensive guide to solar production prediction systems and methodologies</p>
 				</div>
 			</div>
 			<div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
@@ -584,29 +605,299 @@
 		</button>
 		
 		{#if showExplanation}
-			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
-							<span>Forecast Generation</span>
-						</h4>
-						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-							Generate accurate solar production forecasts using machine learning models trained on 
-							weather data, historical production patterns, and seasonal variations.
-						</p>
-					</div>
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
-							<span>Model Performance</span>
-						</h4>
-						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-							Monitor forecast accuracy, model versions, and performance metrics to ensure 
-							reliable predictions for energy trading and grid management decisions.
-						</p>
+			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-6 animate-slide-down">
+				
+				<!-- Introduction Section -->
+				<div class="bg-gradient-to-br from-teal-dark/40 to-dark-petrol/60 rounded-xl p-6 border border-cyan/20">
+					<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+						<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+							<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+							</svg>
+						</div>
+						<span>Professional Solar Forecasting Platform</span>
+					</h4>
+					<p class="text-sm text-soft-blue/80 leading-relaxed mb-4">
+						The Solar Forecasting module represents an advanced predictive analytics platform engineered for professional solar energy operations.
+						Our system integrates meteorological data, machine learning models, and real-time production patterns to generate accurate 
+						forecasts essential for energy trading, grid integration, and operational planning across multi-site solar portfolios.
+					</p>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div class="bg-cyan/10 rounded-lg p-3 border border-cyan/30">
+							<p class="text-xs text-soft-blue/70">
+								<strong class="text-cyan">Predictive Intelligence:</strong> Advanced machine learning algorithms process meteorological forecasts, 
+								historical production data, and real-time system performance to generate accurate 1-7 day production predictions.
+							</p>
+						</div>
+						<div class="bg-cyan/10 rounded-lg p-3 border border-cyan/30">
+							<p class="text-xs text-soft-blue/70">
+								<strong class="text-cyan">Multi-Resolution Analysis:</strong> Forecast generation from 15-minute high-frequency trading intervals 
+								to weekly strategic planning horizons with ensemble model confidence bands and uncertainty quantification.
+							</p>
+						</div>
 					</div>
 				</div>
+
+				<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+					<!-- Forecasting Models & Methods -->
+					<div class="lg:col-span-2">
+						<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+							<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+								<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+								</svg>
+							</div>
+							<span>Forecasting Models & Methodologies</span>
+						</h4>
+						
+						<div class="space-y-4">
+							<!-- Machine Learning Models -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+									</svg>
+									<span>Advanced Machine Learning Models</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>LSTM Neural Networks:</strong> Long Short-Term Memory models for temporal sequence prediction with weather pattern recognition</li>
+									<li>• <strong>Ensemble Methods:</strong> Random Forest and Gradient Boosting algorithms combining multiple predictors for enhanced accuracy</li>
+									<li>• <strong>Deep Learning:</strong> Convolutional Neural Networks for satellite imagery analysis and cloud movement prediction</li>
+									<li>• <strong>Hybrid Models:</strong> Combination of physical and statistical models optimized for specific site characteristics</li>
+								</ul>
+							</div>
+
+							<!-- Physical Models -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+									</svg>
+									<span>Physical & Meteorological Models</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>Irradiance Modeling:</strong> GHI, DNI, and DHI calculations from numerical weather prediction (NWP) models</li>
+									<li>• <strong>Clear Sky Analysis:</strong> Theoretical maximum production calculations with atmospheric corrections</li>
+									<li>• <strong>Cloud Motion Tracking:</strong> Satellite-based cloud movement analysis for sub-hourly forecasting</li>
+									<li>• <strong>Atmospheric Physics:</strong> Aerosol optical depth, precipitable water, and air mass coefficient modeling</li>
+								</ul>
+							</div>
+
+							<!-- Data Integration -->
+							<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+								<h5 class="font-medium text-cyan mb-2 flex items-center space-x-2">
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+									</svg>
+									<span>Multi-Source Data Integration</span>
+								</h5>
+								<ul class="text-xs text-soft-blue/80 space-y-1">
+									<li>• <strong>Weather Data Sources:</strong> ECMWF, GFS, NAM, and high-resolution mesoscale models integration</li>
+									<li>• <strong>Satellite Imagery:</strong> GOES, Meteosat, and Himawari geostationary satellite data processing</li>
+									<li>• <strong>Ground Measurements:</strong> Local weather station, pyranometer, and production data assimilation</li>
+									<li>• <strong>Historical Archives:</strong> Multi-year datasets for seasonal pattern recognition and model training</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+
+					<!-- Forecasting Applications -->
+					<div>
+						<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+							<div class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center">
+								<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+								</svg>
+							</div>
+							<span>Business Applications</span>
+						</h4>
+						
+						<div class="space-y-3">
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Energy Trading & Markets</h6>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• <strong>Day-Ahead Bidding:</strong> Accurate 24-hour forecasts for electricity market participation</li>
+									<li>• <strong>Intraday Optimization:</strong> Real-time forecast updates for trading position adjustments</li>
+									<li>• <strong>Ancillary Services:</strong> Frequency regulation and voltage support capacity planning</li>
+									<li>• <strong>Financial Hedging:</strong> Weather derivative strategies based on production forecasts</li>
+								</ul>
+							</div>
+							
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Grid Integration & Operations</h6>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• <strong>Load Balancing:</strong> Grid stability support through accurate generation predictions</li>
+									<li>• <strong>Transmission Planning:</strong> Network congestion management and power flow optimization</li>
+									<li>• <strong>Storage Optimization:</strong> Battery storage dispatch scheduling for peak shaving and arbitrage</li>
+									<li>• <strong>Curtailment Minimization:</strong> Proactive grid management to reduce renewable energy waste</li>
+								</ul>
+							</div>
+							
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Operations & Maintenance</h6>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• <strong>Maintenance Scheduling:</strong> Optimal timing for equipment servicing during low production periods</li>
+									<li>• <strong>Cleaning Optimization:</strong> Panel cleaning schedules based on soiling and weather forecasts</li>
+									<li>• <strong>Asset Performance:</strong> Expected vs. actual production analysis for fault detection</li>
+									<li>• <strong>Resource Allocation:</strong> Field crew deployment based on forecasted conditions and maintenance needs</li>
+								</ul>
+							</div>
+							
+							<div class="bg-dark-petrol/60 rounded-lg p-3 border border-soft-blue/20">
+								<h6 class="font-medium text-soft-blue mb-2">Financial Planning</h6>
+								<ul class="text-xs text-soft-blue/70 space-y-1">
+									<li>• <strong>Revenue Forecasting:</strong> Monthly and quarterly energy production projections for financial planning</li>
+									<li>• <strong>Performance Guarantees:</strong> Contract compliance monitoring and penalty risk assessment</li>
+									<li>• <strong>Insurance Claims:</strong> Weather-related production loss quantification and documentation</li>
+									<li>• <strong>Investment Analysis:</strong> Site assessment and yield prediction for new installations</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Advanced Features -->
+				<div class="bg-gradient-to-r from-cyan/10 via-teal-dark/20 to-cyan/10 rounded-xl p-6 border border-cyan/30">
+					<h4 class="font-semibold text-white mb-4 flex items-center space-x-2">
+						<div class="w-6 h-6 bg-cyan/30 rounded-full flex items-center justify-center">
+							<svg class="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+							</svg>
+						</div>
+						<span>Advanced Forecasting Capabilities</span>
+					</h4>
+					
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+						<div>
+							<h5 class="font-medium text-cyan mb-3">Uncertainty Quantification</h5>
+							<ul class="text-sm text-soft-blue/80 space-y-2">
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Confidence Intervals:</strong> Statistical uncertainty ranges with probabilistic forecasts</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Scenario Analysis:</strong> Multiple weather scenarios with probability distributions</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Risk Assessment:</strong> Production shortfall probability calculations</span>
+								</li>
+							</ul>
+						</div>
+						
+						<div>
+							<h5 class="font-medium text-cyan mb-3">Real-Time Optimization</h5>
+							<ul class="text-sm text-soft-blue/80 space-y-2">
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Model Updates:</strong> Continuous learning and recalibration based on new data</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Adaptive Algorithms:</strong> Site-specific model optimization and parameter tuning</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Quality Control:</strong> Automated outlier detection and forecast validation</span>
+								</li>
+							</ul>
+						</div>
+						
+						<div>
+							<h5 class="font-medium text-cyan mb-3">Integration & Export</h5>
+							<ul class="text-sm text-soft-blue/80 space-y-2">
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>API Integration:</strong> RESTful APIs for external system connectivity and data exchange</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Data Export:</strong> Multiple formats (CSV, Excel, JSON) with customizable templates</span>
+								</li>
+								<li class="flex items-start space-x-2">
+									<div class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></div>
+									<span><strong>Visualization:</strong> Interactive charts with confidence bands and multiple time resolutions</span>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+
+				<!-- Performance Metrics -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+						<h5 class="font-medium text-cyan mb-3 flex items-center space-x-2">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+							</svg>
+							<span>Forecast Accuracy Metrics</span>
+						</h5>
+						<ul class="text-xs text-soft-blue/80 space-y-1">
+							<li>• <strong>MAPE (Mean Absolute Percentage Error):</strong> Industry-standard accuracy measurement</li>
+							<li>• <strong>RMSE (Root Mean Square Error):</strong> Prediction variance quantification</li>
+							<li>• <strong>MAE (Mean Absolute Error):</strong> Average prediction deviation measurement</li>
+							<li>• <strong>Skill Score:</strong> Performance comparison against persistence and climatological forecasts</li>
+						</ul>
+					</div>
+					
+					<div class="bg-teal-dark/30 rounded-lg p-4 border border-cyan/20">
+						<h5 class="font-medium text-cyan mb-3 flex items-center space-x-2">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<span>Time Resolution Capabilities</span>
+						</h5>
+						<ul class="text-xs text-soft-blue/80 space-y-1">
+							<li>• <strong>15-Minute Resolution:</strong> High-frequency forecasting for intraday trading and grid services</li>
+							<li>• <strong>Hourly Forecasts:</strong> Standard resolution for day-ahead market participation</li>
+							<li>• <strong>Daily Aggregation:</strong> Energy production totals for financial planning</li>
+							<li>• <strong>Weekly/Monthly:</strong> Long-term strategic planning and seasonal analysis</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Platform Features -->
+				<div class="bg-gradient-to-br from-dark-petrol/60 to-teal-dark/40 rounded-xl p-6 border border-cyan/20">
+					<h4 class="font-medium text-white mb-4 flex items-center space-x-2">
+						<ChartBarIcon className="w-5 h-5 text-cyan" />
+						<span>Platform Features & User Experience</span>
+					</h4>
+					
+					<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">Interactive Charts</div>
+							<div class="text-soft-blue/80 text-xs">Advanced ECharts visualization with zoom, pan, and export capabilities</div>
+						</div>
+						
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">Model Comparison</div>
+							<div class="text-soft-blue/80 text-xs">Side-by-side performance analysis of different forecasting models</div>
+						</div>
+						
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">Custom Horizons</div>
+							<div class="text-soft-blue/80 text-xs">Flexible forecast periods from hours to weeks with configurable parameters</div>
+						</div>
+						
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">Weather Integration</div>
+							<div class="text-soft-blue/80 text-xs">Real-time meteorological data overlay and correlation analysis</div>
+						</div>
+						
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">Batch Processing</div>
+							<div class="text-soft-blue/80 text-xs">Multi-location forecast generation with automated scheduling</div>
+						</div>
+						
+						<div class="bg-dark-petrol/50 rounded-lg p-3 border border-cyan/30">
+							<div class="text-cyan font-medium mb-1">API Access</div>
+							<div class="text-soft-blue/80 text-xs">RESTful API endpoints for external integration and automated workflows</div>
+						</div>
+					</div>
+				</div>
+				
 			</div>
 		{/if}
 	</div>

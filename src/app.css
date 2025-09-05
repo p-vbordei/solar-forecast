@@ -227,3 +227,26 @@
 *:focus-visible {
   @apply outline-none ring-2 ring-cyan/50 ring-offset-2 ring-offset-dark-petrol;
 }
+
+/* Custom checkbox styles */
+.custom-checkbox {
+  @apply appearance-none w-4 h-4 border border-cyan/30 rounded bg-dark-petrol 
+         cursor-pointer transition-all duration-200 relative;
+}
+
+.custom-checkbox:checked {
+  @apply bg-cyan border-cyan;
+}
+
+.custom-checkbox:checked::after {
+  content: '✓';
+  @apply absolute inset-0 flex items-center justify-center text-dark-petrol text-xs font-bold;
+}
+
+.custom-checkbox:hover {
+  @apply border-cyan/50;
+}
+
+.custom-checkbox:focus {
+  @apply ring-2 ring-cyan/30 ring-offset-1 ring-offset-dark-petrol;
+}

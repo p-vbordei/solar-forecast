@@ -211,7 +211,7 @@
 <div class="card-glass">
 	<div class="flex items-center justify-between mb-6">
 		<div>
-			<h3 class="text-lg font-semibold text-soft-blue">Data Template Generator</h3>
+			<h3 class="text-lg font-semibold text-soft-blue">Data Upload - Template Generator</h3>
 			<p class="text-sm text-soft-blue/60 mt-1">Create customized CSV templates for historical data upload</p>
 		</div>
 		<button 

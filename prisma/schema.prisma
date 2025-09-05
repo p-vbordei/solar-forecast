@@ -35,6 +35,7 @@ model User {
   forecasts      Forecast[]
   alerts         Alert[]
   reports        Report[]
+  scheduledReports ScheduledReport[]
   auditLogs      AuditLog[]
   
   @@index([email])
@@ -77,6 +78,7 @@ model Client {
   users          User[]
   locations      Location[]
   apiKeys        ApiKey[]
+  emailConfigurations EmailConfiguration[]
   
   @@index([code])
   @@map("clients")
@@ -127,13 +129,24 @@ model Location {
   // Technical specifications
   capacityMW        Float     // Nominal capacity in Megawatts
   actualCapacityMW  Float?    // Actual/derated capacity
+  capacityKW        Float?    // Capacity in Kilowatts
   panelCount        Int?
   panelType         String?
+  panelTechnology   String?   // heterojunction, monocrystalline, etc.
   inverterCount     Int?
   inverterType      String?
+  inverterModel     String?
   trackingSystem    TrackingType @default(FIXED)
   tiltAngle         Float?    // Degrees
   azimuthAngle      Float?    // Degrees
+  isBifacial        Boolean   @default(false)
+  
+  // Performance specifications
+  nominalEfficiency Float?    // Panel efficiency percentage
+  temperatureCoeff  Float?    // Temperature coefficient
+  bifacialityFactor Float?    // Bifaciality factor for bifacial panels
+  dcOverpowerRatio  Float?    // DC overpower ratio
+  performanceRatio  Float?    // Expected PR
   
   // Dates
   installationDate  DateTime?
@@ -148,14 +161,17 @@ model Location {
   // Performance benchmarks
   expectedYield     Float?    // kWh/kWp/year
   degradationRate   Float?    // Percentage per year
-  performanceRatio  Float?    // PR target
   
-  // Comprehensive Technical Data (JSON fields for complex configurations)
-  locationData      Json?     // Extended location details (address, timezone, etc.)
-  plantData         Json?     // Comprehensive plant specifications
-  performanceData   Json?     // Performance parameters and thresholds
-  outputConfig      Json?     // Output formats and delivery configuration
-  calibrationSettings Json?   // Calibration and adjustment settings
+  // Comprehensive Technical Data (JSON fields matching linear forecast YAML)
+  locationData      Json?     // Extended location details, weather station config
+  plantData         Json?     // Complete plant configuration (physics parameters, losses)
+  performanceData   Json?     // Performance parameters, weather adjustments, corrections
+  outputConfig      Json?     // Output formats and delivery configuration  
+  calibrationSettings Json?   // Calibration settings, hourly corrections, seasonal adjustments
+  monitoringConfig  Json?     // Alert thresholds, tracking parameters
+  
+  // Client-specific configuration storage
+  clientConfig      Json?     // Complete client YAML configuration
   
   // Additional metadata
   notes             String?   // Serialized JSON array of notes
@@ -163,6 +179,16 @@ model Location {
   certificationData String?   // Serialized JSON for certification info
   lastMaintenanceDate DateTime?
   version           Int       @default(1)  // For version control
+  
+  // Bulk operations support
+  lastCalibrationDate DateTime?
+  calibrationStatus CalibrationStatus @default(PENDING)
+  bulkOperationId   String?   // For tracking bulk operations
+  
+  // Computed fields for dashboard display
+  displayCapacity   String?   // Formatted capacity for display
+  displayLocation   String?   // "City, Country" format
+  statusDisplay     String?   // Human-readable status
   
   // Metadata
   metadata          Json?
@@ -182,7 +208,17 @@ model Location {
   @@index([code])
   @@index([status])
   @@index([latitude, longitude])
+  @@index([calibrationStatus])
+  @@index([bulkOperationId])
   @@map("locations")
+}
+
+enum CalibrationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  SCHEDULED
 }
 
 enum LocationStatus {
@@ -224,19 +260,27 @@ model Plant {
 // TIME SERIES DATA MODELS
 // ========================================
 
-// Forecast Data (TimescaleDB hypertable recommended)
+// Forecast Data (TimescaleDB hypertable recommended)  
 model Forecast {
   id                String    @id @default(uuid())
   timestamp         DateTime
+  time              DateTime  // Legacy field name compatibility
   locationId        Int
   
-  // Forecast values
-  powerMW           Float     // Forecasted power in MW
+  // Primary forecast values (matching linear forecast CSV structure)
+  powerMW           Float     // Forecasted power in MW (production_mw)
+  powerOutputMW     Float     // Legacy field name compatibility
   energyMWh         Float?    // Forecasted energy in MWh
+  capacityFactor    Float?    // Capacity factor (production_mw / nominal_capacity)
   
-  // Confidence intervals
-  powerMWLower      Float?    // Lower confidence bound
-  powerMWUpper      Float?    // Upper confidence bound
+  // Confidence intervals (matching CSV: production_mw_q10, q25, q75, q90)
+  powerMWQ10        Float?    // 10th percentile (lower bound)
+  powerMWQ25        Float?    // 25th percentile
+  powerMWQ75        Float?    // 75th percentile  
+  powerMWQ90        Float?    // 90th percentile (upper bound)
+  powerMWLower      Float?    // Legacy lower confidence bound
+  powerMWUpper      Float?    // Legacy upper confidence bound
+  confidence        Float?    // Legacy confidence field
   confidenceLevel   Float?    // Confidence percentage (0-100)
   
   // Forecast metadata
@@ -244,14 +288,17 @@ model Forecast {
   modelVersion      String?
   modelId           String?   // Reference to MLModel
   horizonMinutes    Int       // Forecast horizon in minutes
-  resolution        Int       // Resolution in minutes (15, 30, 60)
+  horizonDays       Int?      // Forecast horizon in days (D+1, D+5)
+  resolution        ResolutionType // Time resolution
   runId             String?   // Forecast run identifier
+  forecastType      ForecastType @default(OPERATIONAL)
   
   // Weather inputs used
   temperature       Float?
   ghi               Float?    // Global Horizontal Irradiance W/m²
   dni               Float?    // Direct Normal Irradiance W/m²
   dhi               Float?    // Diffuse Horizontal Irradiance W/m²
+  gti               Float?    // Global Tilted Irradiance W/m²
   cloudCover        Float?    // Percentage
   windSpeed         Float?    // m/s
   humidity          Float?    // Percentage
@@ -262,6 +309,12 @@ model Forecast {
   qualityScore      Float?    // 0-1 quality indicator
   isValidated       Boolean   @default(false)
   validationNotes   String?
+  dataQuality       DataQuality @default(GOOD)
+  
+  // Processing metadata
+  processingTime    Float?    // Processing time in seconds
+  inputFeatures     Json?     // Features used in forecast
+  modelParameters   Json?     // Model parameters used
   
   // Tracking
   createdAt         DateTime  @default(now())
@@ -276,7 +329,26 @@ model Forecast {
   @@index([modelType])
   @@index([horizonMinutes])
   @@index([runId])
+  @@index([resolution])
+  @@index([forecastType])
   @@map("forecasts")
+}
+
+enum ResolutionType {
+  FIFTEEN_MINUTES   // 15min
+  THIRTY_MINUTES    // 30min
+  HOURLY           // 1h
+  DAILY            // 1d
+  WEEKLY           // 1w
+  MONTHLY          // 1m
+}
+
+enum ForecastType {
+  OPERATIONAL      // Regular operational forecasts
+  D_PLUS_1_5       // D+1 to D+5 forecasts
+  MONTHLY_CONTINUED // Monthly continued forecasts
+  HISTORICAL       // Historical forecast recreation
+  VALIDATION       // Validation/backtesting forecasts
 }
 
 enum ModelType {
@@ -296,10 +368,12 @@ enum ModelType {
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
+  time              DateTime  // Legacy field name compatibility
   locationId        Int
   
   // Production values (industry standard metrics)
   powerMW           Float     // Actual AC power in MW
+  powerOutputMW     Float     // Legacy field name compatibility
   powerDCMW         Float?    // DC power in MW
   energyMWh         Float?    // Actual energy in MWh
   
@@ -356,6 +430,7 @@ enum DataQuality {
 model WeatherData {
   id                String    @id @default(uuid())
   timestamp         DateTime
+  time              DateTime  // Legacy field name compatibility
   locationId        Int
   
   // Basic weather metrics
@@ -668,6 +743,8 @@ enum ReportType {
   COMPLIANCE_REPORT
   WEATHER_IMPACT
   LOCATION_COMPARISON
+  FORECAST_D1_D5        // D+1/+5 Forecast Report
+  FORECAST_MONTHLY_CONTINUED // Monthly Continued Forecast Report  
   CUSTOM
 }
 
@@ -692,6 +769,117 @@ enum ExecutionStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+// Scheduled Reports (for automatic report generation and distribution)
+model ScheduledReport {
+  id                String    @id @default(uuid())
+  userId            Int
+  reportType        ReportType
+  
+  // Report configuration
+  name              String
+  description       String?
+  parameters        Json      // Report configuration matching UI
+  filters           Json?     // Location IDs, date ranges, etc.
+  
+  // Schedule configuration (cron-like)
+  frequency         ScheduleFrequency
+  scheduleTime      String    // "06:00", "14:30", etc.
+  startDate         DateTime
+  timezone          String    @default("UTC")
+  
+  // Schedule description for display
+  scheduleDescription String?
+  
+  // Output configuration
+  format            ReportFormat @default(PDF)
+  aggregationLevel  String?   // "15min", "1h", "1day", etc.
+  selectedTimezone  String?   // Timezone for data
+  
+  // Distribution
+  emailRecipients   String[]  // Email addresses
+  emailEnabled      Boolean   @default(true)
+  
+  // Location filtering
+  locationIds       String[]  // Selected location IDs
+  locationDisplay   LocationDisplay @default(INDIVIDUAL)
+  plantIds          String[]  // Selected plant IDs
+  
+  // Status and execution
+  isActive          Boolean   @default(true)
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
+  lastStatus        ExecutionStatus?
+  errorCount        Int       @default(0)
+  lastError         String?
+  
+  // Statistics
+  totalRuns         Int       @default(0)
+  successfulRuns    Int       @default(0)
+  
+  // Metadata
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id])
+  executions        ScheduledReportExecution[]
+  
+  @@index([userId])
+  @@index([reportType])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@map("scheduled_reports")
+}
+
+// Execution history for scheduled reports
+model ScheduledReportExecution {
+  id                String    @id @default(uuid())
+  scheduledReportId String
+  
+  // Execution details
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  duration          Int?      // Seconds
+  
+  // Configuration snapshot (in case schedule changes)
+  configSnapshot    Json
+  
+  // Result
+  status            ExecutionStatus
+  outputUrl         String?
+  fileSize          Int?      // Bytes
+  recordCount       Int?
+  
+  // Email delivery
+  emailsSent        Int       @default(0)
+  emailRecipients   String[]
+  emailStatus       String?   // "sent", "failed", "partial"
+  
+  // Error handling
+  error             String?
+  
+  // Relations
+  scheduledReport   ScheduledReport @relation(fields: [scheduledReportId], references: [id])
+  
+  @@index([scheduledReportId])
+  @@index([startedAt])
+  @@index([status])
+  @@map("scheduled_report_executions")
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  CUSTOM
+}
+
+enum LocationDisplay {
+  INDIVIDUAL  // Show separate data for each location
+  AGGREGATED  // Combine all locations into summary
 }
 
 // ========================================
@@ -814,4 +1002,51 @@ model SystemConfig {
   @@index([category])
   @@index([key])
   @@map("system_configs")
+}
+
+// Email Configuration and Distribution Lists
+model EmailConfiguration {
+  id                String    @id @default(uuid())
+  clientId          Int?      // Null for global configuration
+  
+  // Configuration name and type
+  name              String    // "Default Recipients", "Emergency Contacts", etc.
+  type              EmailConfigType @default(RECIPIENTS)
+  
+  // Email addresses
+  recipients        String[]  // Array of email addresses
+  
+  // Email service settings (for SMTP configuration)
+  smtpSettings      Json?     // SMTP server configuration
+  
+  // Template settings
+  templateSettings  Json?     // Email template configuration
+  
+  // Status
+  isActive          Boolean   @default(true)
+  isValidated       Boolean   @default(false)
+  
+  // Usage tracking
+  lastUsedAt        DateTime?
+  usageCount        Int       @default(0)
+  
+  // Metadata
+  description       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  client            Client?   @relation(fields: [clientId], references: [id])
+  
+  @@index([clientId])
+  @@index([type])
+  @@index([isActive])
+  @@map("email_configurations")
+}
+
+enum EmailConfigType {
+  RECIPIENTS        // Recipient lists
+  SMTP              // SMTP configuration
+  TEMPLATES         // Email templates
+  GLOBAL            // Global settings
 }

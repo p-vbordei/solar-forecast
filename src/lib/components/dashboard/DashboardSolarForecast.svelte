@@ -11,65 +11,6 @@
 		4: 'Coastal Solar Array - Constanta'
 	};
 
-	// Available weather parameters organized by categories
-	const weatherParameterCategories = {
-		solar: {
-			name: 'Solar Radiation',
-			parameters: {
-				shortwave_radiation: { name: 'Global Horizontal Irradiance (GHI)', unit: 'W/m²', color: '#f59e0b', key: 'shortwave_radiation' },
-				direct_radiation: { name: 'Direct Normal Irradiance (DNI)', unit: 'W/m²', color: '#f97316', key: 'direct_radiation' },
-				diffuse_radiation: { name: 'Diffuse Horizontal Irradiance (DHI)', unit: 'W/m²', color: '#06b6d4', key: 'diffuse_radiation' },
-				global_tilted_irradiance: { name: 'Global Tilted Irradiance (GTI)', unit: 'W/m²', color: '#eab308', key: 'global_tilted_irradiance' },
-				sunshine_duration: { name: 'Sunshine Duration', unit: 'min', color: '#facc15', key: 'sunshine_duration' },
-				uv_index: { name: 'UV Index', unit: 'index', color: '#a855f7', key: 'uv_index' }
-			}
-		},
-		atmospheric: {
-			name: 'Atmospheric Conditions',
-			parameters: {
-				temperature_2m: { name: 'Air Temperature', unit: '°C', color: '#ef4444', key: 'temperature_2m' },
-				relative_humidity_2m: { name: 'Relative Humidity', unit: '%', color: '#3b82f6', key: 'relative_humidity_2m' },
-				surface_pressure: { name: 'Surface Pressure', unit: 'hPa', color: '#8b5cf6', key: 'surface_pressure' },
-				dew_point_2m: { name: 'Dew Point', unit: '°C', color: '#06b6d4', key: 'dew_point_2m' },
-				visibility: { name: 'Visibility', unit: 'km', color: '#64748b', key: 'visibility' }
-			}
-		},
-		wind: {
-			name: 'Wind Conditions',
-			parameters: {
-				wind_speed_10m: { name: 'Wind Speed (10m)', unit: 'm/s', color: '#10b981', key: 'wind_speed_10m' },
-				wind_speed_100m: { name: 'Wind Speed (100m)', unit: 'm/s', color: '#059669', key: 'wind_speed_100m' },
-				wind_direction_10m: { name: 'Wind Direction (10m)', unit: '°', color: '#22c55e', key: 'wind_direction_10m' },
-				wind_gusts_10m: { name: 'Wind Gusts', unit: 'm/s', color: '#16a34a', key: 'wind_gusts_10m' }
-			}
-		},
-		cloud: {
-			name: 'Cloud & Precipitation',
-			parameters: {
-				cloud_cover: { name: 'Total Cloud Cover', unit: '%', color: '#6b7280', key: 'cloud_cover' },
-				cloud_cover_low: { name: 'Low Cloud Cover', unit: '%', color: '#9ca3af', key: 'cloud_cover_low' },
-				cloud_cover_mid: { name: 'Mid Cloud Cover', unit: '%', color: '#6b7280', key: 'cloud_cover_mid' },
-				cloud_cover_high: { name: 'High Cloud Cover', unit: '%', color: '#4b5563', key: 'cloud_cover_high' },
-				precipitation: { name: 'Precipitation', unit: 'mm', color: '#0ea5e9', key: 'precipitation' },
-				rain: { name: 'Rain', unit: 'mm', color: '#0284c7', key: 'rain' }
-			}
-		}
-	};
-
-	// Flatten parameters for easy access
-	const weatherParameters = {};
-	Object.values(weatherParameterCategories).forEach(category => {
-		Object.assign(weatherParameters, category.parameters);
-	});
-
-	// Selected parameters
-	let selectedParameters = ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
-	let activeTimeRange = 'Today';
-
-	// Mock forecast data - in real app this would come from API
-	let forecastData: any = null;
-	let chartContainer: HTMLDivElement;
-
 	// Location-specific weather characteristics
 	const locationWeatherProfiles = {
 		1: { // Solar Farm Alpha - Bucharest
@@ -102,7 +43,24 @@
 		}
 	};
 
-	// Generate mock data based on time range and location
+	// Most important weather parameters for solar forecasting (simplified for dashboard)
+	const weatherParameters = {
+		shortwave_radiation: { name: 'Solar Radiation', unit: 'W/m²', color: '#f59e0b', key: 'shortwave_radiation' },
+		temperature_2m: { name: 'Temperature', unit: '°C', color: '#ef4444', key: 'temperature_2m' },
+		cloud_cover: { name: 'Cloud Coverage', unit: '%', color: '#6b7280', key: 'cloud_cover' },
+		wind_speed_10m: { name: 'Wind Speed', unit: 'm/s', color: '#10b981', key: 'wind_speed_10m' },
+		relative_humidity_2m: { name: 'Humidity', unit: '%', color: '#3b82f6', key: 'relative_humidity_2m' }
+	};
+
+	// Selected parameters
+	let selectedParameters = ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
+	let activeTimeRange = 'Today';
+
+	// Mock forecast data - in real app this would come from API
+	let forecastData: any = null;
+	let chartContainer: HTMLDivElement;
+
+	// Generate mock data based on time range
 	function generateMockData(timeRange: string = 'Today') {
 		let timePoints: any[] = [];
 		let labels: string[] = [];
@@ -150,34 +108,12 @@
 			const tempBase = locationProfile.tempBase;
 			
 			data[index] = {
-				// Solar radiation parameters
+				// Most important solar forecasting parameters
 				shortwave_radiation: Math.max(0, sunIntensity * 800 * weatherVariation + Math.random() * 100),
-				direct_radiation: Math.max(0, sunIntensity * 600 * weatherVariation + Math.random() * 80),
-				diffuse_radiation: Math.max(0, sunIntensity * 200 * weatherVariation + Math.random() * 50),
-				global_tilted_irradiance: Math.max(0, sunIntensity * 850 * weatherVariation + Math.random() * 90),
-				sunshine_duration: isDay ? Math.max(0, sunIntensity * 60 * weatherVariation + Math.random() * 10) : 0,
-				uv_index: Math.max(0, sunIntensity * 10 * weatherVariation + Math.random() * 2),
-				
-				// Atmospheric conditions
 				temperature_2m: tempBase + sunIntensity * 10 * weatherVariation + Math.random() * 3,
-				relative_humidity_2m: 40 * locationProfile.humidity + cloudiness * 40 + Math.random() * 20,
-				surface_pressure: 1013 + Math.random() * 20 - (cloudiness * 10),
-				dew_point_2m: (tempBase - 5) + sunIntensity * 5 + Math.random() * 2,
-				visibility: Math.max(5, 25 - cloudiness * 15 + Math.random() * 5),
-				
-				// Wind conditions
-				wind_speed_10m: (5 + cloudiness * 10 + Math.random() * 10) * locationProfile.windiness,
-				wind_speed_100m: (7 + cloudiness * 12 + Math.random() * 12) * locationProfile.windiness,
-				wind_direction_10m: Math.random() * 360,
-				wind_gusts_10m: (8 + cloudiness * 15 + Math.random() * 15) * locationProfile.windiness,
-				
-				// Cloud & precipitation
 				cloud_cover: cloudiness * 80 + Math.random() * 20,
-				cloud_cover_low: cloudiness * 40 + Math.random() * 20,
-				cloud_cover_mid: cloudiness * 30 + Math.random() * 15,
-				cloud_cover_high: cloudiness * 20 + Math.random() * 10,
-				precipitation: timeRange === 'Tomorrow' ? Math.random() * 8 : Math.random() * 3,
-				rain: timeRange === 'Tomorrow' ? Math.random() * 5 : Math.random() * 2
+				wind_speed_10m: (5 + cloudiness * 10 + Math.random() * 10) * locationProfile.windiness,
+				relative_humidity_2m: 40 * locationProfile.humidity + cloudiness * 40 + Math.random() * 20
 			};
 		});
 		
@@ -320,7 +256,7 @@
 				selectedParameters = selectedParameters.filter(p => p !== paramKey);
 			}
 		} else {
-			if (selectedParameters.length < 6) {
+			if (selectedParameters.length < 4) {
 				selectedParameters = [...selectedParameters, paramKey];
 			}
 		}
@@ -369,39 +305,33 @@
 		</div>
 	</div>
 
-	<!-- Categorized Parameter Selector -->
+	<!-- Parameter Selector -->
 	<div class="mb-6">
-		<label class="block text-sm font-medium text-soft-blue mb-3">
-			Weather Parameters ({selectedParameters.length}/6 selected)
+		<label class="block text-sm font-medium text-soft-blue mb-2">
+			Weather Parameters ({selectedParameters.length}/4 selected)
 		</label>
-		
-		{#each Object.entries(weatherParameterCategories) as [categoryKey, category]}
-			<div class="mb-4">
-				<h4 class="text-xs font-medium text-soft-blue/60 mb-2 uppercase tracking-wide">{category.name}</h4>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-					{#each Object.entries(category.parameters) as [key, param]}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-left {selectedParameters.includes(key)
-								? 'border-cyan bg-cyan/10'
-								: 'border-soft-blue/20 bg-glass-white hover:border-cyan/50'}"
-							on:click={() => toggleParameter(key)}
-							disabled={!selectedParameters.includes(key) && selectedParameters.length >= 6}
-						>
-							<div class="flex items-center space-x-2">
-								<div 
-									class="w-3 h-3 rounded-full flex-shrink-0" 
-									style="background-color: {param.color}"
-								></div>
-								<div class="min-w-0 flex-1">
-									<div class="font-medium text-sm {selectedParameters.includes(key) ? 'text-cyan' : 'text-soft-blue'} truncate">{param.name}</div>
-									<div class="text-xs {selectedParameters.includes(key) ? 'text-cyan/70' : 'text-soft-blue/60'}">{param.unit}</div>
-								</div>
-							</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/each}
+		<div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+			{#each Object.entries(weatherParameters) as [key, param]}
+				<button
+					class="p-2 rounded-lg border transition-all duration-200 text-left {selectedParameters.includes(key)
+						? 'border-cyan bg-cyan/10'
+						: 'border-soft-blue/20 bg-glass-white hover:border-cyan/50'}"
+					on:click={() => toggleParameter(key)}
+					disabled={!selectedParameters.includes(key) && selectedParameters.length >= 4}
+				>
+					<div class="flex items-center space-x-2">
+						<div 
+							class="w-3 h-3 rounded-full" 
+							style="background-color: {param.color}"
+						></div>
+						<div>
+							<div class="font-medium text-sm {selectedParameters.includes(key) ? 'text-cyan' : 'text-soft-blue'}">{param.name}</div>
+							<div class="text-xs {selectedParameters.includes(key) ? 'text-cyan/70' : 'text-soft-blue/60'}">{param.unit}</div>
+						</div>
+					</div>
+				</button>
+			{/each}
+		</div>
 	</div>
 
 	<!-- Chart Container -->
