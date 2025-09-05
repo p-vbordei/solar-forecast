@@ -176,11 +176,72 @@
 
 	function resetForm() {
 		formData = {
+			// Mandatory fields only
 			name: '',
 			latitude: 0,
 			longitude: 0,
-			location: { timezone: 'UTC', altitude: 0 },
-			plant: { capacity_mw: 1.0 }
+			
+			// Initialize all nested objects to prevent binding errors
+			location: {
+				timezone: 'UTC',
+				altitude: 0
+			},
+			plant: {
+				capacity_mw: 1.0,
+				panels: {
+					tilt: 30,
+					azimuth: 180,
+					technology: 'monocrystalline',
+					temperature_coefficient: -0.004,
+					nominal_efficiency: 0.20,
+					bifacial: false,
+					bifaciality_factor: 0.0
+				},
+				inverter: {
+					model: 'Generic 3-phase inverter',
+					power_factor: 1.0
+				},
+				mounting: {
+					type: 'fixed',
+					ground_coverage_ratio: 0.4,
+					row_spacing: 0
+				},
+				losses: {
+					soiling_monthly: [0.04, 0.04, 0.03, 0.03, 0.02, 0.02, 0.02, 0.02, 0.02, 0.03, 0.04, 0.04],
+					shading: 0.01,
+					snow: 0.00,
+					mismatch: 0.02,
+					wiring_dc: 0.015,
+					wiring_ac: 0.01,
+					transformer: 0.01,
+					availability: 0.02
+				}
+			},
+			performance: {
+				clear_sky: 0.95,
+				partly_cloudy: 0.88,
+				cloudy: 0.82,
+				overcast: 0.75,
+				dawn_dusk_factor: 0.85,
+				horizon_shading: {
+					north: 0, east: 0, south: 0, west: 0,
+					northeast: 0, southeast: 0, southwest: 0, northwest: 0
+				},
+				temperature_model: 'sapm'
+			},
+			output: {
+				formats: ['csv_15min', 'csv_hourly', 'json_api'],
+				email_reports: true,
+				email_schedule: 'daily',
+				email_time: '06:00'
+			},
+			calibration: {
+				adjustment_factor: 1.0,
+				seasonal_adjustments: Array(12).fill(1.0),
+				auto_calibrate: false,
+				calibration_frequency: 'monthly',
+				min_data_days: 30
+			}
 		};
 		formErrors = {};
 		formTouched = {};
