@@ -1,38 +1,60 @@
 #!/bin/sh
-# Railway deployment start script
+# Railway deployment start script - Simplified and robust
 
-echo "Starting deployment process..."
+echo "🚀 Starting Solar Forecast Platform..."
+echo "Environment: ${NODE_ENV:-development}"
+echo "Database: ${DATABASE_URL:+Connected}"
 
-# Setup database schema
-echo "Setting up database schema..."
+# Step 1: Wait for database to be ready (with timeout)
+echo "📊 Checking database connection..."
+MAX_RETRIES=30
+RETRY_COUNT=0
 
-# Ensure TimescaleDB extension is enabled
-echo "Enabling TimescaleDB extension..."
-if [ -n "$DATABASE_URL" ]; then
-    psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;" 2>/dev/null || echo "TimescaleDB extension may already exist or permissions insufficient"
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if npx prisma db execute --stdin <<< "SELECT 1;" 2>/dev/null; then
+        echo "✅ Database connected!"
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo "⏳ Waiting for database... ($RETRY_COUNT/$MAX_RETRIES)"
+    sleep 2
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "❌ Database connection timeout. Starting anyway..."
 fi
 
-# Try migration first (production approach)
-echo "Checking for migrations..."
-if npx prisma migrate status 2>/dev/null | grep -q "No migrations found"; then
-    echo "No migrations found, using db push for schema setup..."
-    npx prisma db push --accept-data-loss --force-reset
+# Step 2: Apply Prisma schema (creates tables)
+echo "📋 Setting up database schema..."
+npx prisma generate 2>/dev/null || echo "⚠️  Prisma generate failed (may be OK in production)"
+
+# Try to push schema (idempotent - won't hurt if already done)
+if npx prisma db push --skip-generate 2>/dev/null; then
+    echo "✅ Database schema applied!"
 else
-    echo "Applying migrations..."
-    npx prisma migrate deploy
+    echo "⚠️  Schema push failed - may already be applied"
 fi
 
-# Generate Prisma client to ensure it's up to date
-echo "Generating Prisma client..."
-npx prisma generate
-
-# Initialize TimescaleDB hypertables if scripts exist
-echo "Setting up TimescaleDB hypertables..."
-if [ -f "scripts/init-timescaledb.sql" ] && [ -n "$DATABASE_URL" ]; then
-    echo "Initializing TimescaleDB hypertables..."
-    psql "$DATABASE_URL" -f scripts/init-timescaledb.sql 2>/dev/null || echo "Hypertable setup may have failed or already exists"
+# Step 3: Enable TimescaleDB extension (optional but recommended)
+echo "🔧 Checking TimescaleDB extension..."
+if [ -n "$DATABASE_URL" ]; then
+    # Try to enable TimescaleDB (will fail gracefully if not available)
+    psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;" 2>/dev/null && \
+        echo "✅ TimescaleDB extension enabled!" || \
+        echo "⚠️  TimescaleDB extension not available (using standard PostgreSQL)"
+    
+    # Try to set up hypertables if script exists and TimescaleDB is enabled
+    if [ -f "scripts/init-timescaledb.sql" ]; then
+        echo "📊 Setting up TimescaleDB hypertables..."
+        psql "$DATABASE_URL" -f scripts/init-timescaledb.sql 2>/dev/null && \
+            echo "✅ TimescaleDB hypertables configured!" || \
+            echo "⚠️  Hypertables setup skipped (may already exist or TimescaleDB not available)"
+    fi
 fi
 
-# Start the application
-echo "Starting the application..."
+# Step 4: Start the application
+echo "🎯 Starting application server..."
+echo "🌐 App will be available at port ${PORT:-3000}"
+
+# Use exec to replace shell process with node
 exec node build/index.js

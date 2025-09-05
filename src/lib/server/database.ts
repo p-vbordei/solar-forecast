@@ -362,21 +362,74 @@ export class TimescaleQueries {
    * Get hypertable information for monitoring
    */
   static async getHypertableStats() {
-    const query = `
-      SELECT 
-        h.hypertable_name,
-        h.num_chunks,
-        h.compression_enabled,
-        COALESCE(cs.total_chunks, 0) as compressed_chunks,
-        COALESCE(cs.compressed_heap_size, 0) as compressed_size,
-        COALESCE(cs.uncompressed_heap_size, 0) as uncompressed_size
-      FROM timescaledb_information.hypertables h
-      LEFT JOIN timescaledb_information.compressed_hypertable_stats cs
-        ON h.hypertable_name = cs.hypertable_name
-      WHERE h.hypertable_schema = 'public';
-    `;
-    
-    return await db.$queryRawUnsafe(query);
+    try {
+      // First check if TimescaleDB views exist
+      const viewExists = await db.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'timescaledb_information' 
+          AND table_name = 'hypertables'
+        ) as exists;
+      `;
+      
+      if (!viewExists[0]?.exists) {
+        return [];
+      }
+      
+      const query = `
+        SELECT 
+          h.hypertable_name,
+          h.num_chunks,
+          h.compression_enabled,
+          COALESCE(cs.total_chunks, 0) as compressed_chunks,
+          COALESCE(cs.compressed_heap_size, 0) as compressed_size,
+          COALESCE(cs.uncompressed_heap_size, 0) as uncompressed_size
+        FROM timescaledb_information.hypertables h
+        LEFT JOIN timescaledb_information.compressed_hypertable_stats cs
+          ON h.hypertable_name = cs.hypertable_name
+        WHERE h.hypertable_schema = 'public';
+      `;
+      
+      return await db.$queryRawUnsafe(query);
+    } catch (error) {
+      console.warn('Hypertable stats not available yet:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Get chunk information for monitoring
+   */
+  static async getChunkInfo() {
+    try {
+      const viewExists = await db.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'timescaledb_information' 
+          AND table_name = 'chunks'
+        ) as exists;
+      `;
+      
+      if (!viewExists[0]?.exists) {
+        return [];
+      }
+      
+      const query = `
+        SELECT 
+          hypertable_name,
+          COUNT(*) as chunk_count,
+          MIN(range_start) as oldest_chunk,
+          MAX(range_end) as newest_chunk
+        FROM timescaledb_information.chunks
+        WHERE hypertable_schema = 'public'
+        GROUP BY hypertable_name;
+      `;
+      
+      return await db.$queryRawUnsafe(query);
+    } catch (error) {
+      console.warn('Chunk info not available yet:', error);
+      return [];
+    }
   }
 }
 
@@ -385,6 +438,7 @@ export async function checkTimescaleDBHealth(): Promise<{
   connected: boolean;
   timescaleEnabled: boolean;
   hypertables: number;
+  tablesReady: boolean;
   error?: string;
 }> {
   try {
@@ -403,28 +457,81 @@ export async function checkTimescaleDBHealth(): Promise<{
         connected: true,
         timescaleEnabled: false,
         hypertables: 0,
-        error: 'TimescaleDB extension not enabled'
+        tablesReady: false,
+        error: 'TimescaleDB extension not enabled. Run: CREATE EXTENSION IF NOT EXISTS timescaledb;'
       };
     }
     
-    // Count hypertables
-    const hypertableCount = await db.$queryRaw<Array<{ count: bigint }>>`
+    // Check if regular tables exist first (created by Prisma)
+    const tablesExist = await db.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*) as count 
-      FROM timescaledb_information.hypertables 
-      WHERE hypertable_schema = 'public';
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name IN ('forecasts', 'production', 'weather_data');
     `;
     
-    return {
-      connected: true,
-      timescaleEnabled: true,
-      hypertables: Number(hypertableCount[0].count),
-    };
+    const tablesReady = Number(tablesExist[0].count) > 0;
+    
+    if (!tablesReady) {
+      return {
+        connected: true,
+        timescaleEnabled: true,
+        hypertables: 0,
+        tablesReady: false,
+        error: 'Tables not created yet. Run Prisma migrations first.'
+      };
+    }
+    
+    // Check if TimescaleDB information schema exists
+    const schemaExists = await db.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT FROM information_schema.schemata 
+        WHERE schema_name = 'timescaledb_information'
+      ) as exists;
+    `;
+    
+    if (!schemaExists[0]?.exists) {
+      return {
+        connected: true,
+        timescaleEnabled: true,
+        hypertables: 0,
+        tablesReady: true,
+        error: 'TimescaleDB information schema not available yet'
+      };
+    }
+    
+    // Try to count hypertables (may not exist yet)
+    try {
+      const hypertableCount = await db.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) as count 
+        FROM timescaledb_information.hypertables 
+        WHERE hypertable_schema = 'public';
+      `;
+      
+      return {
+        connected: true,
+        timescaleEnabled: true,
+        hypertables: Number(hypertableCount[0].count),
+        tablesReady: true
+      };
+    } catch {
+      // Hypertables view doesn't exist yet, but that's OK
+      return {
+        connected: true,
+        timescaleEnabled: true,
+        hypertables: 0,
+        tablesReady: true,
+        error: 'Hypertables not configured yet. Run init-timescaledb.sql'
+      };
+    }
     
   } catch (error) {
+    // Connection failed
     return {
       connected: false,
       timescaleEnabled: false,
       hypertables: 0,
+      tablesReady: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }

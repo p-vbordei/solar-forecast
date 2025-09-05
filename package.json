@@ -18,7 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "db:setup": "prisma generate && prisma db push && node railway-setup.js",
+    "db:setup": "prisma generate && prisma db push",
     "db:init-timescale": "psql $DATABASE_URL -f scripts/init-timescaledb.sql",
     "db:migrate-timescale": "psql $DATABASE_URL -f prisma/migrations/timescaledb_setup.sql",
     "db:validate-timescale": "node scripts/validate-timescaledb.js",
