@@ -16,22 +16,77 @@
 	// Available locations (from uploaded data)
 	let availableLocations: string[] = ['all'];
 
-	// Mock historical data for demonstration
-	const mockData = [
-		{ datetime: '2024-01-15 06:00', location: 'Site A', production: 0, forecast: 0 },
-		{ datetime: '2024-01-15 07:00', location: 'Site A', production: 5.2, forecast: 4.8 },
-		{ datetime: '2024-01-15 08:00', location: 'Site A', production: 15.8, forecast: 16.2 },
-		{ datetime: '2024-01-15 09:00', location: 'Site A', production: 28.5, forecast: 29.1 },
-		{ datetime: '2024-01-15 10:00', location: 'Site A', production: 42.3, forecast: 41.7 },
-		{ datetime: '2024-01-15 11:00', location: 'Site A', production: 51.2, forecast: 52.8 },
-		{ datetime: '2024-01-15 12:00', location: 'Site A', production: 58.7, forecast: 59.3 },
-		{ datetime: '2024-01-15 13:00', location: 'Site A', production: 56.4, forecast: 57.1 },
-		{ datetime: '2024-01-15 14:00', location: 'Site A', production: 48.9, forecast: 49.5 },
-		{ datetime: '2024-01-15 15:00', location: 'Site A', production: 35.7, forecast: 36.2 },
-		{ datetime: '2024-01-15 16:00', location: 'Site A', production: 18.4, forecast: 17.9 },
-		{ datetime: '2024-01-15 17:00', location: 'Site A', production: 6.8, forecast: 7.2 },
-		{ datetime: '2024-01-15 18:00', location: 'Site A', production: 0, forecast: 0 }
-	];
+	// Comprehensive mock historical data for demonstration
+	function generateMockHistoricalData() {
+		const locations = ['Site A', 'Site B', 'Veranda Mall Bucharest'];
+		const data = [];
+		
+		// Generate 7 days of hourly data for each location
+		for (let day = 0; day < 7; day++) {
+			const date = new Date();
+			date.setDate(date.getDate() - day);
+			const dateStr = date.toISOString().split('T')[0];
+			
+			for (let hour = 0; hour < 24; hour++) {
+				locations.forEach((location, locationIndex) => {
+					const datetime = `${dateStr} ${hour.toString().padStart(2, '0')}:00`;
+					
+					// Generate realistic production curves
+					const sunAngle = Math.sin((hour - 6) * Math.PI / 12);
+					const baseSunIntensity = Math.max(0, sunAngle);
+					
+					// Add location-specific variations
+					const locationMultiplier = locationIndex === 0 ? 1.2 : locationIndex === 1 ? 1.0 : 0.8;
+					const weatherVariation = 1 + Math.sin(day * 0.3 + hour * 0.1) * 0.15;
+					const dailyVariation = 1 + Math.sin(day * 0.5) * 0.1;
+					
+					const maxProduction = location === 'Site A' ? 65 : location === 'Site B' ? 55 : 35;
+					const production = baseSunIntensity * maxProduction * locationMultiplier * weatherVariation * dailyVariation;
+					
+					// Add slight forecast variation
+					const forecastVariation = 1 + (Math.random() - 0.5) * 0.1;
+					const forecast = production * forecastVariation;
+					
+					data.push({
+						datetime,
+						location,
+						production: Math.max(0, production + (Math.random() - 0.5) * 2),
+						forecast: Math.max(0, forecast)
+					});
+				});
+			}
+		}
+		
+		// Add some 15-minute interval data for today for more granular view
+		const today = new Date().toISOString().split('T')[0];
+		for (let hour = 6; hour <= 18; hour++) {
+			for (let minute = 0; minute < 60; minute += 15) {
+				locations.forEach((location, locationIndex) => {
+					const datetime = `${today} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+					
+					const sunAngle = Math.sin((hour + minute/60 - 6) * Math.PI / 12);
+					const baseSunIntensity = Math.max(0, sunAngle);
+					const locationMultiplier = locationIndex === 0 ? 1.2 : locationIndex === 1 ? 1.0 : 0.8;
+					const minuteVariation = 1 + Math.sin(minute * 0.1) * 0.05;
+					
+					const maxProduction = location === 'Site A' ? 65 : location === 'Site B' ? 55 : 35;
+					const production = baseSunIntensity * maxProduction * locationMultiplier * minuteVariation;
+					const forecast = production * (1 + (Math.random() - 0.5) * 0.08);
+					
+					data.push({
+						datetime,
+						location,
+						production: Math.max(0, production + (Math.random() - 0.5) * 1.5),
+						forecast: Math.max(0, forecast)
+					});
+				});
+			}
+		}
+		
+		return data.sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+	}
+
+	const mockData = generateMockHistoricalData();
 
 	// Initialize with mock data
 	onMount(() => {
