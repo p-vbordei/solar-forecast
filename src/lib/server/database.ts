@@ -6,8 +6,21 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 // Enhanced Prisma Client configuration for TimescaleDB
-export const db = globalForPrisma.prisma ??
-  new PrismaClient({
+// Handle build-time initialization gracefully
+const createPrismaClient = () => {
+  // During build, return a minimal client if DATABASE_URL is not set
+  if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+    console.warn('DATABASE_URL not set during build, using placeholder');
+    return new PrismaClient({
+      datasources: {
+        db: {
+          url: 'postgresql://user:pass@localhost:5432/db?schema=public'
+        }
+      }
+    });
+  }
+  
+  return new PrismaClient({
     // Enhanced logging configuration for TimescaleDB monitoring
     log: [
       {
@@ -34,7 +47,7 @@ export const db = globalForPrisma.prisma ??
     // Database connection configuration optimized for time-series workloads
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/db?schema=public',
       },
     },
 
@@ -45,41 +58,49 @@ export const db = globalForPrisma.prisma ??
       isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, // Optimal for time-series
     },
   });
+};
+
+export const db = globalForPrisma.prisma ?? createPrismaClient();
 
 // Prisma Client event listeners for TimescaleDB monitoring
-db.$on('query', (e) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Query: ' + e.query);
-    console.log('Params: ' + e.params);
-    console.log('Duration: ' + e.duration + 'ms');
-  }
-  
-  // Log slow queries in production (>1000ms)
-  if (process.env.NODE_ENV === 'production' && e.duration > 1000) {
-    console.warn(`Slow TimescaleDB query (${e.duration}ms):`, {
-      query: e.query,
-      duration: e.duration,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+// Only add listeners if we have a real database connection
+if (process.env.DATABASE_URL) {
+  db.$on('query', (e) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Query: ' + e.query);
+      console.log('Params: ' + e.params);
+      console.log('Duration: ' + e.duration + 'ms');
+    }
+    
+    // Log slow queries in production (>1000ms)
+    if (process.env.NODE_ENV === 'production' && e.duration > 1000) {
+      console.warn(`Slow TimescaleDB query (${e.duration}ms):`, {
+        query: e.query,
+        duration: e.duration,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
 
-db.$on('error', (e) => {
-  console.error('TimescaleDB Prisma Error:', e);
-});
+  db.$on('error', (e) => {
+    console.error('TimescaleDB Prisma Error:', e);
+  });
 
-db.$on('info', (e) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.info('TimescaleDB Prisma Info:', e.message);
-  }
-});
+  db.$on('info', (e) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.info('TimescaleDB Prisma Info:', e.message);
+    }
+  });
 
-db.$on('warn', (e) => {
-  console.warn('TimescaleDB Prisma Warning:', e.message);
-});
+  db.$on('warn', (e) => {
+    console.warn('TimescaleDB Prisma Warning:', e.message);
+  });
+}
 
 // Prisma Middleware for TimescaleDB Optimizations
-db.$use(async (params, next) => {
+// Only add middleware if we have a real database connection
+if (process.env.DATABASE_URL) {
+  db.$use(async (params, next) => {
   const start = Date.now();
   
   // Time-series table optimizations
@@ -131,7 +152,8 @@ db.$use(async (params, next) => {
   }
   
   return result;
-});
+  });
+}
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
 
