@@ -91,9 +91,9 @@ export const swaggerSpec = {
                     pagination: {
                       type: 'object',
                       properties: {
-                        limit: { type: 'integer' },
-                        offset: { type: 'integer' },
-                        total: { type: 'integer' }
+                        total: { type: 'integer' },
+                        size: { type: 'integer' },
+                        current: { type: 'integer' }
                       }
                     },
                     filters: {
@@ -108,11 +108,31 @@ export const swaggerSpec = {
               }
             }
           },
-          500: {
-            description: 'Server error',
+          400: {
+            description: 'Bad request - Invalid query parameters',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Limit must be between 1 and 100',
+                  field: 'limit',
+                  code: 'BAD_REQUEST'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Database connection failed',
+                  code: 'INTERNAL_ERROR'
+                }
               }
             }
           }
@@ -158,10 +178,58 @@ export const swaggerSpec = {
             }
           },
           400: {
-            description: 'Validation error',
+            description: 'Bad request - Invalid request body',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Failed to create location',
+                  details: 'Invalid JSON in request body',
+                  code: 'BAD_REQUEST'
+                }
+              }
+            }
+          },
+          409: {
+            description: 'Conflict - Location already exists',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'A location with this name already exists',
+                  details: 'Location names must be unique',
+                  code: 'CONFLICT'
+                }
+              }
+            }
+          },
+          422: {
+            description: 'Validation error - Invalid input data',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location name is required',
+                  field: 'name',
+                  code: 'VALIDATION_ERROR'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Database connection failed',
+                  code: 'INTERNAL_ERROR'
+                }
               }
             }
           }
@@ -178,10 +246,12 @@ export const swaggerSpec = {
             name: 'id',
             in: 'path',
             required: true,
-            description: 'Location ID',
+            description: 'Location GUID',
             schema: {
-              type: 'integer'
-            }
+              type: 'string',
+              format: 'uuid'
+            },
+            example: '123e4567-e89b-12d3-a456-426614174000'
           }
         ],
         responses: {
@@ -200,10 +270,16 @@ export const swaggerSpec = {
             }
           },
           400: {
-            description: 'Invalid location ID',
+            description: 'Bad request - Invalid GUID format',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location ID is required',
+                  field: 'id',
+                  code: 'BAD_REQUEST'
+                }
               }
             }
           },
@@ -211,7 +287,27 @@ export const swaggerSpec = {
             description: 'Location not found',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location with ID 123e4567-e89b-12d3-a456-426614174000 not found',
+                  details: 'Location does not exist in the system',
+                  code: 'NOT_FOUND'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Database connection failed',
+                  code: 'INTERNAL_ERROR'
+                }
               }
             }
           }
@@ -226,10 +322,12 @@ export const swaggerSpec = {
             name: 'id',
             in: 'path',
             required: true,
-            description: 'Location ID',
+            description: 'Location GUID',
             schema: {
-              type: 'integer'
-            }
+              type: 'string',
+              format: 'uuid'
+            },
+            example: '123e4567-e89b-12d3-a456-426614174000'
           }
         ],
         requestBody: {
@@ -264,10 +362,16 @@ export const swaggerSpec = {
             }
           },
           400: {
-            description: 'Invalid request data',
+            description: 'Bad request - Invalid GUID format',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location ID is required',
+                  field: 'id',
+                  code: 'BAD_REQUEST'
+                }
               }
             }
           },
@@ -275,7 +379,55 @@ export const swaggerSpec = {
             description: 'Location not found',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location with ID 123e4567-e89b-12d3-a456-426614174000 not found',
+                  details: 'Location does not exist in the system',
+                  code: 'NOT_FOUND'
+                }
+              }
+            }
+          },
+          409: {
+            description: 'Conflict - Location name already exists',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'A location with this name already exists',
+                  details: 'Location names must be unique',
+                  code: 'CONFLICT'
+                }
+              }
+            }
+          },
+          422: {
+            description: 'Validation error - Invalid input data',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Invalid coordinates provided',
+                  field: 'coordinates',
+                  code: 'VALIDATION_ERROR'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Database connection failed',
+                  code: 'INTERNAL_ERROR'
+                }
               }
             }
           }
@@ -290,10 +442,12 @@ export const swaggerSpec = {
             name: 'id',
             in: 'path',
             required: true,
-            description: 'Location ID',
+            description: 'Location GUID',
             schema: {
-              type: 'integer'
-            }
+              type: 'string',
+              format: 'uuid'
+            },
+            example: '123e4567-e89b-12d3-a456-426614174000'
           }
         ],
         responses: {
@@ -305,17 +459,23 @@ export const swaggerSpec = {
                   type: 'object',
                   properties: {
                     success: { type: 'boolean', example: true },
-                    message: { type: 'string' }
+                    message: { type: 'string', example: 'Location deleted successfully' }
                   }
                 }
               }
             }
           },
           400: {
-            description: 'Invalid location ID',
+            description: 'Bad request - Invalid GUID format',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location ID is required',
+                  field: 'id',
+                  code: 'BAD_REQUEST'
+                }
               }
             }
           },
@@ -323,7 +483,27 @@ export const swaggerSpec = {
             description: 'Location not found',
             content: {
               'application/json': {
-                schema: { $ref: '#/components/schemas/ErrorResponse' }
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Location with ID 123e4567-e89b-12d3-a456-426614174000 not found',
+                  details: 'Location does not exist or has already been deleted',
+                  code: 'NOT_FOUND'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Database connection failed',
+                  code: 'INTERNAL_ERROR'
+                }
               }
             }
           }
@@ -476,9 +656,10 @@ export const swaggerSpec = {
         type: 'object',
         properties: {
           id: {
-            type: 'integer',
-            description: 'Unique identifier',
-            example: 1
+            type: 'string',
+            format: 'uuid',
+            description: 'Unique identifier (GUID)',
+            example: '123e4567-e89b-12d3-a456-426614174000'
           },
           name: {
             type: 'string',
@@ -505,6 +686,7 @@ export const swaggerSpec = {
       },
       ErrorResponse: {
         type: 'object',
+        required: ['success', 'error'],
         properties: {
           success: {
             type: 'boolean',
@@ -524,6 +706,12 @@ export const swaggerSpec = {
             type: 'string',
             description: 'Field that caused the error (if applicable)',
             example: 'name'
+          },
+          code: {
+            type: 'string',
+            description: 'Machine-readable error code',
+            example: 'VALIDATION_ERROR',
+            enum: ['BAD_REQUEST', 'NOT_FOUND', 'CONFLICT', 'VALIDATION_ERROR', 'INTERNAL_ERROR']
           }
         }
       }

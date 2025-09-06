@@ -1,7 +1,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { json } from '@sveltejs/kit';
 import type { CreateLocationRequest } from '$lib/features/locations/models/requests/CreateLocationRequest';
 import { CoordinatesValidator } from '$lib/features/locations/helpers/CoordinatesValidator';
+import { ApiResponse } from '$lib/utils/ApiResponse';
+import { ErrorHandler, withErrorHandling } from '$lib/utils/ErrorHandler';
+import { BadRequestError, LocationNotFoundError } from '$lib/utils/ApiErrors';
 
 export class LocationsController {
     /**
@@ -9,7 +11,7 @@ export class LocationsController {
      * Get all locations with optional filtering
      */
     async getAllLocations(event: RequestEvent): Promise<Response> {
-        try {
+        return withErrorHandling(async () => {
             const { url } = event;
             
             // Get query parameters for filtering
@@ -18,148 +20,74 @@ export class LocationsController {
             const limit = parseInt(url.searchParams.get('limit') ?? '50');
             const offset = parseInt(url.searchParams.get('offset') ?? '0');
             
+            // Validate pagination parameters
+            if (limit < 1 || limit > 100) {
+                throw new BadRequestError('Limit must be between 1 and 100', 'limit');
+            }
+            
+            if (offset < 0) {
+                throw new BadRequestError('Offset must be non-negative', 'offset');
+            }
+            
             // TODO: Call service layer to get all locations with filters
             
-            return json({
-                success: true,
-                data: [], // TODO: Return actual locations
-                pagination: {
-                    limit,
-                    offset,
-                    total: 0 // TODO: Return actual count
-                },
-                filters: { search, status }
-            });
+            // Calculate page number from offset and limit
+            const current = Math.floor(offset / limit) + 1;
             
-        } catch (error) {
-            return json({
-                success: false,
-                error: 'Failed to fetch locations',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }, { status: 500 });
-        }
+            return ApiResponse.successWithPagination(
+                [], // TODO: Return actual locations
+                { total: 0, size: limit, current }, // TODO: Return actual count
+                { search, status }
+            );
+        })();
     }
 
     /**
      * GET /api/locations/{id}
-     * Get a specific location by ID
+     * Get a specific location by GUID
      */
     async getLocationById(event: RequestEvent): Promise<Response> {
-        try {
-            const id = event.params.id;
+        return withErrorHandling(async () => {
+            const locationId = event.params.id!; // GUID is mandatory in path
             
-            if (!id) {
-                return json({
-                    success: false,
-                    error: 'Location ID is required'
-                }, { status: 400 });
-            }
-
-            const locationId = parseInt(id);
-            if (isNaN(locationId)) {
-                return json({
-                    success: false,
-                    error: 'Invalid location ID'
-                }, { status: 400 });
-            }
+            // TODO: Call service layer to get location by GUID
+            // Throw LocationNotFoundError if not found
             
-            // TODO: Call service layer to get location by ID
-            
-            return json({
-                success: true,
-                data: null // TODO: Return actual location
-            });
-            
-        } catch (error) {
-            return json({
-                success: false,
-                error: 'Failed to fetch location',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }, { status: 500 });
-        }
+            return ApiResponse.success(null); // TODO: Return actual location
+        })();
     }
 
     /**
      * PUT /api/locations/{id}
-     * Update a specific location
+     * Update a specific location by GUID
      */
     async updateLocation(event: RequestEvent): Promise<Response> {
-        try {
-            const id = event.params.id;
-            
-            if (!id) {
-                return json({
-                    success: false,
-                    error: 'Location ID is required'
-                }, { status: 400 });
-            }
-
-            const locationId = parseInt(id);
-            if (isNaN(locationId)) {
-                return json({
-                    success: false,
-                    error: 'Invalid location ID'
-                }, { status: 400 });
-            }
+        return withErrorHandling(async () => {
+            const locationId = event.params.id!; // GUID is mandatory in path
             
             // Parse request body
             const updateData = await event.request.json();
             
             // TODO: Validate update data
-            // TODO: Call service layer to update location
+            // TODO: Call service layer to update location by GUID
             
-            return json({
-                success: true,
-                message: 'Location updated successfully',
-                data: null // TODO: Return updated location
-            });
-            
-        } catch (error) {
-            return json({
-                success: false,
-                error: 'Failed to update location',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }, { status: 500 });
-        }
+            return ApiResponse.success(null, 'Location updated successfully'); // TODO: Return updated location
+        })();
     }
 
     /**
      * DELETE /api/locations/{id}
-     * Soft delete a specific location
+     * Soft delete a specific location by GUID
      */
     async deleteLocation(event: RequestEvent): Promise<Response> {
-        try {
-            const id = event.params.id;
+        return withErrorHandling(async () => {
+            const locationId = event.params.id!; // GUID is mandatory in path
             
-            if (!id) {
-                return json({
-                    success: false,
-                    error: 'Location ID is required'
-                }, { status: 400 });
-            }
-
-            const locationId = parseInt(id);
-            if (isNaN(locationId)) {
-                return json({
-                    success: false,
-                    error: 'Invalid location ID'
-                }, { status: 400 });
-            }
+            // TODO: Call service layer to delete location by GUID
+            // Throw LocationNotFoundError if not found
             
-            // TODO: Call service layer to delete location
-            
-            return json({
-                success: true,
-                message: 'Location deleted successfully'
-            });
-            
-        } catch (error) {
-            return json({
-                success: false,
-                error: 'Failed to delete location',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }, { status: 500 });
-        }
+            return ApiResponse.success(undefined, 'Location deleted successfully');
+        })();
     }
 
     /**
@@ -167,7 +95,7 @@ export class LocationsController {
      * Creates a new location with the provided configuration
      */
     async createLocation(event: RequestEvent): Promise<Response> {
-        try {
+        return withErrorHandling(async () => {
             // Parse request body
             const requestData: CreateLocationRequest = await event.request.json();
             
@@ -177,21 +105,9 @@ export class LocationsController {
             // TODO: Transform request to domain model
             
             // TODO: Call service layer to create location
+            // Throw LocationExistsError if name already exists
             
-            // TODO: Return created location response
-            return json({
-                success: true,
-                message: 'Location created successfully',
-                data: null // TODO: Return created location
-            }, { status: 201 });
-            
-        } catch (error) {
-            // TODO: Proper error handling
-            return json({
-                success: false,
-                error: 'Failed to create location',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            }, { status: 400 });
-        }
+            return ApiResponse.created(null, 'Location created successfully'); // TODO: Return created location
+        })();
     }
 }
