@@ -10,7 +10,7 @@ export class LocationsRepository {
      * Find all locations with Prisma where clause
      */
     async findAll(whereConditions: any, skip: number, take: number, orderBy: any, select: any) {
-        // Add deletedAt filter to where conditions
+        // Add deletedAt filter to where conditions (industry standard soft delete)
         const whereWithDeleted = {
             ...whereConditions,
             deletedAt: null
@@ -150,7 +150,7 @@ export class LocationsRepository {
      * Soft delete location
      */
     async softDelete(locationId: string) {
-        // Soft delete by setting deletedAt timestamp
+        // Industry standard soft delete using deletedAt timestamp
         const location = await db.location.update({
             where: { 
                 id: locationId,
