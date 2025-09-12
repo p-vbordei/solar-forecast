@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { LocationCreateInput, LocationSummary, LocationTechnicalDetails } from '$lib/types/location';
-	import { LOCATION_DEFAULTS, getOptimalTilt, detectTimezone } from '$lib/types/location';
+	import type { LocationCreateInput, LocationSummary, LocationTechnicalDetails } from '$lib/features/locations/models/dto/location';
+	import { LOCATION_DEFAULTS, getOptimalTilt, detectTimezone } from '$lib/features/locations/models/dto/location';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
 	import PlusIcon from '$lib/components/icons/PlusIcon.svelte';
