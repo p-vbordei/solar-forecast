@@ -1,11 +1,13 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import type { CreateLocationRequest } from '$lib/features/locations/models/requests/CreateLocationRequest';
 import { CoordinatesValidator } from '$lib/features/locations/helpers/CoordinatesValidator';
+import { LocationsService } from '$lib/features/locations/services/LocationsService';
 import { ApiResponse } from '$lib/utils/ApiResponse';
 import { ErrorHandler, withErrorHandling } from '$lib/utils/ErrorHandler';
 import { BadRequestError, LocationNotFoundError } from '$lib/utils/ApiErrors';
 
 export class LocationsController {
+    private locationsService = new LocationsService();
     /**
      * GET /api/locations
      * Get all locations with optional filtering
@@ -29,15 +31,18 @@ export class LocationsController {
                 throw new BadRequestError('Offset must be non-negative', 'offset');
             }
             
-            // TODO: Call service layer to get all locations with filters
-            
-            // Calculate page number from offset and limit
-            const current = Math.floor(offset / limit) + 1;
+            // Call service layer to get all locations with filters
+            const result = await this.locationsService.getAllLocations({
+                search,
+                status,
+                limit,
+                offset
+            });
             
             return ApiResponse.successWithPagination(
-                [], // TODO: Return actual locations
-                { total: 0, size: limit, current }, // TODO: Return actual count
-                { search, status }
+                result.locations,
+                result.pagination,
+                result.filters
             );
         })();
     }
@@ -50,10 +55,10 @@ export class LocationsController {
         return withErrorHandling(async () => {
             const locationId = event.params.id!; // GUID is mandatory in path
             
-            // TODO: Call service layer to get location by GUID
-            // Throw LocationNotFoundError if not found
+            // Call service layer to get location by GUID
+            const location = await this.locationsService.getLocationById(locationId);
             
-            return ApiResponse.success(null); // TODO: Return actual location
+            return ApiResponse.success(location);
         })();
     }
 
@@ -68,10 +73,10 @@ export class LocationsController {
             // Parse request body
             const updateData = await event.request.json();
             
-            // TODO: Validate update data
-            // TODO: Call service layer to update location by GUID
+            // Call service layer to update location by GUID
+            const updatedLocation = await this.locationsService.updateLocation(locationId, updateData);
             
-            return ApiResponse.success(null, 'Location updated successfully'); // TODO: Return updated location
+            return ApiResponse.success(updatedLocation, 'Location updated successfully');
         })();
     }
 
@@ -83,8 +88,8 @@ export class LocationsController {
         return withErrorHandling(async () => {
             const locationId = event.params.id!; // GUID is mandatory in path
             
-            // TODO: Call service layer to delete location by GUID
-            // Throw LocationNotFoundError if not found
+            // Call service layer to delete location by GUID
+            await this.locationsService.deleteLocation(locationId);
             
             return ApiResponse.success(undefined, 'Location deleted successfully');
         })();
@@ -102,12 +107,10 @@ export class LocationsController {
             // Validate required fields using CoordinatesValidator
             CoordinatesValidator.validateCreateLocationRequest(requestData);
             
-            // TODO: Transform request to domain model
+            // Call service layer to create location
+            const createdLocation = await this.locationsService.createLocation(requestData);
             
-            // TODO: Call service layer to create location
-            // Throw LocationExistsError if name already exists
-            
-            return ApiResponse.created(null, 'Location created successfully'); // TODO: Return created location
+            return ApiResponse.created(createdLocation, 'Location created successfully');
         })();
     }
 }
