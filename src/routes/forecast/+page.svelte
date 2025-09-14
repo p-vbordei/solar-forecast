@@ -111,7 +111,8 @@
 		await loadForecastData();
 
 		// Show success message
-		const dataPoints = event.detail.data?.length || 0;
+		// Check both possible data structures
+		const dataPoints = event.detail.data?.data?.length || event.detail.data?.length || 0;
 		const dataType = isMockData ? 'Mock forecast' : 'Forecast';
 		alert(`${dataType} generated successfully! ${dataPoints} data points created.`);
 	}

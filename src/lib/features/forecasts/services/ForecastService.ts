@@ -133,10 +133,8 @@ export class ForecastService {
             // Get Python worker URL from environment
             const pythonWorkerUrl = process.env.PYTHON_WORKER_URL || 'http://localhost:8001';
 
-            // Call Python worker API for forecast generation with timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
+            // Call Python worker API for forecast generation
+            // No timeout here - we'll handle async processing with polling
             let pythonWorkerResponse;
             try {
                 pythonWorkerResponse = await fetch(`${pythonWorkerUrl}/api/v1/forecasts/generate`, {
@@ -148,21 +146,12 @@ export class ForecastService {
                         model_type: params.modelType,  // Pass model type directly as received
                         use_weather: params.useWeather !== false,  // Default to true
                         confidence_level: params.confidenceLevel || 0.95
-                    }),
-                    signal: controller.signal
+                    })
                 });
-                clearTimeout(timeoutId);
             } catch (fetchError) {
-                clearTimeout(timeoutId);
-
-                // Check if it's a timeout or connection error
-                if (fetchError.name === 'AbortError') {
-                    console.warn('Python worker timeout, falling back to mock data');
-                    throw new Error('Python worker timeout - using mock data fallback');
-                } else {
-                    console.warn('Python worker connection failed, falling back to mock data');
-                    throw new Error('Python worker not available - using mock data fallback');
-                }
+                // Connection error
+                console.warn('Python worker connection failed:', fetchError);
+                throw new Error('Python worker not available - using mock data fallback');
             }
 
             if (!pythonWorkerResponse.ok) {
@@ -190,12 +179,17 @@ export class ForecastService {
 
             // Check if task_id was returned (async processing)
             if (forecastResult.task_id) {
+                console.log('Python worker returned task ID:', forecastResult.task_id);
+
                 // Poll for task completion
-                const maxAttempts = 60; // 60 seconds timeout
+                const maxAttempts = 30; // 30 seconds timeout
                 let attempts = 0;
 
                 while (attempts < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                    attempts++;
+
+                    console.log(`Polling task status (attempt ${attempts}/${maxAttempts})...`);
 
                     const statusResponse = await fetch(
                         `${pythonWorkerUrl}/api/v1/forecasts/task/${forecastResult.task_id}`
@@ -203,8 +197,10 @@ export class ForecastService {
 
                     if (statusResponse.ok) {
                         const statusData = await statusResponse.json();
+                        console.log('Task status:', statusData.status);
 
                         if (statusData.status === 'completed') {
+                            console.log('Task completed successfully!');
                             // Transform and store forecast data
                             const transformedData = this.transformPythonWorkerResponse(
                                 statusData.result,
@@ -226,13 +222,63 @@ export class ForecastService {
                                 }
                             };
                         } else if (statusData.status === 'failed') {
+                            console.error('Task failed:', statusData.error);
                             throw new Error(statusData.error || 'Forecast generation failed');
                         }
-                    }
+                    } else if (statusResponse.status === 404) {
+                        // Task not found - Python worker might have completed it already
+                        // Try to get forecasts directly
+                        console.log('Task not found, checking for completed forecasts...');
 
-                    attempts++;
+                        const forecastsResponse = await fetch(
+                            `${pythonWorkerUrl}/api/v1/forecasts/location/${params.locationId}`
+                        );
+
+                        if (forecastsResponse.ok) {
+                            const forecasts = await forecastsResponse.json();
+                            if (forecasts && forecasts.length > 0) {
+                                console.log('Found', forecasts.length, 'forecasts from Python worker');
+
+                                // Transform the forecasts to our format
+                                const transformedData = forecasts.slice(0, params.horizonHours).map((f: any) => ({
+                                    locationId: params.locationId,
+                                    timestamp: new Date(f.time).toISOString(),
+                                    powerForecastMw: f.power_output_mw || 0,
+                                    energyMwh: f.energy_mwh,
+                                    capacityFactor: f.capacity_factor,
+                                    confidenceScore: f.quality_score || 0.95,
+                                    modelType: f.model_type || params.modelType,
+                                    horizonHours: params.horizonHours,
+                                    temperature: f.temperature,
+                                    ghi: f.ghi,
+                                    dni: f.dni,
+                                    cloudCover: f.cloud_cover,
+                                    windSpeed: f.wind_speed
+                                }));
+
+                                // Store in our database
+                                await this.repository.bulkInsertForecasts(transformedData);
+
+                                return {
+                                    success: true,
+                                    forecastId: forecastResult.task_id,
+                                    data: transformedData,
+                                    metadata: {
+                                        generatedAt: new Date().toISOString(),
+                                        modelType: params.modelType,
+                                        horizonHours: params.horizonHours,
+                                        dataPoints: transformedData.length,
+                                        isMockData: false
+                                    }
+                                };
+                            }
+                        }
+
+                        console.log('Task not found and no forecasts available');
+                    }
                 }
 
+                console.error('Forecast generation timeout after', maxAttempts, 'seconds');
                 throw new Error('Forecast generation timeout');
             } else {
                 // Direct response (synchronous)
