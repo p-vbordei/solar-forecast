@@ -122,6 +122,7 @@
 
 	// Fetch real data from API
 	async function fetchWeatherData(timeRange: string = 'Today') {
+		console.log('Fetching weather data:', { locationId, timeRange, params: selectedParameters });
 		isLoading = true;
 		errorMessage = '';
 
@@ -132,6 +133,7 @@
 			// Fetch real data from our API
 			const response = await fetch(`/api/weather/chart-data?location_id=${locationId}&time_range=${timeRange}&parameters=${params}`);
 			const result = await response.json();
+			console.log('API response:', result);
 
 			if (result.success && result.data) {
 				return result.data;
@@ -144,7 +146,9 @@
 			console.error('Error fetching weather data:', error);
 			errorMessage = 'Failed to load weather data';
 			// Fall back to generating mock data locally
-			return generateMockData(timeRange);
+			const mockData = generateMockData(timeRange);
+			console.log('Generated mock data:', mockData);
+			return mockData;
 		} finally {
 			isLoading = false;
 		}
@@ -217,19 +221,28 @@
 		if (data && data.labels) {
 			originalLabels = [...data.labels]; // Store original labels
 		}
+		// Wait a tick to ensure DOM is ready
+		await new Promise(resolve => setTimeout(resolve, 0));
 		updateChart();
 	}
 
 	async function updateChart() {
-		if (!chartContainer || typeof window === 'undefined') return;
+		if (!chartContainer || typeof window === 'undefined' || !forecastData) {
+			console.log('Chart update skipped:', {
+				hasContainer: !!chartContainer,
+				isBrowser: typeof window !== 'undefined',
+				hasData: !!forecastData
+			});
+			return;
+		}
 
 		// Import ECharts dynamically
 		import('echarts').then(async (echarts) => {
+			console.log('Initializing chart with data:', forecastData);
 			const chart = echarts.init(chartContainer, 'dark');
 
-			// Fetch real data from API
-			const chartData = await fetchWeatherData(activeTimeRange);
-			const { labels, datasets } = chartData;
+			// Use the already fetched data
+			const { labels, datasets } = forecastData;
 
 			// Apply timezone conversion to labels
 			const adjustedLabels = formatLabelsForTimezone(labels, 2); // Romania is UTC+2
@@ -339,6 +352,7 @@
 				series: series
 			};
 
+			console.log('Setting chart options:', { option, series: series.length, labels: adjustedLabels.length });
 			chart.setOption(option);
 			
 			// Handle window resize
@@ -372,7 +386,10 @@
 		updateChartData();
 	}
 
+	let mounted = false;
+
 	onMount(async () => {
+		mounted = true;
 		// Load saved timezone preference
 		if (typeof window !== 'undefined') {
 			const savedTimezone = localStorage.getItem(`timezone_location_${locationId}`);
@@ -385,12 +402,12 @@
 	});
 
 	// Update chart when container is available and we have data
-	$: if (chartContainer && forecastData) {
+	$: if (chartContainer && forecastData && typeof window !== 'undefined') {
 		updateChart();
 	}
 
-	// Update chart when location changes
-	$: if (locationId) {
+	// Update chart when location changes (only in browser after mount)
+	$: if (mounted && locationId) {
 		updateChartData();
 	}
 </script>
@@ -441,9 +458,9 @@
 
 	<!-- Parameter Selector -->
 	<div class="mb-6">
-		<label class="block text-sm font-medium text-soft-blue mb-2">
+		<div class="block text-sm font-medium text-soft-blue mb-2">
 			Weather Parameters ({selectedParameters.length}/4 selected)
-		</label>
+		</div>
 		<div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
 			{#each Object.entries(weatherParameters) as [key, param]}
 				<button
