@@ -6,6 +6,10 @@ AM NEVOIE CA ACESTE ELEMENTE DE DESIGN SA FIE IMPLEMENTATE PRIN TAILWIND CSS
 # ICONITELE VOR FI DE TIP LINEART / VECTORIALA SI NU VOR FI ICONITE DE TIP SVG
 
 
+
+#### PLEASE BE VERY CAREFUL REGARDING LOCATION IDs.
+WE USE UUID / GUID that are strings and not integers.
+
 #### **🎨 Color Palette**
 Primary colors for the futuristic energy trading interface:
 

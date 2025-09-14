@@ -130,30 +130,108 @@ export class ForecastService {
         this.validateGuidFormat(params.locationId);
 
         try {
-            // TODO: Replace with actual Python worker API call
-            // const pythonWorkerResponse = await fetch('http://localhost:8001/api/forecasts/generate', {
-            //   method: 'POST',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify(params)
-            // });
+            // Get Python worker URL from environment
+            const pythonWorkerUrl = process.env.PYTHON_WORKER_URL || 'http://localhost:8001';
 
-            // For now, generate enhanced mock forecast
-            const mockForecastData = await this.generateEnhancedMockForecast(params);
-
-            // Store forecast in database using repository bulk insert
-            await this.repository.bulkInsertForecasts(mockForecastData);
-
-            return {
-                success: true,
-                forecastId: `forecast_${Date.now()}`,
-                data: mockForecastData,
-                metadata: {
-                    generatedAt: new Date().toISOString(),
-                    modelType: params.modelType,
-                    horizonHours: params.horizonHours,
-                    dataPoints: mockForecastData.length
-                }
+            // Map SvelteKit model type to Python worker model type
+            const modelTypeMapping: Record<string, string> = {
+                'lstm': 'catboost',  // Map all to catboost for now
+                'xgboost': 'catboost',
+                'random_forest': 'catboost',
+                'arima': 'catboost',
+                'prophet': 'catboost',
+                'ensemble': 'catboost',
+                'catboost': 'catboost'
             };
+
+            // Call Python worker API for forecast generation
+            const pythonWorkerResponse = await fetch(`${pythonWorkerUrl}/api/v1/forecasts/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    location_id: params.locationId,  // Python worker expects GUID string
+                    forecast_hours: params.horizonHours,
+                    model_type: modelTypeMapping[params.modelType.toLowerCase()] || 'catboost',
+                    use_weather: params.useWeather !== false,  // Default to true
+                    confidence_level: params.confidenceLevel || 0.95
+                })
+            });
+
+            if (!pythonWorkerResponse.ok) {
+                const errorData = await pythonWorkerResponse.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Python worker returned ${pythonWorkerResponse.status}`);
+            }
+
+            const forecastResult = await pythonWorkerResponse.json();
+
+            // Check if task_id was returned (async processing)
+            if (forecastResult.task_id) {
+                // Poll for task completion
+                const maxAttempts = 60; // 60 seconds timeout
+                let attempts = 0;
+
+                while (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+
+                    const statusResponse = await fetch(
+                        `${pythonWorkerUrl}/api/v1/forecasts/task/${forecastResult.task_id}`
+                    );
+
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+
+                        if (statusData.status === 'completed') {
+                            // Transform and store forecast data
+                            const transformedData = this.transformPythonWorkerResponse(
+                                statusData.result,
+                                params
+                            );
+
+                            // Store in database
+                            await this.repository.bulkInsertForecasts(transformedData);
+
+                            return {
+                                success: true,
+                                forecastId: forecastResult.task_id,
+                                data: transformedData,
+                                metadata: {
+                                    generatedAt: new Date().toISOString(),
+                                    modelType: params.modelType,
+                                    horizonHours: params.horizonHours,
+                                    dataPoints: transformedData.length
+                                }
+                            };
+                        } else if (statusData.status === 'failed') {
+                            throw new Error(statusData.error || 'Forecast generation failed');
+                        }
+                    }
+
+                    attempts++;
+                }
+
+                throw new Error('Forecast generation timeout');
+            } else {
+                // Direct response (synchronous)
+                const transformedData = this.transformPythonWorkerResponse(
+                    forecastResult,
+                    params
+                );
+
+                // Store in database
+                await this.repository.bulkInsertForecasts(transformedData);
+
+                return {
+                    success: true,
+                    forecastId: `forecast_${Date.now()}`,
+                    data: transformedData,
+                    metadata: {
+                        generatedAt: new Date().toISOString(),
+                        modelType: params.modelType,
+                        horizonHours: params.horizonHours,
+                        dataPoints: transformedData.length
+                    }
+                };
+            }
         } catch (error) {
             console.error('Forecast generation failed:', error);
             throw new Error(`Failed to generate forecast: ${error.message}`);
@@ -197,7 +275,7 @@ export class ForecastService {
             throw new Error('Model type is required');
         }
 
-        const validModelTypes = ['lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'];
+        const validModelTypes = ['catboost', 'lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'];
         if (!validModelTypes.includes(params.modelType.toLowerCase())) {
             throw new Error(`Invalid model type. Valid types: ${validModelTypes.join(', ')}`);
         }
@@ -318,6 +396,78 @@ export class ForecastService {
             nrmse: parseFloat(nrmse.toFixed(2)),
             validPoints
         };
+    }
+
+    /**
+     * Transform Python worker response to database format
+     */
+    private transformPythonWorkerResponse(
+        pythonResponse: any,
+        params: GenerateForecastRequest
+    ): BulkForecastInsert[] {
+        const forecasts: BulkForecastInsert[] = [];
+
+        // Handle both direct forecasts and nested structure
+        const forecastData = pythonResponse.forecasts || pythonResponse;
+
+        if (Array.isArray(forecastData)) {
+            forecastData.forEach((point: any) => {
+                forecasts.push({
+                    locationId: params.locationId,
+                    timestamp: new Date(point.timestamp),
+                    powerForecastMw: parseFloat(point.power_forecast_mw || point.forecast || 0),
+                    confidenceScore: parseFloat(
+                        point.confidence_score ||
+                        point.confidence ||
+                        0.85
+                    ),
+                    modelType: params.modelType,
+                    horizonHours: params.horizonHours
+                });
+            });
+        } else if (forecastData.timestamps && forecastData.values) {
+            // Handle separate arrays format
+            const timestamps = forecastData.timestamps;
+            const values = forecastData.values;
+            const lowerBounds = forecastData.lower_bounds || [];
+            const upperBounds = forecastData.upper_bounds || [];
+
+            for (let i = 0; i < timestamps.length; i++) {
+                const confidence = this.calculateConfidenceFromBounds(
+                    values[i],
+                    lowerBounds[i],
+                    upperBounds[i]
+                );
+
+                forecasts.push({
+                    locationId: params.locationId,
+                    timestamp: new Date(timestamps[i]),
+                    powerForecastMw: parseFloat(values[i] || 0),
+                    confidenceScore: confidence,
+                    modelType: params.modelType,
+                    horizonHours: params.horizonHours
+                });
+            }
+        }
+
+        return forecasts;
+    }
+
+    /**
+     * Calculate confidence score from prediction bounds
+     */
+    private calculateConfidenceFromBounds(
+        value: number,
+        lowerBound?: number,
+        upperBound?: number
+    ): number {
+        if (lowerBound !== undefined && upperBound !== undefined && value > 0) {
+            const range = upperBound - lowerBound;
+            const relativeRange = range / value;
+            // Convert relative range to confidence (smaller range = higher confidence)
+            return Math.max(0.5, Math.min(1.0, 1.0 - relativeRange / 2));
+        }
+        return 0.85; // Default confidence
     }
 
     /**

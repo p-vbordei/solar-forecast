@@ -11,6 +11,63 @@
 		4: 'Coastal Solar Array - Constanta'
 	};
 
+	// Available timezones for display
+	const availableTimezones = [
+		{ value: 'UTC', label: 'UTC', offset: 0 },
+		{ value: 'Europe/London', label: 'London (GMT)', offset: 0 },
+		{ value: 'Europe/Paris', label: 'Paris (CET)', offset: 1 },
+		{ value: 'Europe/Bucharest', label: 'Bucharest (EET)', offset: 2 },
+		{ value: 'America/New_York', label: 'New York (EST)', offset: -5 },
+		{ value: 'America/Chicago', label: 'Chicago (CST)', offset: -6 },
+		{ value: 'America/Denver', label: 'Denver (MST)', offset: -7 },
+		{ value: 'America/Los_Angeles', label: 'Los Angeles (PST)', offset: -8 },
+		{ value: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 9 },
+		{ value: 'Asia/Shanghai', label: 'Shanghai (CST)', offset: 8 },
+		{ value: 'Australia/Sydney', label: 'Sydney (AEDT)', offset: 11 }
+	];
+
+	// Selected timezone for display
+	let selectedTimezone = 'Europe/Bucharest';
+
+	// Save timezone preference when changed
+	function handleTimezoneChange() {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem(`timezone_location_${locationId}`, selectedTimezone);
+		}
+		updateChart();
+	}
+
+	// Format labels based on selected timezone
+	function formatLabelsForTimezone(labels: string[], fromOffset: number = 2): string[] {
+		const selectedTz = availableTimezones.find(tz => tz.value === selectedTimezone);
+		if (!selectedTz) return labels;
+
+		const offsetDiff = selectedTz.offset - fromOffset;
+
+		return labels.map(label => {
+			// Parse the time from the label
+			const [time, period] = label.split(' ');
+			const [hours, minutes] = time.split(':').map(Number);
+			let hour24 = hours;
+			if (period === 'PM' && hours !== 12) hour24 += 12;
+			if (period === 'AM' && hours === 12) hour24 = 0;
+
+			// Apply timezone offset
+			let newHour = hour24 + offsetDiff;
+
+			// Handle day boundaries
+			if (newHour < 0) newHour += 24;
+			if (newHour >= 24) newHour -= 24;
+
+			// Format back to 12-hour format
+			const isPM = newHour >= 12;
+			let hour12 = newHour % 12;
+			if (hour12 === 0) hour12 = 12;
+
+			return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+		});
+	}
+
 	// Location-specific weather characteristics
 	const locationWeatherProfiles = {
 		1: { // Solar Farm Alpha - Bucharest
@@ -58,6 +115,7 @@
 
 	// Real-time forecast data from API
 	let forecastData: any = null;
+	let originalLabels: string[] = []; // Store original labels before timezone conversion
 	let chartContainer: HTMLDivElement;
 	let isLoading = false;
 	let errorMessage = '';
@@ -156,6 +214,9 @@
 	async function updateChartData() {
 		const data = await fetchWeatherData(activeTimeRange);
 		forecastData = data;
+		if (data && data.labels) {
+			originalLabels = [...data.labels]; // Store original labels
+		}
 		updateChart();
 	}
 
@@ -169,6 +230,9 @@
 			// Fetch real data from API
 			const chartData = await fetchWeatherData(activeTimeRange);
 			const { labels, datasets } = chartData;
+
+			// Apply timezone conversion to labels
+			const adjustedLabels = formatLabelsForTimezone(labels, 2); // Romania is UTC+2
 
 			// Convert datasets to ECharts series format
 			const series = datasets.map((dataset, index) => {
@@ -234,7 +298,7 @@
 				},
 				xAxis: {
 					type: 'category',
-					data: labels,
+					data: adjustedLabels,
 					axisLine: {
 						lineStyle: { color: '#0FA4AF' }
 					},
@@ -309,6 +373,13 @@
 	}
 
 	onMount(async () => {
+		// Load saved timezone preference
+		if (typeof window !== 'undefined') {
+			const savedTimezone = localStorage.getItem(`timezone_location_${locationId}`);
+			if (savedTimezone && availableTimezones.find(tz => tz.value === savedTimezone)) {
+				selectedTimezone = savedTimezone;
+			}
+		}
 		// Fetch data first, then update chart
 		await updateChartData();
 	});
@@ -346,6 +417,28 @@
 		</div>
 	</div>
 
+	<!-- Timezone Selector -->
+	<div class="mb-4 flex items-center gap-4">
+		<label for="dashboard-timezone-select" class="text-sm font-medium text-soft-blue">
+			Display Timezone:
+		</label>
+		<select
+			id="dashboard-timezone-select"
+			bind:value={selectedTimezone}
+			on:change={handleTimezoneChange}
+			class="bg-glass-white border border-soft-blue/20 rounded-lg px-3 py-1.5 text-sm text-soft-blue focus:outline-none focus:border-cyan"
+		>
+			{#each availableTimezones as tz}
+				<option value={tz.value} class="bg-dark-petrol text-soft-blue">
+					{tz.label}
+				</option>
+			{/each}
+		</select>
+		<span class="text-xs text-soft-blue/60">
+			Local time: {locations[locationId] || 'Selected Location'} (EET/UTC+2)
+		</span>
+	</div>
+
 	<!-- Parameter Selector -->
 	<div class="mb-6">
 		<label class="block text-sm font-medium text-soft-blue mb-2">
@@ -381,16 +474,35 @@
 	</div>
 	
 	<!-- Current Values Summary -->
-	{#if forecastData && forecastData.datasets && forecastData.labels}
+	{#if forecastData && forecastData.datasets && originalLabels.length > 0}
 	<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
 		{#each selectedParameters as paramKey, index}
 			{@const param = weatherParameters[paramKey]}
 			{@const dataset = forecastData.datasets.find(d => d.label === param.name)}
 			{@const now = new Date()}
 			{@const currentTimeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-			{@const currentIndex = forecastData.labels.findIndex(label => label === currentTimeLabel)}
-			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (forecastData.labels.length - 1))}
-			{@const currentValue = dataset?.data?.[validIndex] ?? 0}
+			{@const currentIndex = originalLabels.findIndex(label => label === currentTimeLabel)}
+			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (originalLabels.length - 1))}
+			{@const currentValue = (() => {
+				if (!dataset?.data) return 0;
+
+				// Special handling for Solar Radiation parameters
+				if (paramKey === 'shortwave_radiation') {
+					// Get all non-null values
+					const nonNullValues = dataset.data.filter(val => val !== null && val !== undefined && val > 0);
+					if (nonNullValues.length === 0) return 0;
+
+					// Sort values in descending order and get top 10
+					const sortedValues = nonNullValues.sort((a, b) => b - a);
+					const top10Values = sortedValues.slice(0, 10);
+
+					// Return average of top 10 values
+					return top10Values.reduce((sum, val) => sum + val, 0) / top10Values.length;
+				}
+
+				// For other parameters, use current time value
+				return dataset.data[validIndex] ?? 0;
+			})()}
 			<div class="bg-glass-white rounded-lg p-3">
 				<div class="flex items-center space-x-2 mb-1">
 					<div

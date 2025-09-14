@@ -39,6 +39,10 @@ export const swaggerSpec = {
     {
       name: 'Reports',
       description: 'Report generation and management'
+    },
+    {
+      name: 'Forecasts',
+      description: 'Solar power forecasting with Python worker integration'
     }
   ],
   paths: {
@@ -917,6 +921,196 @@ export const swaggerSpec = {
           }
         }
       }
+    },
+    '/api/forecast/generate': {
+      post: {
+        tags: ['Forecasts'],
+        summary: 'Generate solar power forecast',
+        description: 'Generate a new solar power forecast using Python worker ML models',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/GenerateForecastRequest' }
+            }
+          }
+        },
+        responses: {
+          201: {
+            description: 'Forecast generated successfully',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ForecastResponse' }
+              }
+            }
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          500: { $ref: '#/components/responses/InternalError' }
+        }
+      }
+    },
+    '/api/forecast/worker/status': {
+      get: {
+        tags: ['Forecasts'],
+        summary: 'Check Python worker status',
+        description: 'Verify connectivity and health of the Python worker service',
+        responses: {
+          200: {
+            description: 'Python worker status information',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/WorkerStatusResponse' }
+              }
+            }
+          },
+          503: {
+            description: 'Python worker unavailable',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/api/forecast/worker/bulk': {
+      post: {
+        tags: ['Forecasts'],
+        summary: 'Generate bulk forecasts',
+        description: 'Generate forecasts for multiple locations simultaneously',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/BulkForecastRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Bulk forecast initiated',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/BulkForecastResponse' }
+              }
+            }
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          500: { $ref: '#/components/responses/InternalError' }
+        }
+      },
+      get: {
+        tags: ['Forecasts'],
+        summary: 'Check bulk forecast status',
+        description: 'Check the status of a bulk forecast operation',
+        parameters: [
+          {
+            name: 'task_id',
+            in: 'query',
+            required: true,
+            description: 'Task ID from bulk forecast initiation',
+            schema: { type: 'string' }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Bulk forecast status',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/BulkForecastStatusResponse' }
+              }
+            }
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          500: { $ref: '#/components/responses/InternalError' }
+        }
+      }
+    },
+    '/api/forecast/worker/validate': {
+      post: {
+        tags: ['Forecasts'],
+        summary: 'Validate forecast parameters',
+        description: 'Validate forecast parameters and test connection before generating actual forecasts',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ValidateForecastRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Validation successful',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ValidationResponse' }
+              }
+            }
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          404: {
+            description: 'Location not found',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          503: {
+            description: 'Python worker unavailable',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/api/forecast/worker/models': {
+      get: {
+        tags: ['Forecasts'],
+        summary: 'Get available ML models',
+        description: 'Retrieve list of available forecasting models from Python worker',
+        responses: {
+          200: {
+            description: 'Available models list',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ModelsResponse' }
+              }
+            }
+          },
+          500: { $ref: '#/components/responses/InternalError' }
+        }
+      },
+      post: {
+        tags: ['Forecasts'],
+        summary: 'Test ML model',
+        description: 'Test a specific model with a sample forecast request',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/TestModelRequest' }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Model test successful',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ModelTestResponse' }
+              }
+            }
+          },
+          400: { $ref: '#/components/responses/BadRequest' },
+          500: { $ref: '#/components/responses/InternalError' }
+        }
+      }
     }
   },
   components: {
@@ -1524,6 +1718,256 @@ export const swaggerSpec = {
             example: 'VALIDATION_ERROR',
             enum: ['BAD_REQUEST', 'NOT_FOUND', 'CONFLICT', 'VALIDATION_ERROR', 'INTERNAL_ERROR']
           }
+        }
+      },
+      GenerateForecastRequest: {
+        type: 'object',
+        required: ['locationId', 'horizonHours', 'modelType'],
+        properties: {
+          locationId: {
+            type: 'string',
+            description: 'Location GUID',
+            example: '123e4567-e89b-12d3-a456-426614174000'
+          },
+          horizonHours: {
+            type: 'integer',
+            description: 'Forecast horizon in hours',
+            enum: [24, 48, 72],
+            example: 24
+          },
+          modelType: {
+            type: 'string',
+            description: 'ML model type to use',
+            enum: ['catboost', 'lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'],
+            example: 'catboost'
+          },
+          useWeather: {
+            type: 'boolean',
+            description: 'Include weather data in forecast',
+            default: true,
+            example: true
+          },
+          confidenceLevel: {
+            type: 'number',
+            description: 'Confidence level for prediction intervals',
+            minimum: 0.5,
+            maximum: 0.99,
+            default: 0.95,
+            example: 0.95
+          }
+        }
+      },
+      ForecastResponse: {
+        type: 'object',
+        required: ['success', 'forecastId', 'data', 'metadata'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          forecastId: { type: 'string', example: 'task_1234567890' },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ForecastDataPoint' }
+          },
+          metadata: { $ref: '#/components/schemas/ForecastMetadata' }
+        }
+      },
+      ForecastDataPoint: {
+        type: 'object',
+        properties: {
+          timestamp: { type: 'string', format: 'date-time' },
+          powerForecastMw: { type: 'number', description: 'Forecasted power in MW' },
+          confidenceScore: { type: 'number', description: 'Prediction confidence (0-1)' }
+        }
+      },
+      ForecastMetadata: {
+        type: 'object',
+        properties: {
+          generatedAt: { type: 'string', format: 'date-time' },
+          modelType: { type: 'string' },
+          horizonHours: { type: 'integer' },
+          dataPoints: { type: 'integer' }
+        }
+      },
+      WorkerStatusResponse: {
+        type: 'object',
+        required: ['success', 'status'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          status: {
+            type: 'string',
+            enum: ['connected', 'disconnected', 'error'],
+            example: 'connected'
+          },
+          worker_url: { type: 'string', example: 'http://localhost:8001' },
+          worker_health: { type: 'object', description: 'Health status from Python worker' },
+          timestamp: { type: 'string', format: 'date-time' }
+        }
+      },
+      BulkForecastRequest: {
+        type: 'object',
+        required: ['location_ids'],
+        properties: {
+          location_ids: {
+            type: 'array',
+            items: { type: 'integer' },
+            description: 'Array of location IDs',
+            example: [1, 2, 3]
+          },
+          forecast_hours: {
+            type: 'integer',
+            enum: [24, 48, 72],
+            default: 24,
+            example: 24
+          },
+          model_type: {
+            type: 'string',
+            enum: ['catboost', 'lstm', 'xgboost'],
+            default: 'catboost',
+            example: 'catboost'
+          }
+        }
+      },
+      BulkForecastResponse: {
+        type: 'object',
+        required: ['success', 'task_id'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          task_id: { type: 'string', example: 'bulk_task_1234567890' },
+          locations: {
+            type: 'array',
+            items: { type: 'integer' }
+          },
+          forecast_hours: { type: 'integer' },
+          model_type: { type: 'string' },
+          status: { type: 'string', example: 'initiated' },
+          timestamp: { type: 'string', format: 'date-time' }
+        }
+      },
+      BulkForecastStatusResponse: {
+        type: 'object',
+        required: ['success', 'task_id', 'status'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          task_id: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['pending', 'running', 'completed', 'failed'],
+            example: 'running'
+          },
+          progress: { type: 'object', description: 'Progress information' },
+          results: { type: 'object', description: 'Results if completed' },
+          error: { type: 'string', description: 'Error message if failed' },
+          timestamp: { type: 'string', format: 'date-time' }
+        }
+      },
+      ValidateForecastRequest: {
+        type: 'object',
+        required: ['location_id'],
+        properties: {
+          location_id: {
+            type: 'integer',
+            description: 'Location ID',
+            example: 1
+          },
+          forecast_hours: {
+            type: 'integer',
+            enum: [24, 48, 72],
+            default: 24,
+            example: 24
+          },
+          model_type: {
+            type: 'string',
+            enum: ['catboost', 'lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'],
+            default: 'catboost',
+            example: 'catboost'
+          }
+        }
+      },
+      ValidationResponse: {
+        type: 'object',
+        required: ['success', 'validation'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          validation: {
+            type: 'object',
+            properties: {
+              parameters: { type: 'string', example: 'valid' },
+              location: { type: 'string', example: 'exists' },
+              worker_connection: { type: 'string', example: 'healthy' },
+              data_quality: { type: 'object', description: 'Data quality information' }
+            }
+          },
+          request_summary: { type: 'object', description: 'Summary of validated request' },
+          recommendations: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Recommendations for forecast generation'
+          }
+        }
+      },
+      ModelsResponse: {
+        type: 'object',
+        required: ['success', 'models'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          models: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ModelInfo' }
+          },
+          source: {
+            type: 'string',
+            enum: ['python_worker', 'fallback'],
+            example: 'python_worker'
+          },
+          timestamp: { type: 'string', format: 'date-time' }
+        }
+      },
+      ModelInfo: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'catboost' },
+          name: { type: 'string', example: 'CatBoost' },
+          description: { type: 'string', example: 'Gradient boosting with quantile regression' },
+          status: {
+            type: 'string',
+            enum: ['available', 'unavailable', 'deprecated'],
+            example: 'available'
+          },
+          confidence: {
+            type: 'string',
+            enum: ['high', 'medium', 'low'],
+            example: 'high'
+          },
+          best_for: { type: 'string', example: 'General purpose forecasting' }
+        }
+      },
+      TestModelRequest: {
+        type: 'object',
+        required: ['model_type', 'location_id'],
+        properties: {
+          model_type: { type: 'string', example: 'catboost' },
+          location_id: { type: 'integer', example: 1 }
+        }
+      },
+      ModelTestResponse: {
+        type: 'object',
+        required: ['success', 'model_type', 'status'],
+        properties: {
+          success: { type: 'boolean', example: true },
+          model_type: { type: 'string', example: 'catboost' },
+          status: {
+            type: 'string',
+            enum: ['working', 'failed', 'error'],
+            example: 'working'
+          },
+          test_result: {
+            type: 'object',
+            properties: {
+              forecast_points: { type: 'integer', example: 24 },
+              confidence_range: { type: 'string', example: '0.95' },
+              processing_time: { type: 'string', example: '2.3s' }
+            }
+          },
+          timestamp: { type: 'string', format: 'date-time' }
         }
       }
     }
