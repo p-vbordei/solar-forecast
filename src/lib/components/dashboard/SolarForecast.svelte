@@ -599,14 +599,9 @@
 			{@const param = weatherParameters[paramKey]}
 			{@const dataset = forecastData.datasets.find(d => d.label === param.name)}
 			{@const now = new Date()}
-			{@const currentHour = now.getHours()}
-			{@const currentMinutes = now.getMinutes()}
-			{@const currentMinutesRounded = currentMinutes < 30 ? '00' : '00'}
-			{@const isPM = currentHour >= 12}
-			{@const hour12 = currentHour === 0 ? 12 : currentHour > 12 ? currentHour - 12 : currentHour}
-			{@const currentTimeLabel = `${hour12.toString().padStart(2, '0')}:${currentMinutesRounded} ${isPM ? 'PM' : 'AM'}`}
+			{@const currentTimeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
 			{@const currentIndex = originalLabels.findIndex(label => label === currentTimeLabel)}
-			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(currentHour, (originalLabels.length - 1))}
+			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (originalLabels.length - 1))}
 			{@const currentValue = (() => {
 				if (!dataset?.data) return 0;
 
