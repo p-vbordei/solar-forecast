@@ -31,6 +31,10 @@ export const swaggerSpec = {
     {
       name: 'Reports',
       description: 'Report generation and management'
+    },
+    {
+      name: 'Historical Analysis',
+      description: 'Historical data analysis and template generation'
     }
   ],
   paths: {
@@ -812,6 +816,152 @@ export const swaggerSpec = {
           }
         }
       }
+    },
+    '/api/historical-analysis/generate-template': {
+      get: {
+        tags: ['Historical Analysis'],
+        summary: 'Generate production data template',
+        description: 'Generate a CSV template for production data with configurable parameters including location info, date range, and aggregation level',
+        parameters: [
+          {
+            name: 'location_name',
+            in: 'query',
+            description: 'Name of the solar location',
+            required: false,
+            schema: {
+              type: 'string',
+              default: 'Solar Farm Site A'
+            },
+            example: 'Solar Farm Alpha'
+          },
+          {
+            name: 'location_guid',
+            in: 'query',
+            description: 'GUID placeholder for the location',
+            required: false,
+            schema: {
+              type: 'string',
+              default: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+            },
+            example: '123e4567-e89b-12d3-a456-426614174000'
+          },
+          {
+            name: 'time_aggregation',
+            in: 'query',
+            description: 'Time aggregation level for the data',
+            required: false,
+            schema: {
+              type: 'string',
+              enum: ['15min', 'hourly', 'daily'],
+              default: 'hourly'
+            }
+          },
+          {
+            name: 'start_date',
+            in: 'query',
+            description: 'Start date for the template data range',
+            required: true,
+            schema: {
+              type: 'string',
+              format: 'date',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}$'
+            },
+            example: '2025-09-14'
+          },
+          {
+            name: 'end_date',
+            in: 'query',
+            description: 'End date for the template data range',
+            required: true,
+            schema: {
+              type: 'string',
+              format: 'date',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}$'
+            },
+            example: '2025-09-21'
+          },
+          {
+            name: 'timezone',
+            in: 'query',
+            description: 'Timezone in ±HH:MM format',
+            required: false,
+            schema: {
+              type: 'string',
+              pattern: '^[+-]\\d{2}:\\d{2}$',
+              default: '+03:00'
+            },
+            example: '+03:00'
+          },
+          {
+            name: 'format',
+            in: 'query',
+            description: 'Response format',
+            required: false,
+            schema: {
+              type: 'string',
+              enum: ['csv', 'json'],
+              default: 'csv'
+            }
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Production data template generated successfully',
+            content: {
+              'text/csv': {
+                schema: {
+                  type: 'string',
+                  format: 'binary',
+                  description: 'CSV file with metadata rows, header, and sample data'
+                },
+                example: `location_name,Solar Farm Site A
+location_guid,xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+time_aggregation,hourly
+start_date,2025-09-14
+end_date,2025-09-21
+timestamp,production,capacity_factor,availability
+2025-09-14 00:00:00+03:00,0.0,0.0,1.0
+2025-09-14 01:00:00+03:00,0.0,0.0,1.0`
+              },
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ProductionDataTemplate' }
+              }
+            }
+          },
+          400: {
+            description: 'Bad request - Invalid parameters',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  message: 'Invalid request parameters',
+                  details: [
+                    {
+                      code: 'invalid_string',
+                      expected: 'YYYY-MM-DD format',
+                      received: '2025/09/14',
+                      path: ['start_date'],
+                      message: 'Date must be in YYYY-MM-DD format'
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  message: 'Internal server error while generating template',
+                  details: 'Template generation failed'
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   components: {
@@ -1244,6 +1394,137 @@ export const swaggerSpec = {
             type: 'string',
             description: 'Human-readable file size',
             example: '1.05 MB'
+          }
+        }
+      },
+      GenerateTemplateRequest: {
+        type: 'object',
+        required: ['start_date', 'end_date'],
+        properties: {
+          location_name: {
+            type: 'string',
+            description: 'Name of the solar location',
+            default: 'Solar Farm Site A',
+            example: 'Solar Farm Alpha'
+          },
+          location_guid: {
+            type: 'string',
+            description: 'GUID placeholder for the location',
+            default: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+            example: '123e4567-e89b-12d3-a456-426614174000'
+          },
+          time_aggregation: {
+            type: 'string',
+            enum: ['15min', 'hourly', 'daily'],
+            description: 'Time aggregation level for the data',
+            default: 'hourly'
+          },
+          start_date: {
+            type: 'string',
+            format: 'date',
+            pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+            description: 'Start date for the template data range',
+            example: '2025-09-14'
+          },
+          end_date: {
+            type: 'string',
+            format: 'date',
+            pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+            description: 'End date for the template data range',
+            example: '2025-09-21'
+          },
+          timezone: {
+            type: 'string',
+            pattern: '^[+-]\\d{2}:\\d{2}$',
+            description: 'Timezone in ±HH:MM format',
+            default: '+03:00',
+            example: '+03:00'
+          },
+          format: {
+            type: 'string',
+            enum: ['csv', 'json'],
+            description: 'Response format',
+            default: 'csv'
+          }
+        }
+      },
+      ProductionDataTemplate: {
+        type: 'object',
+        required: ['metadata', 'data'],
+        properties: {
+          metadata: { $ref: '#/components/schemas/ProductionDataMetadata' },
+          data: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/ProductionDataRow' }
+          }
+        }
+      },
+      ProductionDataMetadata: {
+        type: 'object',
+        required: ['location_name', 'location_guid', 'time_aggregation', 'start_date', 'end_date'],
+        properties: {
+          location_name: {
+            type: 'string',
+            description: 'Name of the solar location',
+            example: 'Solar Farm Site A'
+          },
+          location_guid: {
+            type: 'string',
+            description: 'GUID of the location',
+            example: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+          },
+          time_aggregation: {
+            type: 'string',
+            enum: ['15min', 'hourly', 'daily'],
+            description: 'Time aggregation level',
+            example: 'hourly'
+          },
+          start_date: {
+            type: 'string',
+            format: 'date',
+            description: 'Start date of the data range',
+            example: '2025-09-14'
+          },
+          end_date: {
+            type: 'string',
+            format: 'date',
+            description: 'End date of the data range',
+            example: '2025-09-21'
+          }
+        }
+      },
+      ProductionDataRow: {
+        type: 'object',
+        required: ['timestamp', 'production', 'capacity_factor', 'availability'],
+        properties: {
+          timestamp: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Timestamp with UTC offset in YYYY-MM-DD HH:MM:SS±HH:MM format',
+            example: '2025-09-14 12:00:00+03:00'
+          },
+          production: {
+            type: 'number',
+            format: 'float',
+            description: 'Actual energy produced during interval in MWh',
+            minimum: 0,
+            example: 35.2
+          },
+          capacity_factor: {
+            type: 'number',
+            format: 'float',
+            description: 'Ratio of actual production to maximum capacity (0.0 - 1.0)',
+            minimum: 0,
+            maximum: 1,
+            example: 0.98
+          },
+          availability: {
+            type: 'number',
+            format: 'float',
+            description: 'System availability ratio (0.0 - 1.0)',
+            minimum: 0,
+            maximum: 1,
+            example: 1.0
           }
         }
       }
