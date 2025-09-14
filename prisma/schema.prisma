@@ -271,7 +271,6 @@ model Plant {
 model Forecast {
   id                String    @id @default(uuid())
   timestamp         DateTime
-  time              DateTime  // Legacy field name compatibility
   locationId        String
   
   // Primary forecast values (matching linear forecast CSV structure)
@@ -379,7 +378,6 @@ enum ModelType {
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
-  time              DateTime  // Legacy field name compatibility
   locationId        String
 
   // Core production metrics (essential for ML training & historical analysis)

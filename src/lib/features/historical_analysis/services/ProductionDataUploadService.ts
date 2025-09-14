@@ -108,7 +108,6 @@ export class ProductionDataUploadService {
 						productionDataToInsert.push({
 							id: crypto.randomUUID(),
 							timestamp: new Date(parsedRow.data.timestamp),
-							time: new Date(parsedRow.data.timestamp), // Legacy compatibility
 							locationId: locationId,
 							powerMW: parsedRow.data.productionPowerMw,
 							capacityFactor: parsedRow.data.capacityFactor,

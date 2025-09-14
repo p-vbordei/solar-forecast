@@ -10,6 +10,11 @@
 	let selectedLocation = 'all';
 	let chartContainer: HTMLDivElement;
 	let fileInput: HTMLInputElement;
+	let uploadedFile: File | null = null;
+	let validatedData: any[] = [];
+	let validationResults: any = null;
+	let isValidationPassed = false;
+	let isDragOver = false;
 	let isUploading = false;
 	let uploadError = '';
 	let showExplanation = false;
@@ -23,10 +28,99 @@
 	// Available locations (from uploaded data)
 	let availableLocations: string[] = ['all'];
 
+	// CSV validation constants
+	const expectedColumns = ['timestamp', 'production (powerMw)', 'capacity_factor', 'availability'];
+
+	function validateCSVStructure(headers: string[]) {
+		const missingColumns = expectedColumns.filter(col => !headers.includes(col));
+		return {
+			isValid: missingColumns.length === 0,
+			missingColumns: missingColumns,
+			foundColumns: headers
+		};
+	}
+
+	function validateCSVData(csvData: any[], locationName: string) {
+		const errors: string[] = [];
+		const processedData: any[] = [];
+		let validRows = 0;
+
+		csvData.forEach((row, index) => {
+			const rowNumber = index + 1;
+			const rowErrors: string[] = [];
+
+			// Validate timestamp
+			if (!row.timestamp) {
+				rowErrors.push(`Row ${rowNumber}: Missing timestamp`);
+			} else {
+				const date = new Date(row.timestamp);
+				if (isNaN(date.getTime())) {
+					rowErrors.push(`Row ${rowNumber}: Invalid timestamp format`);
+				}
+			}
+
+			// Validate production (powerMw)
+			const production = parseFloat(row['production (powerMw)'] || 0);
+			if (isNaN(production) || production < 0) {
+				rowErrors.push(`Row ${rowNumber}: Invalid production value`);
+			}
+
+			// Validate capacity factor
+			const capacityFactor = parseFloat(row.capacity_factor || 0);
+			if (isNaN(capacityFactor) || capacityFactor < 0 || capacityFactor > 1) {
+				rowErrors.push(`Row ${rowNumber}: Capacity factor must be between 0 and 1`);
+			}
+
+			// Validate availability
+			const availability = parseFloat(row.availability || 0);
+			if (isNaN(availability) || availability < 0 || availability > 1) {
+				rowErrors.push(`Row ${rowNumber}: Availability must be between 0 and 1`);
+			}
+
+			if (rowErrors.length === 0) {
+				validRows++;
+				const normalizedRow = {
+					datetime: row.timestamp,
+					location: locationName,
+					production: production,
+					capacity_factor: capacityFactor,
+					availability: availability,
+					forecast: production // Use production as forecast for demo
+				};
+				processedData.push(normalizedRow);
+			} else {
+				errors.push(...rowErrors);
+			}
+		});
+
+		// Extract summary information
+		const locations = [locationName];
+		const timestamps = processedData.map(row => new Date(row.datetime)).sort();
+		const dateRange = timestamps.length > 0 ?
+			`${timestamps[0].toLocaleDateString()} - ${timestamps[timestamps.length - 1].toLocaleDateString()}` :
+			'N/A';
+
+		return {
+			isValid: errors.length === 0,
+			errors: errors,
+			totalRows: csvData.length,
+			validRows,
+			invalidRows: csvData.length - validRows,
+			processedData,
+			summary: {
+				totalRecords: validRows,
+				locationCount: locations.length,
+				locations: locations,
+				dateRange,
+				dataType: 'Production'
+			}
+		};
+	}
+
 	// Comprehensive mock historical data for demonstration
 	function generateMockHistoricalData() {
 		const locations = ['Site A', 'Site B', 'Veranda Mall Bucharest'];
-		const data = [];
+		const data: { datetime: string; location: string; production: number; forecast: number; }[] = [];
 		
 		// Generate 7 days of hourly data for each location
 		for (let day = 0; day < 7; day++) {
@@ -103,131 +197,6 @@
 	});
 
 	// Enhanced file upload with validation
-	let isDragOver = false;
-	let uploadedFile: File | null = null;
-	let validationResults: any = null;
-	let isValidationPassed = false;
-	let validatedData: any[] = [];
-
-	// Expected CSV template structure based on actual template
-	const expectedColumns = ['timestamp', 'production (powerMw)', 'capacity_factor', 'availability'];
-
-	function validateCSVStructure(headers: string[]) {
-		const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
-		const missingColumns = expectedColumns.filter(col =>
-			!normalizedHeaders.includes(col.toLowerCase())
-		);
-
-		return {
-			isValid: missingColumns.length === 0,
-			missingColumns,
-			foundColumns: headers
-		};
-	}
-
-	function validateDataRow(row: any, index: number) {
-		const errors: string[] = [];
-
-		// Validate timestamp format
-		const timestamp = row.timestamp;
-		if (!timestamp) {
-			errors.push(`Row ${index + 2}: Missing timestamp`);
-		} else {
-			const dateObj = new Date(timestamp);
-			if (isNaN(dateObj.getTime())) {
-				errors.push(`Row ${index + 2}: Invalid timestamp format "${timestamp}". Use ISO format (YYYY-MM-DDTHH:MM:SS+TZ)`);
-			}
-		}
-
-		// Validate production value
-		const production = row['production (powerMw)'] || row.production;
-		if (production === null || production === undefined || production === '') {
-			errors.push(`Row ${index + 2}: Missing production (powerMw) value`);
-		} else {
-			const prodNum = parseFloat(production);
-			if (isNaN(prodNum)) {
-				errors.push(`Row ${index + 2}: Invalid production (powerMw) value "${production}". Must be a decimal number`);
-			} else if (prodNum < 0) {
-				errors.push(`Row ${index + 2}: Production (powerMw) value cannot be negative`);
-			}
-		}
-
-		// Validate capacity_factor value
-		const capacityFactor = row.capacity_factor;
-		if (capacityFactor === null || capacityFactor === undefined || capacityFactor === '') {
-			errors.push(`Row ${index + 2}: Missing capacity_factor value`);
-		} else {
-			const cfNum = parseFloat(capacityFactor);
-			if (isNaN(cfNum)) {
-				errors.push(`Row ${index + 2}: Invalid capacity_factor value "${capacityFactor}". Must be a decimal number`);
-			} else if (cfNum < 0 || cfNum > 1) {
-				errors.push(`Row ${index + 2}: Capacity factor must be between 0 and 1`);
-			}
-		}
-
-		// Validate availability value
-		const availability = row.availability;
-		if (availability === null || availability === undefined || availability === '') {
-			errors.push(`Row ${index + 2}: Missing availability value`);
-		} else {
-			const availNum = parseFloat(availability);
-			if (isNaN(availNum)) {
-				errors.push(`Row ${index + 2}: Invalid availability value "${availability}". Must be a decimal number`);
-			} else if (availNum < 0 || availNum > 1) {
-				errors.push(`Row ${index + 2}: Availability must be between 0 and 1`);
-			}
-		}
-
-		return errors;
-	}
-
-	function validateCSVData(csvData: any[], locationName = 'Solar Farm Site A') {
-		let totalErrors: string[] = [];
-		let validRows = 0;
-		const processedData: any[] = [];
-
-		csvData.forEach((row, index) => {
-			const rowErrors = validateDataRow(row, index);
-			totalErrors = [...totalErrors, ...rowErrors];
-
-			if (rowErrors.length === 0) {
-				validRows++;
-				// Normalize the row data for the new template structure
-				const normalizedRow = {
-					datetime: row.timestamp,
-					location: locationName,
-					production: parseFloat(row['production (powerMw)'] || row.production || 0),
-					capacity_factor: parseFloat(row.capacity_factor || 0),
-					availability: parseFloat(row.availability || 0),
-					forecast: parseFloat(row['production (powerMw)'] || row.production || 0) // Use production as forecast for demo
-				};
-				processedData.push(normalizedRow);
-			}
-		});
-
-		// Extract summary information
-		const locations = [...new Set(processedData.map(row => row.location))];
-		const timestamps = processedData.map(row => new Date(row.datetime)).sort();
-		const dateRange = timestamps.length > 0 ?
-			`${timestamps[0].toLocaleDateString()} - ${timestamps[timestamps.length - 1].toLocaleDateString()}` :
-			'N/A';
-
-		return {
-			isValid: totalErrors.length === 0,
-			errors: totalErrors,
-			totalRows: csvData.length,
-			validRows,
-			invalidRows: csvData.length - validRows,
-			processedData,
-			summary: {
-				totalRecords: validRows,
-				locationCount: locations.length,
-				locations: locations,
-				dateRange,
-				dataType: 'Production'
-			}
-		};
-	}
 
 	function handleFileUpload(event: Event) {
 		const target = event.target as HTMLInputElement;
@@ -365,25 +334,50 @@
 		reader.readAsText(file);
 	}
 
-	function uploadToServer() {
-		if (!isValidationPassed || validatedData.length === 0) return;
+	async function uploadToServer() {
+		if (!isValidationPassed || !uploadedFile || validatedData.length === 0) return;
 
 		isUploading = true;
+		uploadError = '';
 
-		// Simulate upload to historical analysis controller endpoint
-		// In real implementation, this would call the POST endpoint
-		setTimeout(() => {
-			// Merge with existing data for demo
-			uploadedData = [...uploadedData, ...validatedData];
-			availableLocations = ['all', ...new Set(uploadedData.map(d => d.location))];
-			processData();
+		try {
+			// Get location ID from metadata or use a default
+			const locationId = validationResults?.metadata?.location_guid || 'default-location-id';
 
-			// Reset upload state completely
-			resetUploadState();
+			// Create FormData for file upload
+			const formData = new FormData();
+			formData.append('csvFile', uploadedFile);
 
-			// Show success message
-			alert('CSV file uploaded successfully!');
-		}, 2000);
+			// Call the actual API endpoint we created
+			const response = await fetch(`/api/historical-analysis/upload?locationId=${locationId}&skipDuplicates=true&batchSize=1000`, {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				// Update UI with success data
+				uploadedData = [...uploadedData, ...validatedData];
+				availableLocations = ['all', ...new Set(uploadedData.map(d => d.location))];
+				processData();
+
+				// Reset upload state
+				resetUploadState();
+
+				// Show success message with details
+				alert(`CSV uploaded successfully!\n\nDetails:\n- Total rows: ${result.data.totalRows}\n- Inserted: ${result.data.insertedRows}\n- Skipped: ${result.data.skippedRows}\n- Processing time: ${result.data.processingTimeMs}ms`);
+			} else {
+				// Handle API errors
+				uploadError = `Upload failed: ${result.message || result.error || 'Unknown error'}`;
+				console.error('Upload failed:', result);
+			}
+		} catch (error) {
+			console.error('Upload error:', error);
+			uploadError = `Upload failed: ${error instanceof Error ? error.message : 'Network or server error'}`;
+		}
+
+		isUploading = false;
 	}
 
 	function resetUploadState() {

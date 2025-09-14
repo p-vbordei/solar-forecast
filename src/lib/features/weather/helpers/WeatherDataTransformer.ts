@@ -73,7 +73,6 @@ export class WeatherDataTransformer {
       const weatherRecord: WeatherData = {
         id: crypto.randomUUID(), // Generate GUID
         timestamp,
-        time: timestamp, // Legacy compatibility
         locationId,
 
         // Basic weather metrics
@@ -209,7 +208,6 @@ export class WeatherDataTransformer {
     return {
       id: crypto.randomUUID(),
       timestamp,
-      time: timestamp,
       locationId,
       temperature: 20 + Math.random() * 15, // 20-35°C
       humidity: 40 + Math.random() * 40,    // 40-80%
