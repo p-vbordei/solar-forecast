@@ -27,11 +27,41 @@ Currently in development mode. Production deployment will require authentication
   },
   servers: [
     {
-      url: "http://localhost:5173/api",
-      description: "Development server"
+      url: "/api",
+      description: "Development server (relative URL)"
     }
   ],
   paths: {
+    "/dashboard": {
+      get: {
+        summary: "Get Dashboard Statistics",
+        description: "Retrieve real-time dashboard metrics including active locations, total capacity, solar power, and current temperature",
+        operationId: "getDashboardStats",
+        tags: ["Dashboard"],
+        responses: {
+          "200": {
+            description: "Dashboard statistics retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reports": {
       get: {
         summary: "Generate Excel Report",
@@ -313,6 +343,48 @@ Production version will connect to real solar production databases.
   },
   components: {
     schemas: {
+      DashboardResponse: {
+        type: "object",
+        required: ["success", "data"],
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            required: ["activeLocations", "totalCapacityMW", "currentSolarPowerWM2", "currentTemperatureC", "lastUpdated"],
+            properties: {
+              activeLocations: {
+                type: "integer",
+                description: "Number of active solar locations",
+                example: 6
+              },
+              totalCapacityMW: {
+                type: "number",
+                format: "double",
+                description: "Total solar capacity in megawatts",
+                example: 82.5
+              },
+              currentSolarPowerWM2: {
+                type: "number",
+                format: "double",
+                description: "Current solar irradiance in W/m²",
+                example: 693
+              },
+              currentTemperatureC: {
+                type: "number",
+                format: "double",
+                description: "Current temperature in Celsius",
+                example: 16
+              },
+              lastUpdated: {
+                type: "string",
+                format: "date-time",
+                description: "Timestamp of last data update",
+                example: "2025-09-14T21:26:15.267Z"
+              }
+            }
+          }
+        }
+      },
       ErrorResponse: {
         type: "object",
         required: ["success", "error", "code"],
@@ -450,6 +522,7 @@ Production version will connect to real solar production databases.
     }
   },
   tags: [
+    { name: "Dashboard", description: "Real-time dashboard statistics" },
     { name: "Reports", description: "Excel report generation endpoints" },
     { name: "Locations", description: "Solar farm location management" }
   ]

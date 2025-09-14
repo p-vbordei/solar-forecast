@@ -28,13 +28,33 @@
 		]).then(() => {
 			// Initialize Swagger UI after all scripts are loaded
 			setTimeout(() => {
+				// Clear all Swagger UI related storage and cache
+				try {
+					localStorage.removeItem('swagger-ui');
+					sessionStorage.removeItem('swagger-ui');
+					// Clear any swagger-related keys
+					Object.keys(localStorage).forEach(key => {
+						if (key.includes('swagger') || key.includes('openapi')) {
+							localStorage.removeItem(key);
+						}
+					});
+				} catch (e) {
+					console.log('Storage clearing failed (expected in some browsers):', e);
+				}
+
+				// Force clear any existing Swagger UI
+				const swaggerContainer = document.getElementById('swagger-ui');
+				if (swaggerContainer) {
+					swaggerContainer.innerHTML = '';
+				}
+
 				// @ts-ignore
 				if (window.SwaggerUIBundle && window.SwaggerUIStandalonePreset) {
 					// @ts-ignore
 					window.SwaggerUIBundle({
-						url: '/api/openapi',
+						url: '/api/openapi?bustcache=' + Date.now() + Math.random(),
 						dom_id: '#swagger-ui',
-						deepLinking: true,
+						deepLinking: false, // Disable to prevent URL caching
 						presets: [
 							// @ts-ignore
 							window.SwaggerUIBundle.presets.apis,
@@ -48,13 +68,16 @@
 						layout: 'StandaloneLayout',
 						tryItOutEnabled: true,
 						validatorUrl: null,
-						requestInterceptor: (request: any) => {
-							// Add base URL if needed
-							if (request.url.startsWith('/api/')) {
-								request.url = `${window.location.origin}${request.url}`;
+						docExpansion: 'list',
+						operationsSorter: 'alpha',
+						persistAuthorization: false, // Disable auth persistence
+						// Force server URL override
+						servers: [
+							{
+								url: window.location.origin + '/api',
+								description: 'Current Development Server'
 							}
-							return request;
-						}
+						]
 					});
 				} else {
 					console.error('Swagger UI scripts not loaded properly');
