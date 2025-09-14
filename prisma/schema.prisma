@@ -373,55 +373,26 @@ enum ModelType {
   STATISTICAL
 }
 
-// Production Data - TimescaleDB Hypertable  
-// Actual solar production measurements converted to hypertable
+// Production Data - TimescaleDB Hypertable
+// Optimized for historical analysis and ML training
 // Supports compression and retention policies for efficient storage
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
   time              DateTime  // Legacy field name compatibility
   locationId        String
-  
-  // Production values (industry standard metrics)
-  powerMW           Float     // Actual AC power in MW
-  powerOutputMW     Float     // Legacy field name compatibility
-  powerDCMW         Float?    // DC power in MW
-  energyMWh         Float?    // Actual energy in MWh
-  
-  // Performance metrics
-  capacityFactor    Float?    // Actual/Nominal capacity
-  performanceRatio  Float?    // PR = Actual/Expected
+
+  // Core production metrics (essential for ML training & historical analysis)
+  powerMW           Float     // Actual AC power in MW - PRIMARY TARGET
+  capacityFactor    Float?    // Actual/Nominal capacity ratio
   availability      Float?    // System availability percentage
-  efficiency        Float?    // Conversion efficiency
-  
-  // Environmental conditions
-  temperature       Float?    // Module temperature
-  ambientTemp       Float?    // Ambient temperature
-  ghi               Float?    // Global Horizontal Irradiance W/m²
-  dni               Float?    // Direct Normal Irradiance W/m²
-  dhi               Float?    // Diffuse Horizontal Irradiance W/m²
-  windSpeed         Float?    // m/s
-  windDirection     Float?    // Degrees
-  
-  // Electrical parameters
-  voltage           Float?    // V
-  current           Float?    // A
-  frequency         Float?    // Hz
-  powerFactor       Float?    // cos(φ)
-  
-  // Quality flags
+
+  // Minimal quality control
   dataQuality       DataQuality @default(GOOD)
-  dataSource        String?   // SCADA, Meter, Manual, etc.
-  isValidated       Boolean   @default(false)
-  validationNotes   String?
-  
-  // Downtime tracking
-  downtimeMinutes   Int       @default(0)
-  downtimeReason    String?
-  
+
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])
-  
+
   // TimescaleDB optimized indexes - time dimension first for hypertables
   @@index([timestamp, locationId], name: "production_time_location_idx")
   @@index([locationId, timestamp(sort: Desc)], name: "production_location_time_desc_idx")

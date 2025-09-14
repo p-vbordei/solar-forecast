@@ -420,3 +420,103 @@ async def delete_location_forecasts(
         "message": f"Deleted {deleted_count} forecast records",
         "location_id": location_id
     }
+
+
+@router.get(
+    "/training-data/{location_id}",
+    summary="Get Historical Production Data for ML Training",
+    description="""Extract historical production data for ML model training.
+
+    Returns historical production data optimized for ML training:
+    - Power production values (MW) - primary training target
+    - Capacity factor for performance normalization
+    - System availability metrics
+    - Timestamp-indexed data ready for pandas DataFrame
+
+    This endpoint is specifically designed for ML model training workflows
+    and returns data in the format expected by the CatBoost training pipeline.
+    """,
+    responses={
+        200: {
+            "description": "Historical production data retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "location_id": "1",
+                        "data_points": 8760,
+                        "date_range": {
+                            "start": "2023-01-01T00:00:00",
+                            "end": "2023-12-31T23:00:00"
+                        },
+                        "records": [
+                            {
+                                "timestamp": "2023-01-01T00:00:00",
+                                "power_mw": 0.0,
+                                "capacity_factor": 0.0,
+                                "availability": 100.0,
+                                "data_quality": "GOOD"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        404: {"description": "Location not found"},
+        400: {"description": "Invalid date range"}
+    }
+)
+async def get_training_data(
+    location_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Extract historical production data for ML model training"""
+    service = ForecastService(db)
+
+    # Default to last year of data if no dates specified
+    if not end_date:
+        end_time = datetime.utcnow()
+    else:
+        end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+    if not start_date:
+        start_time = end_time - timedelta(days=365)  # Last year
+    else:
+        start_time = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+
+    # Validate location exists
+    if not await service.validate_location(location_id):
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    # Get historical production data using optimized schema
+    production_data = await service.repo.get_production_range(
+        location_id=location_id,
+        start_time=start_time,
+        end_time=end_time
+    )
+
+    if not production_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No production data found for location {location_id} in specified date range"
+        )
+
+    return {
+        "location_id": location_id,
+        "data_points": len(production_data),
+        "date_range": {
+            "start": start_time.isoformat(),
+            "end": end_time.isoformat()
+        },
+        "records": [
+            {
+                "timestamp": record["time"].isoformat(),
+                "power_mw": record["power_output_mw"],
+                "capacity_factor": record.get("capacity_factor"),
+                "availability": record.get("availability"),
+                "data_quality": "GOOD"  # From optimized schema
+            }
+            for record in production_data
+        ]
+    }

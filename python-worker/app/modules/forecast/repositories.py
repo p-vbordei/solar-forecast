@@ -157,9 +157,9 @@ class ForecastRepository:
         start_time: datetime,
         end_time: datetime
     ) -> List[Dict]:
-        """Get actual production data within time range (corrected field names)"""
+        """Get actual production data within time range (optimized schema)"""
         query = text("""
-            SELECT timestamp, "powerMW", "energyMWh", efficiency
+            SELECT timestamp, "powerMW", "capacityFactor", availability
             FROM production
             WHERE "locationId" = :location_id
                 AND timestamp >= :start_time
@@ -179,8 +179,8 @@ class ForecastRepository:
             {
                 "time": row[0],  # timestamp
                 "power_output_mw": row[1],  # powerMW
-                "energy_mwh": row[2],  # energyMWh
-                "efficiency": row[3]
+                "capacity_factor": row[2],  # capacityFactor
+                "availability": row[3]  # availability
             }
             for row in rows
         ]
