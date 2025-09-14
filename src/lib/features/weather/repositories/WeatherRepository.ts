@@ -13,12 +13,13 @@ export class WeatherRepository {
    */
   async bulkInsert(
     weatherData: WeatherData[],
-    options: { upsert?: boolean; validateData?: boolean } = {}
+    options: { upsert?: boolean; validateData?: boolean; overwriteForecasts?: boolean } = {}
   ): Promise<{
     inserted: number;
     updated: number;
     skipped: number;
     batches: number;
+    deleted?: number;
   }> {
     if (weatherData.length === 0) {
       throw new Error('Weather data array cannot be empty');
@@ -27,6 +28,43 @@ export class WeatherRepository {
     // Validate data if requested
     if (options.validateData !== false) {
       this.validateWeatherDataBatch(weatherData);
+    }
+
+    let deletedCount = 0;
+
+    // If overwriting forecasts, delete existing forecast data first
+    if (options.overwriteForecasts) {
+      // Group data by location and find date ranges
+      const locationDateRanges = new Map<string, { start: Date; end: Date }>();
+
+      for (const record of weatherData) {
+        const existing = locationDateRanges.get(record.locationId);
+        if (!existing) {
+          locationDateRanges.set(record.locationId, {
+            start: record.timestamp,
+            end: record.timestamp
+          });
+        } else {
+          if (record.timestamp < existing.start) existing.start = record.timestamp;
+          if (record.timestamp > existing.end) existing.end = record.timestamp;
+        }
+      }
+
+      // Delete existing forecast data for each location/date range
+      for (const [locationId, range] of locationDateRanges) {
+        const deleted = await db.weatherData.deleteMany({
+          where: {
+            locationId,
+            timestamp: {
+              gte: range.start,
+              lte: range.end
+            }
+          }
+        });
+        deletedCount += deleted.count;
+      }
+
+      console.log(`Deleted ${deletedCount} existing forecast records for overwrite`);
     }
 
     // Transform data for Prisma
@@ -43,7 +81,8 @@ export class WeatherRepository {
       inserted: result.inserted,
       updated: result.updated || 0,
       skipped: result.skipped || 0,
-      batches: result.batches
+      batches: result.batches,
+      ...(options.overwriteForecasts && { deleted: deletedCount })
     };
   }
 
@@ -239,11 +278,6 @@ export class WeatherRepository {
         throw new Error(`Invalid humidity value: ${record.humidity}. Must be between 0% and 100%`);
       }
 
-      // Validate pressure range (800 hPa to 1200 hPa)
-      if (record.pressure < 800 || record.pressure > 1200) {
-        throw new Error(`Invalid pressure value: ${record.pressure}. Must be between 800 and 1200 hPa`);
-      }
-
       // Validate wind speed (0 to 200 m/s)
       if (record.windSpeed < 0 || record.windSpeed > 200) {
         throw new Error(`Invalid wind speed value: ${record.windSpeed}. Must be between 0 and 200 m/s`);
@@ -287,42 +321,21 @@ export class WeatherRepository {
     return {
       id: weatherData.id,
       timestamp: weatherData.timestamp,
-      time: weatherData.time,
       locationId: weatherData.locationId,
 
-      // Basic weather metrics
+      // Essential weather metrics for solar forecasting
       temperature: weatherData.temperature,
       humidity: weatherData.humidity,
-      pressure: weatherData.pressure,
       windSpeed: weatherData.windSpeed,
-      windDirection: weatherData.windDirection,
       cloudCover: weatherData.cloudCover,
-      visibility: weatherData.visibility || null,
-      precipitation: weatherData.precipitation || null,
-      precipitationType: weatherData.precipitationType || null,
 
-      // Solar radiation components
+      // Solar radiation components (essential for forecasting)
       ghi: weatherData.ghi || null,
       dni: weatherData.dni || null,
       dhi: weatherData.dhi || null,
-      gti: weatherData.gti || null,
-      extraterrestrial: weatherData.extraterrestrial || null,
-
-      // Solar position
-      solarZenith: weatherData.solarZenith || null,
-      solarAzimuth: weatherData.solarAzimuth || null,
-      solarElevation: weatherData.solarElevation || null,
-      airMass: weatherData.airMass || null,
-
-      // Additional metrics
-      albedo: weatherData.albedo || null,
-      soilingLoss: weatherData.soilingLoss || null,
-      snowDepth: weatherData.snowDepth || null,
-      moduleTemp: weatherData.moduleTemp || null,
 
       // Source and quality
       source: weatherData.source,
-      stationId: weatherData.stationId || null,
       dataQuality: weatherData.dataQuality
     };
   }
@@ -334,42 +347,21 @@ export class WeatherRepository {
     return {
       id: record.id,
       timestamp: record.timestamp,
-      time: record.time,
       locationId: record.locationId,
 
-      // Basic weather metrics
+      // Essential weather metrics for solar forecasting
       temperature: record.temperature,
       humidity: record.humidity,
-      pressure: record.pressure,
       windSpeed: record.windSpeed,
-      windDirection: record.windDirection,
       cloudCover: record.cloudCover,
-      visibility: record.visibility,
-      precipitation: record.precipitation,
-      precipitationType: record.precipitationType,
 
-      // Solar radiation components
+      // Solar radiation components (essential for forecasting)
       ghi: record.ghi,
       dni: record.dni,
       dhi: record.dhi,
-      gti: record.gti,
-      extraterrestrial: record.extraterrestrial,
-
-      // Solar position
-      solarZenith: record.solarZenith,
-      solarAzimuth: record.solarAzimuth,
-      solarElevation: record.solarElevation,
-      airMass: record.airMass,
-
-      // Additional metrics
-      albedo: record.albedo,
-      soilingLoss: record.soilingLoss,
-      snowDepth: record.snowDepth,
-      moduleTemp: record.moduleTemp,
 
       // Source and quality
       source: record.source,
-      stationId: record.stationId,
       dataQuality: record.dataQuality as DataQuality
     };
   }

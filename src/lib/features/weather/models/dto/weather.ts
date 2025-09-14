@@ -1,47 +1,26 @@
 import type { DataQuality } from '@prisma/client';
 
 /**
- * Weather Data Interface - matches Prisma WeatherData model
+ * Optimized Weather Data Interface - Essential fields for solar forecasting
  */
 export interface WeatherData {
   id: string;                    // GUID
   timestamp: Date;
-  time: Date;                    // Legacy compatibility
   locationId: string;            // GUID reference
 
-  // Basic weather metrics
-  temperature: number;           // Celsius
-  humidity: number;              // Percentage
-  pressure: number;              // hPa
-  windSpeed: number;             // m/s
-  windDirection: number;         // Degrees
-  cloudCover: number;            // Percentage (0-100)
-  visibility?: number;           // km
-  precipitation?: number;        // mm
-  precipitationType?: string;    // rain, snow, etc.
+  // Essential weather metrics for solar forecasting
+  temperature: number;           // Celsius - affects panel efficiency
+  humidity: number;              // Percentage - affects atmospheric transparency
+  windSpeed: number;             // m/s - affects panel cooling
+  cloudCover: number;            // Percentage (0-100) - primary solar impact factor
 
-  // Solar radiation components (industry standard)
+  // Solar radiation components (essential for forecasting)
   ghi?: number;                  // Global Horizontal Irradiance W/m²
   dni?: number;                  // Direct Normal Irradiance W/m²
   dhi?: number;                  // Diffuse Horizontal Irradiance W/m²
-  gti?: number;                  // Global Tilted Irradiance W/m² (POA)
-  extraterrestrial?: number;     // Extraterrestrial radiation W/m²
-
-  // Solar position
-  solarZenith?: number;          // Degrees
-  solarAzimuth?: number;         // Degrees
-  solarElevation?: number;       // Degrees
-  airMass?: number;              // Air mass coefficient
-
-  // Additional metrics
-  albedo?: number;               // Surface reflectivity (0-1)
-  soilingLoss?: number;          // Soiling loss percentage
-  snowDepth?: number;            // cm
-  moduleTemp?: number;           // Estimated module temperature
 
   // Source and quality
   source: string;                // 'open-meteo'
-  stationId?: string;            // Weather station identifier
   dataQuality: DataQuality;      // GOOD, ESTIMATED, etc.
 }
 
@@ -115,10 +94,4 @@ export interface WeatherAggregation {
 export const WEATHER_DEFAULTS = {
   source: 'open-meteo',
   dataQuality: 'GOOD' as DataQuality,
-  visibility: 10.0,         // km
-  precipitation: 0.0,       // mm
-  precipitationType: null,
-  albedo: 0.2,             // Typical ground reflectivity
-  soilingLoss: 0.0,        // Percentage
-  snowDepth: 0.0,          // cm
 } as const;

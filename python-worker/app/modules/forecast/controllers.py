@@ -14,18 +14,55 @@ from .models_api import (
     ForecastAccuracyResponse
 )
 
-router = APIRouter()
+router = APIRouter(
+    tags=["Solar Forecasting"],
+    responses={404: {"description": "Not found"}}
+)
 
 
-@router.post("/generate", response_model=ForecastTaskResponse)
+@router.post(
+    "/generate",
+    response_model=ForecastTaskResponse,
+    summary="Generate Solar Power Forecast",
+    description="""Generate a solar power forecast for a specific location using ML models and physics calculations.
+
+    This endpoint:
+    - Uses real CatBoost ML models with quantile regression for uncertainty
+    - Integrates PVLIB physics calculations for solar modeling
+    - Processes weather data from TimescaleDB
+    - Returns a task ID for async tracking
+    - Saves forecasts to database with confidence bands
+
+    The forecast generation runs asynchronously in the background.
+    Use the task status endpoint to track progress.
+    """,
+    responses={
+        200: {
+            "description": "Forecast task successfully queued",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "status": "queued",
+                        "location_id": "1",
+                        "progress": 0,
+                        "estimated_time_seconds": 30
+                    }
+                }
+            }
+        },
+        404: {"description": "Location not found"},
+        500: {"description": "Internal server error"}
+    }
+)
 async def generate_forecast(
     request: ForecastRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ) -> ForecastTaskResponse:
     """
-    Generate forecast for a location
-    Returns task ID for tracking progress
+    Generate forecast for a location using real ML models and physics calculations.
+    Returns task ID for tracking progress.
     """
     service = ForecastService(db)
     
@@ -61,7 +98,45 @@ async def generate_forecast(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/task/{task_id}", response_model=ForecastTaskResponse)
+@router.get(
+    "/task/{task_id}",
+    response_model=ForecastTaskResponse,
+    summary="Get Forecast Task Status",
+    description="""Check the status of an asynchronous forecast generation task.
+
+    Returns current progress, status, and results when completed.
+
+    Status values:
+    - `queued`: Task is waiting to be processed
+    - `processing`: Task is currently running (check progress %)
+    - `completed`: Task finished successfully (results available)
+    - `failed`: Task failed (error details available)
+    """,
+    responses={
+        200: {
+            "description": "Task status retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "task_id": "550e8400-e29b-41d4-a716-446655440000",
+                        "status": "completed",
+                        "location_id": "1",
+                        "progress": 100,
+                        "result": {
+                            "forecast_count": 48,
+                            "start_time": "2025-09-14T12:00:00",
+                            "end_time": "2025-09-16T12:00:00",
+                            "model_type": "ENSEMBLE",
+                            "location_name": "Bucharest Solar Farm",
+                            "capacity_mw": 1.0
+                        }
+                    }
+                }
+            }
+        },
+        404: {"description": "Task not found"}
+    }
+)
 async def get_forecast_task_status(
     task_id: str,
     db: AsyncSession = Depends(get_db)
@@ -77,7 +152,50 @@ async def get_forecast_task_status(
     return task_status
 
 
-@router.get("/location/{location_id}", response_model=List[ForecastResponse])
+@router.get(
+    "/location/{location_id}",
+    response_model=List[ForecastResponse],
+    summary="Get Location Forecasts",
+    description="""Retrieve solar power forecasts for a specific location.
+
+    Returns detailed forecast data including:
+    - Power output predictions (MW)
+    - Confidence bands (P10, P25, P75, P90)
+    - Weather parameters used
+    - Model type and version
+    - Quality scores
+
+    All data is retrieved from TimescaleDB with optimized queries.
+    Default time range is next 48 hours if not specified.
+    """,
+    responses={
+        200: {
+            "description": "Forecasts retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [{
+                        "time": "2025-09-14T12:00:00",
+                        "location_id": "1",
+                        "power_output_mw": 0.85,
+                        "capacity_factor": 0.85,
+                        "power_mw_q10": 0.75,
+                        "power_mw_q25": 0.80,
+                        "power_mw_q75": 0.90,
+                        "power_mw_q90": 0.95,
+                        "model_type": "ENSEMBLE",
+                        "model_version": "2.0",
+                        "temperature": 25.0,
+                        "ghi": 850.0,
+                        "cloud_cover": 10.0,
+                        "quality_score": 0.95
+                    }]
+                }
+            }
+        },
+        404: {"description": "Location not found"},
+        500: {"description": "Error retrieving forecasts"}
+    }
+)
 async def get_location_forecasts(
     location_id: str,  # String UUID for database consistency
     start_time: Optional[datetime] = None,
@@ -85,7 +203,7 @@ async def get_location_forecasts(
     model_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[ForecastResponse]:
-    """Get forecasts for a specific location (database-driven)"""
+    """Get forecasts for a specific location from TimescaleDB"""
     service = ForecastService(db)
 
     try:
@@ -125,7 +243,40 @@ async def get_location_forecasts(
         raise HTTPException(status_code=500, detail="Error retrieving forecasts")
 
 
-@router.get("/accuracy/{location_id}", response_model=ForecastAccuracyResponse)
+@router.get(
+    "/accuracy/{location_id}",
+    response_model=ForecastAccuracyResponse,
+    summary="Get Forecast Accuracy Metrics",
+    description="""Calculate forecast accuracy by comparing predictions with actual production.
+
+    Metrics calculated:
+    - **Accuracy Percentage**: Overall accuracy score (100 - MAPE)
+    - **MAPE**: Mean Absolute Percentage Error
+    - **RMSE**: Root Mean Square Error (MW)
+    - **Sample Size**: Number of data points analyzed
+
+    Default analysis period is 7 days. Requires both forecast and production data.
+    """,
+    responses={
+        200: {
+            "description": "Accuracy metrics calculated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "location_id": "1",
+                        "accuracy_percentage": 94.5,
+                        "mape": 5.5,
+                        "rmse": 2.3,
+                        "sample_size": 168,
+                        "period_days": 7,
+                        "model_type": "ENSEMBLE"
+                    }
+                }
+            }
+        },
+        404: {"description": "No forecast data available for accuracy calculation"}
+    }
+)
 async def get_forecast_accuracy(
     location_id: str,
     days: int = 7,
@@ -148,14 +299,51 @@ async def get_forecast_accuracy(
     return accuracy
 
 
-@router.post("/batch", response_model=List[ForecastTaskResponse])
+@router.post(
+    "/batch",
+    response_model=List[ForecastTaskResponse],
+    summary="Generate Batch Forecasts",
+    description="""Generate forecasts for multiple locations simultaneously.
+
+    Efficient batch processing for multiple solar farms:
+    - Processes all locations in parallel
+    - Uses same horizon period for all locations
+    - Returns individual task IDs for tracking
+    - Handles failures gracefully per location
+
+    Maximum recommended batch size: 10 locations
+    """,
+    responses={
+        200: {
+            "description": "Batch forecast tasks queued successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "task_id": "task-001",
+                            "status": "queued",
+                            "location_id": "1",
+                            "estimated_time_seconds": 30
+                        },
+                        {
+                            "task_id": "task-002",
+                            "status": "queued",
+                            "location_id": "2",
+                            "estimated_time_seconds": 30
+                        }
+                    ]
+                }
+            }
+        }
+    }
+)
 async def generate_batch_forecasts(
     location_ids: List[str],  # String UUIDs
     background_tasks: BackgroundTasks,
     horizon_hours: int = 48,
     db: AsyncSession = Depends(get_db)
 ) -> List[ForecastTaskResponse]:
-    """Generate forecasts for multiple locations"""
+    """Generate forecasts for multiple locations in parallel"""
     service = ForecastService(db)
     
     tasks = []
@@ -188,7 +376,33 @@ async def generate_batch_forecasts(
     return tasks
 
 
-@router.delete("/location/{location_id}")
+@router.delete(
+    "/location/{location_id}",
+    summary="Delete Old Forecasts",
+    description="""Delete historical forecasts for a location.
+
+    Cleanup old forecast data to manage storage:
+    - Default: Deletes forecasts older than 30 days
+    - Custom date: Specify exact cutoff date
+    - Maintains data retention compliance
+    - Optimizes TimescaleDB storage
+
+    ⚠️ This operation is irreversible.
+    """,
+    responses={
+        200: {
+            "description": "Forecasts deleted successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Deleted 1680 forecast records",
+                        "location_id": "1"
+                    }
+                }
+            }
+        }
+    }
+)
 async def delete_location_forecasts(
     location_id: str,
     before_date: Optional[datetime] = None,

@@ -89,10 +89,10 @@ export class WeatherService {
       // Transform API response to WeatherData format
       const forecastData = WeatherDataTransformer.transform(forecastResponse, locationId);
 
-      // Store forecast in database
+      // Store forecast in database - overwrite existing forecasts for same timestamps
       if (forecastData.length > 0) {
         await this.weatherRepository.bulkInsert(forecastData, {
-          upsert: true,
+          overwriteForecasts: true,
           validateData: true
         });
       }
@@ -188,7 +188,7 @@ export class WeatherService {
             // Store in database if we have data
             if (weatherData.length > 0) {
               const insertResult = await this.weatherRepository.bulkInsert(weatherData, {
-                upsert: !request.skipDuplicates,
+                overwriteForecasts: request.includeForecasts !== false, // Overwrite when including forecasts
                 validateData: request.validateData !== false
               });
 
@@ -303,7 +303,7 @@ export class WeatherService {
 
         if (historicalData.length > 0) {
           await this.weatherRepository.bulkInsert(historicalData, {
-            upsert: true,
+            overwriteForecasts: false, // Historical data should not overwrite
             validateData: true
           });
         }
