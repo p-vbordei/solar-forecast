@@ -105,6 +105,7 @@ export class LocationsService {
             region: true,
             country: true,
             capacityMW: true,
+            timezone: true,
             status: true,
             installationDate: true,
             createdAt: true,
@@ -200,13 +201,13 @@ export class LocationsService {
             
             // Capacity from basic config
             capacityMW: locationData.basic?.capacityMW || 1.0,
-            
+
             // Status (convert to enum if provided)
-            // status: locationData.basic?.status ? 
+            // status: locationData.basic?.status ?
             //     this.convertStatusToEnum(locationData.basic.status) : 'ACTIVE',
-            
-            // Optional fields with defaults
-            timezone: 'UTC',
+
+            // Timezone from basic config
+            timezone: locationData.basic?.timezone || 'UTC',
             city: null,
             region: null,
             country: null,

@@ -292,7 +292,8 @@ export interface LocationSummary {
 	id: string;
 	name: string;
 	city?: string;
-	capacity_mw: number;
+	capacityMW: number;  // Changed to match API response
+	timezone?: string;   // Added timezone field
 	latitude: number;
 	longitude: number;
 	status: string;
@@ -301,7 +302,9 @@ export interface LocationSummary {
 	efficiency?: number;
 	healthScore?: number;
 	alertCount?: number;
-	lastUpdate: Date;
+	lastUpdate?: Date;
+	createdAt?: Date;
+	updatedAt?: Date;
 }
 
 // Technical Details View (for expanded display)
