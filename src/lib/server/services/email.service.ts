@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import handlebars from 'handlebars';
 import { emailConfigService } from './email-config.service';
@@ -21,7 +20,8 @@ export class EmailService {
     // Get SMTP configuration
     const smtpConfig = await emailConfigService.getSMTPConfig(clientId);
 
-    // Create new transporter
+    // Dynamic import for nodemailer to handle ES module issues
+    const nodemailer = await import('nodemailer');
     this.transporter = nodemailer.createTransporter({
       host: smtpConfig.host,
       port: smtpConfig.port,
