@@ -29,9 +29,19 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Weather API
+    # Weather API (deprecated - now using database)
     OPENWEATHER_API_KEY: str = ""
     OPENWEATHER_BASE_URL: str = "https://api.openweathermap.org/data/2.5"
+
+    # SvelteKit Integration
+    SVELTEKIT_URL: str = "http://localhost:5173"
+    SVELTEKIT_API_TIMEOUT: int = 30  # seconds
+
+    # Weather Data Settings
+    WEATHER_FRESHNESS_MINUTES: int = 15  # Data older than this triggers sync
+    WEATHER_SYNC_TIMEOUT: int = 30       # Timeout for sync operations
+    WEATHER_MAX_RETRIES: int = 3         # Max retries for sync failures
+    WEATHER_RETRY_DELAY: int = 2         # Seconds between retries
     
     # ML Models
     MODELS_PATH: str = "/app/models"

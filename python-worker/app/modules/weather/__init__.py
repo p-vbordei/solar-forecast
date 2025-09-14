@@ -1,17 +1,5 @@
 """Weather module"""
 
-from fastapi import APIRouter
+from .controllers import router as weather_router
 
-router = APIRouter()
-
-@router.get("/forecast")
-async def get_weather_forecast(latitude: float, longitude: float, days: int = 3):
-    """Get weather forecast for location"""
-    return {
-        "latitude": latitude,
-        "longitude": longitude,
-        "days": days,
-        "forecast": []
-    }
-
-weather_router = router
+__all__ = ["weather_router"]
