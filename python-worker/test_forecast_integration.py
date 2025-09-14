@@ -31,30 +31,19 @@ async def test_forecast_integration():
             response = await client.post(
                 f"{base_url}/api/v1/forecast/generate",
                 json={
-                    "latitude": 44.4268,
-                    "longitude": 26.1025,
-                    "location_name": "Test Location",
-                    "azimuth": 180,
-                    "tilt_angle": 30,
-                    "installed_capacity": 100,
-                    "days": 1
+                    "location_id": 1,
+                    "horizon_hours": 24,
+                    "model_type": "ML"
                 }
             )
             
             if response.status_code == 200:
                 data = response.json()
                 print(f"✓ Forecast generated successfully")
-                print(f"  Location: {data.get('location', {}).get('name')}")
-                print(f"  Capacity: {data.get('location', {}).get('installed_capacity')} kW")
-                print(f"  Forecast hours: {len(data.get('forecast', []))}")
-                
-                if data.get('forecast'):
-                    first_hour = data['forecast'][0]
-                    print(f"\n  First hour forecast:")
-                    print(f"    Time: {first_hour.get('timestamp')}")
-                    print(f"    Power: {first_hour.get('power_kw')} kW")
-                    print(f"    Efficiency: {first_hour.get('efficiency')}%")
-                    print(f"    Weather: {first_hour.get('temperature')}°C, Cloud: {first_hour.get('cloud_cover')}%")
+                print(f"  Task ID: {data.get('task_id')}")
+                print(f"  Status: {data.get('status')}")
+                print(f"  Location ID: {data.get('location_id')}")
+                print(f"  Estimated time: {data.get('estimated_time_seconds')} seconds")
             else:
                 print(f"✗ Failed to generate forecast: {response.status_code}")
                 print(f"  Response: {response.text}")
@@ -121,33 +110,29 @@ async def test_forecast_integration():
             response = await client.post(
                 f"{base_url}/api/v1/forecast/generate",
                 json={
-                    "latitude": 44.4268,
-                    "longitude": 26.1025,
-                    "location_name": "Test with DB Weather",
-                    "azimuth": 180,
-                    "tilt_angle": 30,
-                    "installed_capacity": 100,
-                    "days": 1
+                    "location_id": 1,
+                    "horizon_hours": 24,
+                    "model_type": "ML"
                 }
             )
             
             if response.status_code == 200:
                 data = response.json()
-                print(f"✓ Forecast with DB weather generated")
-                
-                # Calculate total production
-                total_production = sum(h.get('power_kw', 0) for h in data.get('forecast', []))
-                avg_efficiency = sum(h.get('efficiency', 0) for h in data.get('forecast', [])) / max(1, len(data.get('forecast', [])))
-                
-                print(f"  Total production: {total_production:.2f} kWh")
-                print(f"  Average efficiency: {avg_efficiency:.2f}%")
-                print(f"  Peak hour analysis:")
-                
-                # Find peak production hour
-                if data.get('forecast'):
-                    peak_hour = max(data['forecast'], key=lambda x: x.get('power_kw', 0))
-                    print(f"    Peak time: {peak_hour.get('timestamp')}")
-                    print(f"    Peak power: {peak_hour.get('power_kw')} kW")
+                print(f"✓ Forecast task created")
+                print(f"  Task ID: {data.get('task_id')}")
+                print(f"  Status: {data.get('status')}")
+
+                # Check task status
+                if data.get('task_id'):
+                    await asyncio.sleep(2)  # Wait for processing
+                    status_response = await client.get(
+                        f"{base_url}/api/v1/forecast/task/{data['task_id']}"
+                    )
+                    if status_response.status_code == 200:
+                        status_data = status_response.json()
+                        print(f"\n  Task status update:")
+                        print(f"    Status: {status_data.get('status')}")
+                        print(f"    Progress: {status_data.get('progress')}%")
             else:
                 print(f"✗ Failed: {response.status_code}")
         except Exception as e:
