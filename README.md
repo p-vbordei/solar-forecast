@@ -5,6 +5,7 @@ A modern solar energy forecasting platform built with SvelteKit, featuring real-
 ## 🚀 Features
 
 - **Real-time Dashboard** - Monitor solar production across multiple locations
+- **Weather Data Integration** - Real-time weather and solar radiation data from Open-Meteo API
 - **ML-Powered Forecasting** - Advanced prediction models with confidence bands
 - **Location Management** - Manage multiple solar installations with technical specs
 - **Alert System** - Multi-severity notifications (INFO, WARNING, CRITICAL, EMERGENCY)
@@ -14,6 +15,7 @@ A modern solar energy forecasting platform built with SvelteKit, featuring real-
 - **Comprehensive Database** - 16 models covering all solar industry requirements
 - **ML Model Management** - Complete model lifecycle tracking and versioning
 - **Audit & Compliance** - Full audit logging and API key management
+- **TimescaleDB Integration** - Optimized time-series data storage and queries
 
 ## 🛠️ Tech Stack
 
@@ -97,6 +99,7 @@ solar/
 │   ├── routes/          # SvelteKit routes
 │   │   ├── api/         # API endpoints (CSR pattern)
 │   │   │   ├── locations/
+│   │   │   ├── weather/    # Weather API endpoints
 │   │   │   ├── forecasts/
 │   │   │   ├── reports/
 │   │   │   └── analysis/
@@ -109,9 +112,15 @@ solar/
 │   │   │   ├── analysis/
 │   │   │   ├── reports/
 │   │   │   └── icons/
+│   │   ├── features/    # Feature modules (CSR pattern)
+│   │   │   ├── locations/   # Location management
+│   │   │   ├── weather/     # Weather data integration
+│   │   │   └── forecasts/   # Forecast functionality
 │   │   ├── server/      # Server-side code
 │   │   │   ├── services/    # Business logic
 │   │   │   └── repositories/ # Data access
+│   │   ├── integrations/ # External API clients
+│   │   │   └── open-meteo/  # Weather API client
 │   │   └── types/       # TypeScript definitions
 │   └── app.css          # Global styles
 ├── python-worker/       # Python ML microservice
@@ -199,6 +208,12 @@ export class LocationRepository {
 - Base layout with sidebar navigation
 - Dashboard UI components with real-time metrics
 - CSR pattern implementation (Controller/Service/Repository)
+- **Weather Data Integration** - Complete Open-Meteo API integration
+  - Real-time weather data fetching and storage
+  - Solar radiation components (GHI, DNI, DHI, GTI)
+  - TimescaleDB optimization for time-series data
+  - Health monitoring and automated sync jobs
+  - Comprehensive Swagger documentation
 - Reports page with 5 report types (Production, Efficiency, Accuracy, Financial, Compliance)
 - Advanced forecast analysis page with ECharts visualization
 - Interactive charts with confidence bands
@@ -228,6 +243,38 @@ npm run test:e2e
 # Run type checking
 npm run check
 ```
+
+## 🌤️ Weather API Integration
+
+The platform integrates with Open-Meteo API for real-time weather and solar radiation data:
+
+### Features
+- **No API Key Required** - Free Open-Meteo service
+- **Comprehensive Data** - Weather parameters + solar radiation components
+- **GUID-Based Architecture** - Consistent with location management
+- **TimescaleDB Optimized** - High-performance time-series storage
+- **Health Monitoring** - Real-time system health checks
+- **Automated Sync** - Scheduled data synchronization jobs
+
+### API Endpoints
+- `GET /api/weather` - Current weather for location
+- `GET /api/weather?days={1-16}` - Weather forecast
+- `GET /api/weather?start_date={date}&end_date={date}` - Historical data
+- `GET /api/weather?interval={15min|1hour|6hour|1day}&hours={1-720}` - Aggregated data
+- `POST /api/weather/sync` - Manual synchronization
+- `GET /api/weather/{id}` - Weather record by ID
+- `GET /api/weather/health` - System health check
+
+### Solar Radiation Components
+- **GHI** - Global Horizontal Irradiance (W/m²)
+- **DNI** - Direct Normal Irradiance (W/m²)
+- **DHI** - Diffuse Horizontal Irradiance (W/m²)
+- **GTI** - Global Tilted Irradiance (W/m²)
+
+### Documentation
+- **Interactive Swagger UI**: `/swagger`
+- **OpenAPI Specification**: `/api/swagger/spec`
+- **Health Check**: `/api/weather/health`
 
 ## 📦 Building for Production
 
