@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	export let locationId: number = 1;
+	export let locationId: string | number = 1;
 	export let isMockData: boolean = true; // Default to true since this component generates mock data
+
+	// Convert locationId to number for compatibility with existing code
+	$: numericLocationId = typeof locationId === 'string' ? 1 : locationId;
 
 	// Location names for display
 	const locations = {
@@ -68,7 +71,7 @@
 		}
 		
 		const data: any = {};
-		const locationProfile = locationProductionProfiles[locationId] || locationProductionProfiles[1];
+		const locationProfile = locationProductionProfiles[numericLocationId] || locationProductionProfiles[1];
 		
 		timePoints.forEach((point, index) => {
 			let productionFactor = 0;
@@ -276,7 +279,7 @@
 	}
 	
 	// Update chart when location changes
-	$: if (locationId) {
+	$: if (numericLocationId) {
 		updateChart();
 	}
 </script>
@@ -292,7 +295,7 @@
 					</span>
 				{/if}
 			</div>
-			<p class="text-sm text-soft-blue/60 mt-1">Energy production forecasts for <span class="text-cyan font-medium">{locations[locationId] || 'Selected Location'}</span></p>
+			<p class="text-sm text-soft-blue/60 mt-1">Energy production forecasts for <span class="text-cyan font-medium">{locations[numericLocationId] || 'Selected Location'}</span></p>
 		</div>
 		
 		<!-- Time Range Buttons -->
@@ -321,7 +324,7 @@
 		{@const currentData = activeTimeRange === '7 Days' ? 
 			mockData.data[0] : 
 			mockData.data[new Date().getHours()] ? mockData.data[new Date().getHours()] : mockData.data[0]}
-		{@const locationProfile = locationProductionProfiles[locationId] || locationProductionProfiles[1]}
+		{@const locationProfile = locationProductionProfiles[numericLocationId] || locationProductionProfiles[1]}
 		
 		<div class="bg-glass-white rounded-lg p-3">
 			<div class="text-xs text-soft-blue/70 mb-1">Forecast</div>
