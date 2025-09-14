@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import type { LocationCreateInput, LocationSummary, LocationTechnicalDetails } from '$lib/features/locations/models/dto/location';
 	import { LOCATION_DEFAULTS, getOptimalTilt, detectTimezone } from '$lib/features/locations/models/dto/location';
+	import { TIMEZONES, detectTimezoneFromCoordinates, getDefaultTimezone } from '$lib/constants/timezones';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
 	import PlusIcon from '$lib/components/icons/PlusIcon.svelte';
@@ -28,7 +29,7 @@
 		
 		// Initialize all nested objects to prevent binding errors
 		location: {
-			timezone: 'UTC',
+			timezone: getDefaultTimezone().value, // Default to UTC+2 (Bucharest)
 			altitude: 0
 		},
 		plant: {
@@ -198,7 +199,7 @@
 			
 			// Initialize all nested objects to prevent binding errors
 			location: {
-				timezone: 'UTC',
+				timezone: getDefaultTimezone().value, // Default to UTC+2 (Bucharest)
 				altitude: 0
 			},
 			plant: {
@@ -320,13 +321,13 @@
 	// Intelligent location defaults based on GPS
 	async function optimizeLocationDefaults() {
 		if (!formData.latitude || !formData.longitude) return;
-		
-		// Auto-detect timezone (simplified - in production use a proper library)
-		const detectedTimezone = detectTimezone(formData.latitude, formData.longitude);
-		
+
+		// Auto-detect timezone using our UTC-based system
+		const detectedTimezone = detectTimezoneFromCoordinates(formData.latitude, formData.longitude);
+
 		// Initialize location object if it doesn't exist
 		if (!formData.location) {
-			formData.location = { timezone: 'UTC', altitude: 0 };
+			formData.location = { timezone: getDefaultTimezone().value, altitude: 0 };
 		}
 		formData.location.timezone = detectedTimezone;
 		
@@ -444,9 +445,10 @@
 					latitude: formData.latitude,
 					longitude: formData.longitude
 				},
-				// Include other form data as needed
+				// Include required basic configuration
 				basic: {
-					capacityMW: formData.plant?.capacity_mw || 1.0
+					capacityMW: formData.plant?.capacity_mw || 1.0,
+					timezone: formData.location?.timezone || 'UTC'
 				}
 			};
 
@@ -708,7 +710,7 @@
 					<div class="grid grid-cols-2 gap-4 mb-4">
 						<div class="bg-teal-dark/50 rounded-lg p-3">
 							<p class="text-xs text-soft-blue/60 mb-1">Capacity</p>
-							<p class="text-lg font-mono text-white">{location.capacity_mw} MW</p>
+							<p class="text-lg font-mono text-white">{location.capacityMW || 1.0} MW</p>
 						</div>
 						<div class="bg-teal-dark/50 rounded-lg p-3">
 							<p class="text-xs text-soft-blue/60 mb-1">Current Output</p>
@@ -917,25 +919,24 @@
 							</div>
 
 							<div>
-								<label for="timezone" class="label">Timezone</label>
+								<label for="timezone" class="label">
+									Timezone <span class="text-alert-red">*</span>
+								</label>
 								<select
 									id="timezone"
 									bind:value={formData.location.timezone}
-									class="select"
+									on:blur={() => handleFieldUpdate('timezone', formData.location?.timezone)}
+									class="select {formErrors.timezone ? 'border-alert-red' : ''}"
+									required
 								>
-									<option value="UTC">UTC (Auto-detected)</option>
-									<option value="Europe/Bucharest">Europe/Bucharest</option>
-									<option value="Europe/Berlin">Europe/Berlin</option>
-									<option value="Europe/London">Europe/London</option>
-									<option value="America/New_York">America/New_York</option>
-									<option value="America/Chicago">America/Chicago</option>
-									<option value="America/Denver">America/Denver</option>
-									<option value="America/Los_Angeles">America/Los_Angeles</option>
-									<option value="Asia/Tokyo">Asia/Tokyo</option>
-									<option value="Asia/Shanghai">Asia/Shanghai</option>
-									<option value="Australia/Sydney">Australia/Sydney</option>
+									{#each TIMEZONES as timezone}
+										<option value={timezone.value}>{timezone.label}</option>
+									{/each}
 								</select>
-								<p class="text-xs text-soft-blue/60 mt-1">Auto-detected from GPS coordinates</p>
+								{#if formErrors.timezone}
+									<p class="text-xs text-alert-red mt-1">{formErrors.timezone}</p>
+								{/if}
+								<p class="text-xs text-soft-blue/60 mt-1">Select the timezone for accurate solar calculations</p>
 							</div>
 						</div>
 					</div>
@@ -1154,7 +1155,7 @@
 							type="button"
 							on:click={saveLocation}
 							class="btn btn-primary"
-							disabled={!formData.name || !formData.latitude || !formData.longitude || Object.keys(formErrors).length > 0}
+							disabled={!formData.name || !formData.latitude || !formData.longitude || !formData.plant?.capacity_mw || !formData.location?.timezone || Object.keys(formErrors).length > 0}
 						>
 							{editingLocation ? 'Update Location' : 'Create Location'}
 						</button>

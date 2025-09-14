@@ -66,6 +66,11 @@
 						actual: item.actual || null
 					}));
 
+					// Check if metadata indicates this is mock data
+					if (result.metadata?.isMockData) {
+						isMockData = true;
+					}
+
 					// Set forecast data for summary
 					const totalForecast = chartData.reduce((sum, d) => sum + d.forecast, 0);
 					const avgForecast = totalForecast / chartData.length;
@@ -73,12 +78,13 @@
 
 					forecastData = {
 						generated: true,
-						accuracy: 94.5,
-						confidence: 92.3,
+						accuracy: result.metadata?.isMockData ? 0 : 94.5,
+						confidence: result.metadata?.isMockData ? 0 : 92.3,
 						totalEnergy: totalForecast,
 						avgPower: avgForecast,
 						peakPower: peakForecast,
-						dataPoints: chartData.length
+						dataPoints: chartData.length,
+						isMockData: result.metadata?.isMockData || false
 					};
 				}
 			} else {
@@ -91,16 +97,24 @@
 		}
 	}
 
+	// Track if current data is mock or real
+	let isMockData = false;
+
 	// Handle forecast generation completion
 	async function handleForecastGenerated(event: any) {
 		console.log('Forecast generated:', event.detail);
+
+		// Check if mock data was used
+		isMockData = event.detail.metadata?.isMockData || false;
 
 		// Refresh the forecast data
 		await loadForecastData();
 
 		// Show success message
-		const dataPoints = event.detail.data?.length || 0;
-		alert(`Forecast generated successfully! ${dataPoints} data points created.`);
+		// Check both possible data structures
+		const dataPoints = event.detail.data?.data?.length || event.detail.data?.length || 0;
+		const dataType = isMockData ? 'Mock forecast' : 'Forecast';
+		alert(`${dataType} generated successfully! ${dataPoints} data points created.`);
 	}
 
 	// Export forecast data
@@ -213,9 +227,18 @@
 		<!-- Forecast Chart Controls -->
 		<div class="card-glass">
 			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-xl font-semibold text-soft-blue">
-					Production Forecast
-				</h2>
+				<div class="flex items-center gap-3">
+					<h2 class="text-xl font-semibold text-soft-blue">
+						Production Forecast
+					</h2>
+					{#if chartData.length > 0}
+						<span class="px-3 py-1 rounded-full text-xs font-medium {isMockData
+							? 'bg-alert-orange/20 text-alert-orange border border-alert-orange/30'
+							: 'bg-cyan/20 text-cyan border border-cyan/30'}">
+							{isMockData ? '⚠️ Mock Data' : '✓ Real Data'}
+						</span>
+					{/if}
+				</div>
 
 				<div class="flex items-center gap-3">
 					<!-- Display Options -->
@@ -299,6 +322,7 @@
 					showConfidenceBands={showConfidenceBands}
 					showActual={false}
 					height={450}
+					isMockData={isMockData}
 				/>
 			{:else}
 				<div class="flex items-center justify-center h-96">

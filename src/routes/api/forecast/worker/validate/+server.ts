@@ -26,7 +26,7 @@ export const POST: RequestHandler = async ({ request }) => {
             }, { status: 400 });
         }
 
-        const validModels = ['catboost', 'lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'];
+        const validModels = ['ML_ENSEMBLE', 'PHYSICS', 'HYBRID'];
         if (!validModels.includes(model_type)) {
             return json({
                 success: false,
@@ -48,34 +48,26 @@ export const POST: RequestHandler = async ({ request }) => {
 
         // Test Python worker connection
         const pythonWorkerUrl = process.env.PYTHON_WORKER_URL || 'http://localhost:8001';
+        let workerAvailable = false;
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
             const healthResponse = await fetch(`${pythonWorkerUrl}/health`, {
                 method: 'GET',
-                timeout: 5000
+                signal: controller.signal
             });
 
-            if (!healthResponse.ok) {
-                return json({
-                    success: false,
-                    error: 'Python worker is not healthy',
-                    validation: {
-                        parameters: 'valid',
-                        location: 'exists',
-                        worker_connection: 'failed'
-                    }
-                }, { status: 503 });
+            clearTimeout(timeoutId);
+
+            if (healthResponse.ok) {
+                workerAvailable = true;
+            } else {
+                console.warn('Python worker is not healthy, but will use mock data fallback');
             }
         } catch (connectionError) {
-            return json({
-                success: false,
-                error: 'Cannot connect to Python worker',
-                validation: {
-                    parameters: 'valid',
-                    location: 'exists',
-                    worker_connection: 'failed'
-                }
-            }, { status: 503 });
+            console.warn('Cannot connect to Python worker, will use mock data fallback');
         }
 
         // Validate location has required data
@@ -88,9 +80,21 @@ export const POST: RequestHandler = async ({ request }) => {
             }
         });
 
+        // Check for historical production data (required for CatBoost)
+        const historicalProduction = await db.production.count({
+            where: {
+                locationId: String(location_id),
+                timestamp: {
+                    gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Last 30 days
+                }
+            }
+        });
+
         const dataQuality = {
             weather_data_points: recentWeather,
             has_recent_weather: recentWeather > 0,
+            production_data_points: historicalProduction,
+            has_historical_production: historicalProduction > 0,
             location_coordinates: {
                 latitude: location.latitude,
                 longitude: location.longitude
@@ -102,7 +106,7 @@ export const POST: RequestHandler = async ({ request }) => {
             validation: {
                 parameters: 'valid',
                 location: 'exists',
-                worker_connection: 'healthy',
+                worker_connection: workerAvailable ? 'healthy' : 'unavailable',
                 data_quality: dataQuality
             },
             request_summary: {
@@ -112,13 +116,40 @@ export const POST: RequestHandler = async ({ request }) => {
                 model_type,
                 estimated_points: forecast_hours // One prediction per hour
             },
-            recommendations: recentWeather === 0 ? [
-                'No recent weather data found. Forecast may use default weather patterns.',
-                'Consider updating weather data for better accuracy.'
-            ] : [
-                'All validation checks passed.',
-                'Ready for forecast generation.'
-            ]
+            recommendations: (() => {
+                const recommendations = [];
+
+                if (!workerAvailable) {
+                    recommendations.push(
+                        'Python worker is not available. Mock data will be used for forecasting.',
+                        'To get real ML-based forecasts, ensure the Python worker is running.'
+                    );
+                }
+
+                if (historicalProduction === 0 && model_type === 'ML_ENSEMBLE') {
+                    recommendations.push(
+                        'WARNING: No historical production data found for this location.',
+                        'ML Ensemble model requires historical data to train. Mock data will be used instead.',
+                        'To get accurate forecasts, ensure production data is being recorded for this location.'
+                    );
+                }
+
+                if (recentWeather === 0) {
+                    recommendations.push(
+                        'No recent weather data found. Forecast may use default weather patterns.',
+                        'Consider updating weather data for better accuracy.'
+                    );
+                }
+
+                if (recommendations.length === 0) {
+                    recommendations.push(
+                        'All validation checks passed.',
+                        'Ready for forecast generation.'
+                    );
+                }
+
+                return recommendations;
+            })()
         });
     } catch (error) {
         console.error('Forecast validation failed:', error);

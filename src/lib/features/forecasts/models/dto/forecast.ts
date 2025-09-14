@@ -20,7 +20,7 @@ export interface ExportParameters extends ForecastParameters {
 export interface GenerateForecastRequest {
   locationId: string;
   horizonHours: number;
-  modelType: string;
+  modelType: 'ML_ENSEMBLE' | 'PHYSICS' | 'HYBRID';
   resolution?: string;
   includeWeather?: boolean;
 }

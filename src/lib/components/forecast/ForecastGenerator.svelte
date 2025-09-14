@@ -12,16 +12,17 @@
   let taskId: string | null = null;
   let error: string | null = null;
   let completed = false;
+  let validationWarning: string | null = null;
 
   // Generation parameters
   let horizonHours = 24;
-  let modelType = 'catboost';
+  let modelType = 'ML_ENSEMBLE';
   let useWeather = true;
 
   const modelTypes = [
-    { value: 'catboost', label: 'CatBoost (Recommended)', description: 'Gradient boosting with high accuracy' },
-    { value: 'lstm', label: 'LSTM Neural Network', description: 'Time-series neural network' },
-    { value: 'xgboost', label: 'XGBoost', description: 'Extreme gradient boosting' }
+    { value: 'ML_ENSEMBLE', label: 'ML Ensemble (CatBoost)', description: 'Machine learning with uncertainty bands' },
+    { value: 'PHYSICS', label: 'Physics-Based Model', description: 'PVLIB solar physics calculations' },
+    { value: 'HYBRID', label: 'Hybrid Model', description: 'Combines ML predictions with physics' }
   ];
 
   const horizonOptions = [
@@ -38,12 +39,30 @@
 
     isGenerating = true;
     progress = 0;
-    progressMessage = 'Initializing forecast generation...';
+    progressMessage = 'Validating parameters...';
     error = null;
     completed = false;
     taskId = null;
 
     try {
+      // First, validate parameters and check for historical data
+      progress = 10;
+      const validation = await validateParameters();
+
+      if (validation && validation.recommendations) {
+        const warnings = validation.recommendations.filter((r: string) =>
+          r.includes('WARNING') || r.includes('No historical') || r.includes('CatBoost')
+        );
+
+        if (warnings.length > 0) {
+          // Show warning but continue
+          validationWarning = warnings.join(' ');
+          console.warn('Validation warnings:', warnings);
+        }
+      }
+
+      progress = 20;
+      progressMessage = 'Initializing forecast generation...';
       // Start forecast generation
       const response = await fetch('/api/forecast/generate', {
         method: 'POST',
@@ -66,7 +85,14 @@
       if (result.success) {
         completed = true;
         progress = 100;
-        progressMessage = `Forecast generated successfully! ${result.data?.length || 0} data points created.`;
+
+        // Check if mock data was used
+        if (result.metadata?.isMockData) {
+          progressMessage = `Mock forecast generated! ${result.data?.length || 0} data points created. Note: This is simulated data for demonstration purposes.`;
+          error = 'No historical data available for CatBoost model. Mock data has been generated instead.';
+        } else {
+          progressMessage = `Forecast generated successfully! ${result.data?.length || 0} data points created.`;
+        }
 
         // Dispatch success event
         dispatch('forecastGenerated', {
@@ -115,6 +141,7 @@
     error = null;
     completed = false;
     taskId = null;
+    validationWarning = null;
   }
 </script>
 
@@ -143,6 +170,19 @@
       </div>
     {/if}
   </div>
+
+  <!-- Validation Warning -->
+  {#if validationWarning && !isGenerating && !completed}
+    <div class="mb-4 p-3 bg-alert-orange/20 border border-alert-orange/50 rounded-lg">
+      <div class="flex items-center gap-2 text-alert-orange">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span class="text-sm font-medium">Data Warning</span>
+      </div>
+      <p class="text-alert-orange/90 text-sm mt-1">{validationWarning}</p>
+    </div>
+  {/if}
 
   <!-- Generation Parameters -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -202,16 +242,21 @@
     </div>
   {/if}
 
-  <!-- Error Message -->
+  <!-- Error/Warning Message -->
   {#if error}
-    <div class="mb-4 p-3 bg-alert-red/20 border border-alert-red/50 rounded-lg">
-      <div class="flex items-center gap-2 text-alert-red">
+    {@const isWarning = error.includes('Mock data') || error.includes('simulated')}
+    <div class="mb-4 p-3 {isWarning ? 'bg-alert-orange/20 border-alert-orange/50' : 'bg-alert-red/20 border-alert-red/50'} border rounded-lg">
+      <div class="flex items-center gap-2 {isWarning ? 'text-alert-orange' : 'text-alert-red'}">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          {#if isWarning}
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          {:else}
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          {/if}
         </svg>
-        <span class="text-sm font-medium">Error</span>
+        <span class="text-sm font-medium">{isWarning ? 'Warning' : 'Error'}</span>
       </div>
-      <p class="text-alert-red/90 text-sm mt-1">{error}</p>
+      <p class="{isWarning ? 'text-alert-orange/90' : 'text-alert-red/90'} text-sm mt-1">{error}</p>
     </div>
   {/if}
 
