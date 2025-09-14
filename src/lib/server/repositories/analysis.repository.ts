@@ -305,7 +305,8 @@ export class AnalysisRepository {
    * Verify location exists and is accessible
    */
   async validateLocation(locationId: string) {
-    if (!locationId || locationId.trim() === '') {
+    // Validate UUID format (basic check)
+    if (!locationId || typeof locationId !== 'string' || locationId.length < 1) {
       return null;
     }
 

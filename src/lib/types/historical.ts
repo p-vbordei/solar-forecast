@@ -72,14 +72,6 @@ export interface HistoricalDataPoint {
     modelType?: string;
   };
   
-  // Data quality indicators
-  dataQuality: {
-    production?: DataQualityLevel;
-    weather?: DataQualityLevel;
-    forecast?: DataQualityLevel;
-    overall: DataQualityLevel;
-  };
-  
   // Aggregation info (for non-raw data)
   aggregationInfo?: {
     sampleCount: number;
@@ -242,14 +234,6 @@ export enum AggregationMethod {
   WEIGHTED_AVERAGE = 'weighted_avg'
 }
 
-export enum DataQualityLevel {
-  EXCELLENT = 'excellent',   // > 95% complete, validated
-  GOOD = 'good',            // > 85% complete, minor issues
-  FAIR = 'fair',            // > 70% complete, some interpolation
-  POOR = 'poor',            // > 50% complete, significant gaps
-  UNRELIABLE = 'unreliable' // < 50% complete
-}
-
 export enum DataQualityFilter {
   GOOD_ONLY = 'good_only',
   EXCLUDE_POOR = 'exclude_poor',
@@ -369,16 +353,6 @@ export function validateDateRange(startDate: string, endDate: string): boolean {
   }
   
   return true;
-}
-
-export function calculateDataQualityLevel(completeness: number, reliability: number): DataQualityLevel {
-  const score = (completeness + reliability) / 2;
-  
-  if (score >= 95) return DataQualityLevel.EXCELLENT;
-  if (score >= 85) return DataQualityLevel.GOOD;
-  if (score >= 70) return DataQualityLevel.FAIR;
-  if (score >= 50) return DataQualityLevel.POOR;
-  return DataQualityLevel.UNRELIABLE;
 }
 
 // CSV template generation for historical data uploads

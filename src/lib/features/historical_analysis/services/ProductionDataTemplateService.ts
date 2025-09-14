@@ -159,7 +159,7 @@ export class ProductionDataTemplateService {
 		lines[2] = `time_aggregation,${template.metadata.time_aggregation}`;
 		lines[3] = `start_date,${template.metadata.start_date}`;
 		lines[4] = `end_date,${template.metadata.end_date}`;
-		lines[5] = 'timestamp,production,capacity_factor,availability';
+		lines[5] = 'timestamp,production (powerMw),capacity_factor,availability';
 
 		// Add data rows - optimized loop with direct assignment
 		for (let i = 0; i < template.data.length; i++) {

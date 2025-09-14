@@ -271,7 +271,6 @@ model Plant {
 model Forecast {
   id                String    @id @default(uuid())
   timestamp         DateTime
-  time              DateTime  // Legacy field name compatibility
   locationId        String
   
   // Primary forecast values (matching linear forecast CSV structure)
@@ -379,25 +378,19 @@ enum ModelType {
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
-  time              DateTime  // Legacy field name compatibility
   locationId        String
 
   // Core production metrics (essential for ML training & historical analysis)
   powerMW           Float     // Actual AC power in MW - PRIMARY TARGET
   capacityFactor    Float?    // Actual/Nominal capacity ratio
   availability      Float?    // System availability percentage
-
-  // Minimal quality control
-  dataQuality       DataQuality @default(GOOD)
-
+  
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])
 
   // TimescaleDB optimized indexes - time dimension first for hypertables
   @@index([timestamp, locationId], name: "production_time_location_idx")
   @@index([locationId, timestamp(sort: Desc)], name: "production_location_time_desc_idx")
-  @@index([timestamp, dataQuality], name: "production_time_quality_idx")
-  @@index([dataQuality, timestamp], name: "production_quality_time_idx")
   @@map("production")
 }
 

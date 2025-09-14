@@ -169,7 +169,6 @@ export class ForecastTransformer {
     return {
       locationId: request.locationId,
       timestamp: startTime,
-      time: startTime, // Legacy field compatibility
       modelType: request.modelType,
       modelVersion: '1.0', // Default version
       forecastType: 'OPERATIONAL',

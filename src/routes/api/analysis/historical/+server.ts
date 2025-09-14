@@ -36,20 +36,22 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Parse location IDs
     let parsedLocationIds: string[] = [];
+    let parsedLocationIds: string[] = [];
     try {
       if (locationIds) {
         parsedLocationIds = locationIds.split(',').map(id => id.trim());
+        parsedLocationIds = locationIds.split(',').map(id => id.trim());
       } else if (location) {
-        parsedLocationIds = [location.trim()];
+        parsedLocationIds = [location];
       }
 
-      // Validate location IDs are not empty
-      if (parsedLocationIds.some(id => !id)) {
+      // Validate location IDs are not empty strings
+      if (parsedLocationIds.some(id => !id || id.length === 0)) {
         throw new Error('Invalid location ID format');
       }
     } catch (error) {
       return json(
-        { success: false, error: 'Invalid location ID format. Use comma-separated location IDs.' },
+        { success: false, error: 'Invalid location ID format. Use comma-separated strings.' },
         { status: 400 }
       );
     }
