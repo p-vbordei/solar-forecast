@@ -347,19 +347,37 @@ async function getLocationGuid(locationId: string): Promise<string> {
   try {
     const locations = await db.location.findMany({
       select: { id: true },
-      orderBy: { name: 'asc' }
+      orderBy: { createdAt: 'asc' }  // Use createdAt for consistent ordering
     });
 
-    // Map numeric IDs to actual UUIDs (by order)
+    // Map numeric IDs to actual UUIDs (by creation order)
     const numericId = parseInt(locationId) - 1; // Convert 1-based to 0-based
-    if (locations[numericId]) {
+    if (numericId >= 0 && numericId < locations.length && locations[numericId]) {
+      console.log(`Mapped location input '${locationId}' to UUID: ${locations[numericId].id}`);
       return locations[numericId].id;
     }
+
+    console.log(`Location index ${numericId} out of range (0-${locations.length-1}), using first location`);
   } catch (error) {
     console.error('Error fetching location ID:', error);
   }
 
-  // Fallback - return first location
+  // Fallback - return first location that has weather data
+  const locationWithWeather = await db.location.findFirst({
+    where: {
+      weatherData: {
+        some: {}
+      }
+    },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  if (locationWithWeather) {
+    console.log(`Fallback: Using location with weather data: ${locationWithWeather.id}`);
+    return locationWithWeather.id;
+  }
+
+  // Final fallback - just use first location
   const firstLocation = await db.location.findFirst();
   return firstLocation?.id || locationId;
 }
