@@ -59,7 +59,7 @@ export interface ForecastResponse {
 }
 
 export interface BulkForecastInsert {
-  locationId: number;
+  locationId: string;
   timestamp: Date;
   powerForecastMw: number;
   confidenceScore?: number;

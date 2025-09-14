@@ -24,6 +24,9 @@ export class ForecastService {
     async getForecast(params: ForecastParameters): Promise<ForecastResponse> {
         const { locationId, interval, startDate, endDate } = params;
 
+        // Validate GUID format
+        this.validateGuidFormat(locationId);
+
         // Try to get real data from repository first
         let rawData = await this.repository.getForecastData(
             locationId,
@@ -70,6 +73,9 @@ export class ForecastService {
      */
     async getAccuracyMetrics(params: AccuracyParameters): Promise<AccuracyMetrics> {
         const { locationId, startDate, endDate } = params;
+
+        // Validate GUID format
+        this.validateGuidFormat(locationId);
 
         // Get accuracy data from repository
         let accuracyData = await this.repository.getAccuracyData(
@@ -120,6 +126,9 @@ export class ForecastService {
         // Validate parameters
         this.validateGenerateForecastRequest(params);
 
+        // Validate GUID format
+        this.validateGuidFormat(params.locationId);
+
         try {
             // TODO: Replace with actual Python worker API call
             // const pythonWorkerResponse = await fetch('http://localhost:8001/api/forecasts/generate', {
@@ -155,7 +164,21 @@ export class ForecastService {
      * Get forecast statistics
      */
     async getForecastStatistics(locationId: string, days: number = 30) {
+        // Validate GUID format
+        this.validateGuidFormat(locationId);
+
         return await this.repository.getForecastStatistics(locationId, days);
+    }
+
+    /**
+     * Validate GUID format
+     */
+    private validateGuidFormat(guid: string): void {
+        const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (!guidRegex.test(guid)) {
+            throw new Error(`Invalid GUID format: ${guid}`);
+        }
     }
 
     /**
@@ -332,7 +355,7 @@ export class ForecastService {
             }
 
             forecasts.push({
-                locationId: parseInt(locationId),
+                locationId: locationId,
                 timestamp,
                 powerForecastMw: parseFloat(baseForecast.toFixed(2)),
                 confidenceScore: parseFloat(confidence.toFixed(3)),

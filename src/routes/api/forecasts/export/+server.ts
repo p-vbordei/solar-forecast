@@ -3,5 +3,5 @@ import { ForecastController } from '$lib/features/forecasts/controllers/Forecast
 
 const controller = new ForecastController();
 
-// GET /api/forecasts/statistics - Get forecast statistics
-export const GET: RequestHandler = (event) => controller.getForecastStatistics(event);
+// GET /api/forecasts/export - Export forecast data
+export const GET: RequestHandler = (event) => controller.exportForecast(event);

@@ -15,13 +15,15 @@ class WeatherData:
     time: datetime  # Legacy field name compatibility
     locationId: str
 
-    # Basic weather metrics
+    # Basic weather metrics (required fields)
     temperature: float          # Celsius
     humidity: float            # Percentage
     pressure: float            # hPa
     windSpeed: float           # m/s (camelCase in DB)
-    windDirection: Optional[float] = None  # Degrees
     cloudCover: float          # Percentage (camelCase in DB)
+
+    # Basic weather metrics (optional fields)
+    windDirection: Optional[float] = None  # Degrees
     visibility: Optional[float] = None     # km
     precipitation: Optional[float] = None  # mm
     precipitationType: Optional[str] = None  # rain, snow, etc.

@@ -1,6 +1,6 @@
 // PV panel domain models
 
-import type { PanelTechnology } from "../enums/panelTechnology";
+import type { PanelTechnology } from "../enums/PanelTechnology";
 
 
 export interface PanelConfig {

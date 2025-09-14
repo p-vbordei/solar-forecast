@@ -33,7 +33,7 @@ class WeatherRepository:
             List of WeatherData objects
         """
         try:
-            query = text("""
+            query = text(f"""
                 SELECT
                     id, timestamp, time, "locationId",
                     temperature, humidity, pressure,
@@ -41,55 +41,23 @@ class WeatherRepository:
                     visibility, precipitation, "precipitationType",
                     ghi, dni, dhi, gti, extraterrestrial,
                     "solarZenith", "solarAzimuth", "solarElevation", "airMass",
-                    "dewPoint", "uvIndex", "apparentTemperature",
-                    source, "dataQuality", "isForecasted", "forecastHorizon"
-                FROM "WeatherData"
+                    source, "dataQuality"
+                FROM weather_data
                 WHERE "locationId" = :location_id
-                    AND timestamp >= NOW() - INTERVAL :hours HOUR
+                    AND timestamp >= NOW() - INTERVAL '{hours} hours'
                 ORDER BY timestamp DESC
                 LIMIT 1000
             """)
 
             result = await self.db.execute(query, {
-                "location_id": location_id,
-                "hours": f"{hours} hours"
+                "location_id": location_id
             })
 
             rows = result.fetchall()
 
             weather_data_list = []
             for row in rows:
-                weather_data = WeatherData(
-                    id=row.id,
-                    timestamp=row.timestamp,
-                    time=row.time or row.timestamp,  # Fallback to timestamp if time is None
-                    locationId=row.locationId,
-                    temperature=float(row.temperature),
-                    humidity=float(row.humidity),
-                    pressure=float(row.pressure),
-                    windSpeed=float(row.windSpeed),
-                    windDirection=float(row.windDirection) if row.windDirection is not None else None,
-                    cloudCover=float(row.cloudCover),
-                    visibility=float(row.visibility) if row.visibility is not None else None,
-                    precipitation=float(row.precipitation) if row.precipitation is not None else None,
-                    precipitationType=row.precipitationType,
-                    ghi=float(row.ghi) if row.ghi is not None else None,
-                    dni=float(row.dni) if row.dni is not None else None,
-                    dhi=float(row.dhi) if row.dhi is not None else None,
-                    gti=float(row.gti) if row.gti is not None else None,
-                    extraterrestrial=float(row.extraterrestrial) if row.extraterrestrial is not None else None,
-                    solarZenith=float(row.solarZenith) if row.solarZenith is not None else None,
-                    solarAzimuth=float(row.solarAzimuth) if row.solarAzimuth is not None else None,
-                    solarElevation=float(row.solarElevation) if row.solarElevation is not None else None,
-                    airMass=float(row.airMass) if row.airMass is not None else None,
-                    dewPoint=float(row.dewPoint) if row.dewPoint is not None else None,
-                    uvIndex=float(row.uvIndex) if row.uvIndex is not None else None,
-                    apparentTemperature=float(row.apparentTemperature) if row.apparentTemperature is not None else None,
-                    source=row.source or "open-meteo",
-                    dataQuality=row.dataQuality or "GOOD",
-                    isForecasted=bool(row.isForecasted) if row.isForecasted is not None else False,
-                    forecastHorizon=int(row.forecastHorizon) if row.forecastHorizon is not None else None
-                )
+                weather_data = self._row_to_weather_data(row)
                 weather_data_list.append(weather_data)
 
             logger.info(f"Retrieved {len(weather_data_list)} weather records for location {location_id}")
@@ -125,9 +93,8 @@ class WeatherRepository:
                     visibility, precipitation, "precipitationType",
                     ghi, dni, dhi, gti, extraterrestrial,
                     "solarZenith", "solarAzimuth", "solarElevation", "airMass",
-                    "dewPoint", "uvIndex", "apparentTemperature",
-                    source, "dataQuality", "isForecasted", "forecastHorizon"
-                FROM "WeatherData"
+                    source, "dataQuality"
+                FROM weather_data
                 WHERE "locationId" = :location_id
                     AND timestamp >= :start_time
                     AND timestamp <= :end_time
@@ -174,9 +141,8 @@ class WeatherRepository:
                     visibility, precipitation, "precipitationType",
                     ghi, dni, dhi, gti, extraterrestrial,
                     "solarZenith", "solarAzimuth", "solarElevation", "airMass",
-                    "dewPoint", "uvIndex", "apparentTemperature",
-                    source, "dataQuality", "isForecasted", "forecastHorizon"
-                FROM "WeatherData"
+                    source, "dataQuality"
+                FROM weather_data
                 WHERE "locationId" = :location_id
                 ORDER BY timestamp DESC
                 LIMIT 1
@@ -252,8 +218,8 @@ class WeatherRepository:
             humidity=float(row.humidity),
             pressure=float(row.pressure),
             windSpeed=float(row.windSpeed),
-            windDirection=float(row.windDirection) if row.windDirection is not None else None,
             cloudCover=float(row.cloudCover),
+            windDirection=float(row.windDirection) if row.windDirection is not None else None,
             visibility=float(row.visibility) if row.visibility is not None else None,
             precipitation=float(row.precipitation) if row.precipitation is not None else None,
             precipitationType=row.precipitationType,
@@ -266,11 +232,12 @@ class WeatherRepository:
             solarAzimuth=float(row.solarAzimuth) if row.solarAzimuth is not None else None,
             solarElevation=float(row.solarElevation) if row.solarElevation is not None else None,
             airMass=float(row.airMass) if row.airMass is not None else None,
-            dewPoint=float(row.dewPoint) if row.dewPoint is not None else None,
-            uvIndex=float(row.uvIndex) if row.uvIndex is not None else None,
-            apparentTemperature=float(row.apparentTemperature) if row.apparentTemperature is not None else None,
+            # Fields not in database - set to None
+            dewPoint=None,
+            uvIndex=None,
+            apparentTemperature=None,
             source=row.source or "open-meteo",
-            dataQuality=row.dataQuality or "GOOD",
-            isForecasted=bool(row.isForecasted) if row.isForecasted is not None else False,
-            forecastHorizon=int(row.forecastHorizon) if row.forecastHorizon is not None else None
+            dataQuality=str(row.dataQuality) if row.dataQuality is not None else "GOOD",
+            isForecasted=False,
+            forecastHorizon=None
         )
