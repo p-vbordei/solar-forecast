@@ -5,17 +5,35 @@
 	let selectedTimezone = 'Europe/Bucharest';
 	let startDate = new Date().toISOString().split('T')[0];
 	let endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 7 days from now
-	let includeWeatherData = true;
-	let includeProductionData = true;
-	let includeForecastData = true;
+	let selectedDataType = 'production';
 
 	// Available options
-	const locations = [
+	let locations = [
 		{ id: 'site_a', name: 'Solar Farm Site A', coordinates: '45.1234, 25.5678' },
 		{ id: 'site_b', name: 'Solar Farm Site B', coordinates: '44.9876, 26.9012' },
 		{ id: 'veranda_mall', name: 'Veranda Mall Bucharest', coordinates: '44.4522, 26.1306' },
 		{ id: 'custom', name: 'Custom Location', coordinates: 'User defined' }
 	];
+
+	// Load locations from API
+	async function loadLocations() {
+		try {
+			const response = await fetch('/api/locations/minified');
+			const result = await response.json();
+
+			if (result.success && result.data) {
+				locations = result.data;
+			}
+		} catch (error) {
+			console.warn('Failed to load locations from API, using defaults:', error);
+		}
+	}
+
+	// Load locations on component mount
+	import { onMount } from 'svelte';
+	onMount(() => {
+		loadLocations();
+	});
 
 	const aggregations = [
 		{ key: '15min', label: '15 Minutes', duration: 15, unit: 'minutes' },
@@ -94,118 +112,85 @@
 		return datetimes;
 	}
 
-	// Generate CSV template
-	function generateTemplate() {
-		const datetimes = generateDatetimeArray();
-		const selectedLocationData = locations.find(l => l.id === selectedLocation);
-		
-		// Build columns array
-		let columns = [...baseColumns];
-		
-		if (includeWeatherData) {
-			columns = [...columns, ...weatherColumns];
-		}
-		
-		if (includeProductionData) {
-			columns = [...columns, ...productionColumns];
-		}
-		
-		if (includeForecastData) {
-			columns = [...columns, ...forecastColumns];
-		}
+	// Generate CSV template via API
+	async function generateTemplate() {
+		try {
+			const selectedLocationData = locations.find(l => l.id === selectedLocation);
 
-		// Generate CSV content
-		const csvContent = [
-			// Header row
-			columns.join(','),
-			// Data rows with sample/placeholder values
-			...datetimes.map(datetime => {
-				const row = [datetime, selectedLocationData?.name || 'Custom Location'];
-				
-				// Add weather data placeholders
-				if (includeWeatherData) {
-					row.push(
-						'20.5',    // temperature_2m
-						'65',      // relative_humidity_2m
-						'1013.2',  // surface_pressure
-						'12.3',    // dew_point_2m
-						'650',     // shortwave_radiation
-						'800',     // direct_radiation
-						'150',     // diffuse_radiation
-						'700',     // global_tilted_irradiance
-						'25',      // cloud_cover
-						'15',      // cloud_cover_low
-						'10',      // cloud_cover_mid
-						'5',       // cloud_cover_high
-						'8.2',     // wind_speed_10m
-						'180',     // wind_direction_10m
-						'12.5',    // wind_gusts_10m
-						'0',       // precipitation
-						'0',       // rain
-						'15.5',    // visibility
-						'45'       // sunshine_duration
-					);
-				}
-				
-				// Add production data placeholders
-				if (includeProductionData) {
-					row.push(
-						'45.8',    // production_mw
-						'0.82',    // capacity_factor
-						'0.89',    // performance_ratio
-						'0.98'     // availability
-					);
-				}
-				
-				// Add forecast data placeholders
-				if (includeForecastData) {
-					row.push(
-						'47.2',    // forecast_production_mw
-						'0.95',    // forecast_confidence
-						'v2.1.3'   // forecast_model_version
-					);
-				}
-				
-				return row.join(',');
-			})
-		].join('\n');
+			// Build parameters according to API schema requirements
+			const params = new URLSearchParams();
 
-		return csvContent;
+			// Map timezone name to offset format
+			const timezoneMap: Record<string, string> = {
+				'Europe/Bucharest': '+02:00',
+				'Europe/London': '+00:00',
+				'Europe/Berlin': '+01:00',
+				'UTC': '+00:00',
+				'America/New_York': '-05:00',
+				'America/Los_Angeles': '-08:00',
+				'Asia/Tokyo': '+09:00',
+				'Australia/Sydney': '+10:00'
+			};
+
+			// Add required parameters with correct formats
+			params.append('location_name', selectedLocationData?.name || 'Solar Farm Site A');
+			params.append('location_guid', selectedLocationData?.id || 'custom'); // Use actual selected location ID
+			params.append('time_aggregation', selectedAggregation); // hourly, daily, monthly
+			params.append('start_date', startDate); // Already in YYYY-MM-DD format
+			params.append('end_date', endDate); // Already in YYYY-MM-DD format
+			params.append('timezone', timezoneMap[selectedTimezone] || '+02:00'); // Convert to ±HH:MM format
+			params.append('format', 'csv');
+
+			const url = `/api/historical-analysis/generate-template?${params.toString()}`;
+			console.log('Sending GET request to:', url);
+			console.log('Parameters:', Object.fromEntries(params));
+
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Accept': 'text/csv'
+				}
+			});
+
+			console.log('Response status:', response.status);
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				console.error('API Error:', errorText);
+				throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+			}
+
+			// Handle as text since it's CSV
+			const csvContent = await response.text();
+			console.log('CSV content received:', csvContent.substring(0, 200) + '...');
+
+			// Create blob from CSV text
+			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+			const downloadUrl = window.URL.createObjectURL(blob);
+
+			const filename = `solar_data_template_${selectedLocationData?.id || 'custom'}_${selectedAggregation}_${startDate}_${endDate}.csv`;
+
+			const a = document.createElement('a');
+			a.href = downloadUrl;
+			a.download = filename;
+			a.style.display = 'none';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			window.URL.revokeObjectURL(downloadUrl);
+
+			console.log('Template downloaded successfully');
+		} catch (error) {
+			console.error('Error generating template:', error);
+			alert(`Error generating template: ${error.message}. Please check the console for details.`);
+		}
 	}
 
-	// Download template
+	// Download template - now calls generateTemplate directly
 	function downloadTemplate() {
-		const csvContent = generateTemplate();
-		const aggregation = aggregations.find(a => a.key === selectedAggregation);
-		const location = locations.find(l => l.id === selectedLocation);
-		
-		const filename = `solar_data_template_${location?.id || 'custom'}_${selectedAggregation}_${startDate}_${endDate}.csv`;
-		
-		const blob = new Blob([csvContent], { type: 'text/csv' });
-		const url = window.URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		window.URL.revokeObjectURL(url);
+		generateTemplate();
 	}
 
-	// Calculate template statistics
-	$: templateStats = {
-		totalRows: generateDatetimeArray().length,
-		dateRange: `${startDate} to ${endDate}`,
-		columns: baseColumns.length + 
-			(includeWeatherData ? weatherColumns.length : 0) + 
-			(includeProductionData ? productionColumns.length : 0) + 
-			(includeForecastData ? forecastColumns.length : 0),
-		estimatedSize: Math.round((generateDatetimeArray().length * 
-			(baseColumns.length + 
-			(includeWeatherData ? weatherColumns.length : 0) + 
-			(includeProductionData ? productionColumns.length : 0) + 
-			(includeForecastData ? forecastColumns.length : 0)) * 8) / 1024) // KB estimate
-	};
 </script>
 
 <div class="card-glass">
@@ -319,65 +304,20 @@
 				<label class="block text-sm font-medium text-soft-blue mb-3">Include Data Types</label>
 				<div class="space-y-3">
 					<label class="flex items-center space-x-3 cursor-pointer">
-						<input 
-							type="checkbox" 
-							bind:checked={includeWeatherData}
-							class="w-4 h-4 text-cyan bg-glass-white border-soft-blue/30 rounded focus:ring-cyan focus:ring-2"
-						/>
-						<div class="flex-1">
-							<div class="text-sm font-medium text-soft-blue">Weather Data</div>
-							<div class="text-xs text-soft-blue/60">{weatherColumns.length} columns: temperature, humidity, radiation, etc.</div>
-						</div>
-					</label>
-
-					<label class="flex items-center space-x-3 cursor-pointer">
-						<input 
-							type="checkbox" 
-							bind:checked={includeProductionData}
-							class="w-4 h-4 text-cyan bg-glass-white border-soft-blue/30 rounded focus:ring-cyan focus:ring-2"
+						<input
+							type="radio"
+							bind:group={selectedDataType}
+							value="production"
+							class="w-4 h-4 text-cyan bg-glass-white border-soft-blue/30 focus:ring-cyan focus:ring-2"
 						/>
 						<div class="flex-1">
 							<div class="text-sm font-medium text-soft-blue">Production Data</div>
 							<div class="text-xs text-soft-blue/60">{productionColumns.length} columns: production, capacity factor, availability</div>
 						</div>
 					</label>
-
-					<label class="flex items-center space-x-3 cursor-pointer">
-						<input 
-							type="checkbox" 
-							bind:checked={includeForecastData}
-							class="w-4 h-4 text-cyan bg-glass-white border-soft-blue/30 rounded focus:ring-cyan focus:ring-2"
-						/>
-						<div class="flex-1">
-							<div class="text-sm font-medium text-soft-blue">Forecast Data</div>
-							<div class="text-xs text-soft-blue/60">{forecastColumns.length} columns: forecast values, confidence, model version</div>
-						</div>
-					</label>
 				</div>
 			</div>
 
-			<!-- Template Statistics -->
-			<div class="bg-glass-white rounded-lg p-4">
-				<h4 class="text-sm font-medium text-soft-blue mb-3">Template Statistics</h4>
-				<div class="space-y-2 text-sm">
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Total Rows:</span>
-						<span class="text-soft-blue font-mono">{templateStats.totalRows.toLocaleString()}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Total Columns:</span>
-						<span class="text-soft-blue font-mono">{templateStats.columns}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Date Range:</span>
-						<span class="text-soft-blue font-mono text-xs">{templateStats.dateRange}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Estimated Size:</span>
-						<span class="text-soft-blue font-mono">{templateStats.estimatedSize} KB</span>
-					</div>
-				</div>
-			</div>
 
 			<!-- Instructions -->
 			<div class="bg-cyan/10 border border-cyan/30 rounded-lg p-4">
