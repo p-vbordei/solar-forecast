@@ -14,6 +14,12 @@
 	let uploadError = '';
 	let showExplanation = false;
 
+	// Customizable data summary fields
+	let totalRecords = 'N/A';
+	let locationName = 'N/A';
+	let dataType = 'Production';
+	let dateRange = 'N/A';
+
 	// Available locations (from uploaded data)
 	let availableLocations: string[] = ['all'];
 
@@ -96,44 +102,308 @@
 		processData();
 	});
 
-	// Handle file upload
+	// Enhanced file upload with validation
+	let isDragOver = false;
+	let uploadedFile: File | null = null;
+	let validationResults: any = null;
+	let isValidationPassed = false;
+	let validatedData: any[] = [];
+
+	// Expected CSV template structure based on actual template
+	const expectedColumns = ['timestamp', 'production', 'capacity_factor', 'availability'];
+
+	function validateCSVStructure(headers: string[]) {
+		const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
+		const missingColumns = expectedColumns.filter(col =>
+			!normalizedHeaders.includes(col)
+		);
+
+		return {
+			isValid: missingColumns.length === 0,
+			missingColumns,
+			foundColumns: headers
+		};
+	}
+
+	function validateDataRow(row: any, index: number) {
+		const errors: string[] = [];
+
+		// Validate timestamp format
+		const timestamp = row.timestamp;
+		if (!timestamp) {
+			errors.push(`Row ${index + 2}: Missing timestamp`);
+		} else {
+			const dateObj = new Date(timestamp);
+			if (isNaN(dateObj.getTime())) {
+				errors.push(`Row ${index + 2}: Invalid timestamp format "${timestamp}". Use ISO format (YYYY-MM-DDTHH:MM:SS+TZ)`);
+			}
+		}
+
+		// Validate production value
+		const production = row.production;
+		if (production === null || production === undefined || production === '') {
+			errors.push(`Row ${index + 2}: Missing production value`);
+		} else {
+			const prodNum = parseFloat(production);
+			if (isNaN(prodNum)) {
+				errors.push(`Row ${index + 2}: Invalid production value "${production}". Must be a decimal number`);
+			} else if (prodNum < 0) {
+				errors.push(`Row ${index + 2}: Production value cannot be negative`);
+			}
+		}
+
+		// Validate capacity_factor value
+		const capacityFactor = row.capacity_factor;
+		if (capacityFactor === null || capacityFactor === undefined || capacityFactor === '') {
+			errors.push(`Row ${index + 2}: Missing capacity_factor value`);
+		} else {
+			const cfNum = parseFloat(capacityFactor);
+			if (isNaN(cfNum)) {
+				errors.push(`Row ${index + 2}: Invalid capacity_factor value "${capacityFactor}". Must be a decimal number`);
+			} else if (cfNum < 0 || cfNum > 1) {
+				errors.push(`Row ${index + 2}: Capacity factor must be between 0 and 1`);
+			}
+		}
+
+		// Validate availability value
+		const availability = row.availability;
+		if (availability === null || availability === undefined || availability === '') {
+			errors.push(`Row ${index + 2}: Missing availability value`);
+		} else {
+			const availNum = parseFloat(availability);
+			if (isNaN(availNum)) {
+				errors.push(`Row ${index + 2}: Invalid availability value "${availability}". Must be a decimal number`);
+			} else if (availNum < 0 || availNum > 1) {
+				errors.push(`Row ${index + 2}: Availability must be between 0 and 1`);
+			}
+		}
+
+		return errors;
+	}
+
+	function validateCSVData(csvData: any[], locationName = 'Solar Farm Site A') {
+		let totalErrors: string[] = [];
+		let validRows = 0;
+		const processedData: any[] = [];
+
+		csvData.forEach((row, index) => {
+			const rowErrors = validateDataRow(row, index);
+			totalErrors = [...totalErrors, ...rowErrors];
+
+			if (rowErrors.length === 0) {
+				validRows++;
+				// Normalize the row data for the new template structure
+				const normalizedRow = {
+					datetime: row.timestamp,
+					location: locationName,
+					production: parseFloat(row.production || 0),
+					capacity_factor: parseFloat(row.capacity_factor || 0),
+					availability: parseFloat(row.availability || 0),
+					forecast: parseFloat(row.production || 0) // Use production as forecast for demo
+				};
+				processedData.push(normalizedRow);
+			}
+		});
+
+		// Extract summary information
+		const locations = [...new Set(processedData.map(row => row.location))];
+		const timestamps = processedData.map(row => new Date(row.datetime)).sort();
+		const dateRange = timestamps.length > 0 ?
+			`${timestamps[0].toLocaleDateString()} - ${timestamps[timestamps.length - 1].toLocaleDateString()}` :
+			'N/A';
+
+		return {
+			isValid: totalErrors.length === 0,
+			errors: totalErrors,
+			totalRows: csvData.length,
+			validRows,
+			invalidRows: csvData.length - validRows,
+			processedData,
+			summary: {
+				totalRecords: validRows,
+				locationCount: locations.length,
+				locations: locations,
+				dateRange,
+				dataType: 'Production'
+			}
+		};
+	}
+
 	function handleFileUpload(event: Event) {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
-		
-		if (!file) return;
 
+		if (file) {
+			processFile(file);
+		}
+	}
+
+	function handleDrop(event: DragEvent) {
+		event.preventDefault();
+		isDragOver = false;
+
+		const files = event.dataTransfer?.files;
+		if (files && files.length > 0) {
+			const file = files[0];
+			if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+				processFile(file);
+			} else {
+				uploadError = 'Please upload a CSV file only.';
+			}
+		}
+	}
+
+	function handleDragOver(event: DragEvent) {
+		event.preventDefault();
+		isDragOver = true;
+	}
+
+	function handleDragLeave() {
+		isDragOver = false;
+	}
+
+	function processFile(file: File) {
+		uploadedFile = file;
 		isUploading = true;
 		uploadError = '';
+		validationResults = null;
+		isValidationPassed = false;
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
 			try {
 				const text = e.target?.result as string;
-				const lines = text.split('\n');
-				const headers = lines[0].split(',').map(h => h.trim());
-				
-				const data = lines.slice(1).map(line => {
+				const lines = text.split('\n').filter(line => line.trim());
+
+				if (lines.length < 7) { // Need metadata + header + at least 1 data row
+					uploadError = 'CSV file must contain metadata rows, header row, and at least one data row.';
+					isUploading = false;
+					return;
+				}
+
+				// Extract metadata from first 5 rows
+				const metadata: any = {};
+				let headerRowIndex = -1;
+				let headers: string[] = [];
+
+				// Parse metadata and find header row
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i];
+					const parts = line.split(',').map(p => p.trim());
+
+					// Check if this line contains the data headers
+					if (parts.includes('timestamp') && parts.includes('production')) {
+						headerRowIndex = i;
+						headers = parts;
+						break;
+					}
+
+					// Parse metadata rows (key,value format)
+					if (parts.length >= 2 && !parts.includes('timestamp')) {
+						metadata[parts[0]] = parts[1];
+					}
+				}
+
+				if (headerRowIndex === -1) {
+					uploadError = 'Could not find data header row with timestamp and production columns.';
+					isUploading = false;
+					return;
+				}
+
+				// Validate CSV structure
+				const structureValidation = validateCSVStructure(headers);
+				if (!structureValidation.isValid) {
+					uploadError = `CSV template is incorrect. Missing columns: ${structureValidation.missingColumns.join(', ')}. Expected columns: ${expectedColumns.join(', ')}`;
+					isUploading = false;
+					return;
+				}
+
+				// Parse data rows (everything after header row)
+				const data = lines.slice(headerRowIndex + 1).map(line => {
 					const values = line.split(',').map(v => v.trim());
 					const row: any = {};
 					headers.forEach((header, index) => {
 						row[header] = values[index];
 					});
 					return row;
-				}).filter(row => row.datetime); // Filter out empty rows
+				}).filter(row => Object.keys(row).some(key => row[key] !== '')); // Filter out completely empty rows
 
-				uploadedData = [...uploadedData, ...data];
-				availableLocations = ['all', ...new Set(uploadedData.map(d => d.location))];
-				processData();
-				
+				// Validate data
+				const dataValidation = validateCSVData(data, metadata.location_name || 'Solar Farm Site A');
+
+				validationResults = {
+					structure: structureValidation,
+					data: dataValidation,
+					metadata: metadata,
+					filename: file.name,
+					fileSize: (file.size / 1024).toFixed(1) + ' KB'
+				};
+
+				if (dataValidation.isValid) {
+					isValidationPassed = true;
+					validatedData = dataValidation.processedData;
+
+					// Update summary with actual data from metadata and validation
+					totalRecords = dataValidation.summary.totalRecords.toString();
+					locationName = metadata.location_name || 'Unknown Location';
+					dataType = 'Production';
+					dateRange = metadata.start_date && metadata.end_date ?
+						`${metadata.start_date} - ${metadata.end_date}` :
+						dataValidation.summary.dateRange;
+				} else {
+					isValidationPassed = false;
+				}
+
 				isUploading = false;
 			} catch (error) {
-				uploadError = 'Error parsing CSV file. Please check the format.';
+				uploadError = 'Error parsing CSV file. Please check the format and try again.';
 				isUploading = false;
+				validationResults = null;
 			}
 		};
-		
+
 		reader.readAsText(file);
+	}
+
+	function uploadToServer() {
+		if (!isValidationPassed || validatedData.length === 0) return;
+
+		isUploading = true;
+
+		// Simulate upload to historical analysis controller endpoint
+		// In real implementation, this would call the POST endpoint
+		setTimeout(() => {
+			// Merge with existing data for demo
+			uploadedData = [...uploadedData, ...validatedData];
+			availableLocations = ['all', ...new Set(uploadedData.map(d => d.location))];
+			processData();
+
+			// Reset upload state completely
+			resetUploadState();
+
+			// Show success message
+			alert('CSV file uploaded successfully!');
+		}, 2000);
+	}
+
+	function resetUploadState() {
+		uploadedFile = null;
+		validationResults = null;
+		isValidationPassed = false;
+		validatedData = [];
+		uploadError = '';
+		isUploading = false;
+		if (fileInput) fileInput.value = '';
+
+		// Reset data summary to defaults
+		totalRecords = 'N/A';
+		locationName = 'N/A';
+		dataType = 'Production';
+		dateRange = 'N/A';
+	}
+
+	function resetUpload() {
+		resetUploadState();
 	}
 
 	// Process data based on aggregation and location
@@ -799,88 +1069,172 @@
 
 	<!-- Upload Section -->
 	<div class="card-glass">
-		<div class="flex items-center justify-between mb-4">
+		<div class="flex items-center justify-between mb-6">
 			<h3 class="text-lg font-semibold text-soft-blue">Data Upload</h3>
 			<div class="text-sm text-soft-blue/60">
 				Supported formats: CSV (use template above)
 			</div>
 		</div>
-		
+
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- File Upload -->
+			<!-- Enhanced File Upload with Drag & Drop -->
 			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Upload Historical Data</label>
-				<div class="border-2 border-dashed border-soft-blue/30 rounded-lg p-6 text-center hover:border-cyan/50 transition-colors">
-					<input 
-						type="file" 
+				<label class="block text-sm font-medium text-soft-blue mb-3">Upload Historical Data</label>
+				<div
+					class="border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 {isDragOver ? 'border-cyan bg-cyan/5' : uploadError ? 'border-alert-red/50 bg-alert-red/5' : validationResults && isValidationPassed ? 'border-alert-green bg-alert-green/5' : validationResults && !isValidationPassed ? 'border-alert-orange/50 bg-alert-orange/5' : 'border-soft-blue/30 hover:border-cyan/50'}"
+					on:drop={handleDrop}
+					on:dragover={handleDragOver}
+					on:dragleave={handleDragLeave}
+				>
+					<input
+						type="file"
 						accept=".csv"
 						bind:this={fileInput}
 						on:change={handleFileUpload}
 						class="hidden"
 					/>
-					<button 
-						on:click={() => fileInput?.click()}
-						class="btn btn-primary"
-						disabled={isUploading}
-					>
-						{#if isUploading}
-							Uploading...
-						{:else}
-							<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-							</svg>
-							Upload CSV File
-						{/if}
-					</button>
-					<p class="text-sm text-soft-blue/60 mt-2">
-						Upload CSV file generated from template above, or custom format with: datetime, location, production, forecast
-					</p>
+
+					{#if !uploadedFile}
+						<!-- Initial Upload State -->
+						<div class="flex flex-col items-center space-y-4">
+							<div class="w-12 h-12 bg-gradient-to-br from-cyan/20 to-soft-blue/20 rounded-xl flex items-center justify-center">
+								<svg class="w-6 h-6 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+								</svg>
+							</div>
+							<div>
+								<button
+									on:click={() => fileInput?.click()}
+									class="bg-cyan hover:bg-soft-blue text-dark-petrol font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-cyan/30"
+									disabled={isUploading}
+								>
+									{#if isUploading}
+										<svg class="w-5 h-5 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+										</svg>
+										Processing...
+									{:else}
+										<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+										</svg>
+										Upload CSV File
+									{/if}
+								</button>
+								<p class="text-sm text-soft-blue/70 mt-3">
+									Drag & drop your CSV file here, or click to browse
+								</p>
+								<p class="text-xs text-soft-blue/50 mt-1">
+									Expected format: timestamp, production, capacity_factor, availability
+								</p>
+							</div>
+						</div>
+					{:else}
+						<!-- File Uploaded State -->
+						<div class="space-y-4">
+							<div class="flex items-center justify-center space-x-3">
+								<div class="w-10 h-10 bg-gradient-to-br from-cyan/20 to-soft-blue/20 rounded-lg flex items-center justify-center">
+									<svg class="w-5 h-5 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+									</svg>
+								</div>
+								<div class="text-left">
+									<p class="text-sm font-medium text-soft-blue">{validationResults?.filename}</p>
+									<p class="text-xs text-soft-blue/60">{validationResults?.fileSize}</p>
+								</div>
+							</div>
+
+							{#if validationResults}
+								{#if isValidationPassed}
+									<!-- Validation Passed -->
+									<div class="bg-alert-green/10 border border-alert-green/30 rounded-lg p-3">
+										<div class="flex items-center space-x-2 mb-2">
+											<svg class="w-4 h-4 text-alert-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+											</svg>
+											<span class="text-sm font-medium text-alert-green">Validation Passed</span>
+										</div>
+										<div class="text-xs text-soft-blue/80">
+											<div>• Template structure: Valid</div>
+											<div>• Data rows: {validationResults.data.validRows} valid out of {validationResults.data.totalRows}</div>
+											<div>• Locations found: {validationResults.data.summary.locationCount}</div>
+											<div>• Date range: {validationResults.data.summary.dateRange}</div>
+										</div>
+									</div>
+								{:else}
+									<!-- Validation Failed -->
+									<div class="bg-alert-orange/10 border border-alert-orange/30 rounded-lg p-3 max-h-32 overflow-y-auto">
+										<div class="flex items-center space-x-2 mb-2">
+											<svg class="w-4 h-4 text-alert-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+											</svg>
+											<span class="text-sm font-medium text-alert-orange">Validation Errors ({validationResults.data.errors.length})</span>
+										</div>
+										<div class="space-y-1 text-xs text-soft-blue/80">
+											{#each validationResults.data.errors.slice(0, 5) as error}
+												<div>• {error}</div>
+											{/each}
+											{#if validationResults.data.errors.length > 5}
+												<div class="text-alert-orange">... and {validationResults.data.errors.length - 5} more errors</div>
+											{/if}
+										</div>
+									</div>
+								{/if}
+							{/if}
+
+							<div class="flex space-x-2">
+								<button
+									on:click={resetUpload}
+									class="flex-1 bg-soft-blue/10 hover:bg-soft-blue/20 text-soft-blue border border-soft-blue/30 px-4 py-2 rounded-lg transition-colors text-sm"
+								>
+									Choose Different File
+								</button>
+								{#if isValidationPassed}
+									<button
+										on:click={uploadToServer}
+										class="flex-1 bg-cyan hover:bg-soft-blue text-dark-petrol font-semibold px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-cyan/30 text-sm"
+										disabled={isUploading}
+									>
+										{#if isUploading}
+											Uploading...
+										{:else}
+											Upload Data
+										{/if}
+									</button>
+								{/if}
+							</div>
+						</div>
+					{/if}
+
 					{#if uploadError}
-						<p class="text-alert-red text-sm mt-2">{uploadError}</p>
+						<div class="mt-4 bg-alert-red/10 border border-alert-red/30 rounded-lg p-3">
+							<div class="flex items-center space-x-2">
+								<svg class="w-4 h-4 text-alert-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+								</svg>
+								<span class="text-sm font-medium text-alert-red">Upload Error</span>
+							</div>
+							<p class="text-xs text-soft-blue/80 mt-1">{uploadError}</p>
+						</div>
 					{/if}
 				</div>
 			</div>
 
 			<!-- Data Summary -->
 			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Data Summary</label>
-				<div class="bg-glass-white rounded-lg p-4 space-y-3">
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Total Records With Timestamps:</span>
-						<span class="text-soft-blue font-mono">{uploadedData.length > 0 ? uploadedData.length : 'N/A'}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">De-Identified Locations:</span>
-						<span class="text-soft-blue font-mono">{availableLocations.length > 1 ? availableLocations.length - 1 : 'N/A'}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Data Type:</span>
-						<span class="text-soft-blue font-mono">
-							{#if uploadedData.length > 0}
-								{#if uploadedData[0].production !== undefined}
-									Production
-								{:else if uploadedData[0].forecast !== undefined}
-									Forecast
-								{:else}
-									Weather
-								{/if}
-							{:else}
-								N/A
-							{/if}
-						</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Date Range:</span>
-						<span class="text-soft-blue font-mono">
-							{#if uploadedData.length > 0}
-								{new Date(uploadedData[0].datetime).toLocaleDateString()} -
-								{new Date(uploadedData[uploadedData.length - 1].datetime).toLocaleDateString()}
-							{:else}
-								N/A
-							{/if}
-						</span>
+				<label class="block text-sm font-medium text-soft-blue mb-3">Data Summary</label>
+				<div class="bg-gradient-to-br from-dark-petrol/40 to-teal-dark/60 rounded-lg p-4 border border-soft-blue/20">
+					<h4 class="text-sm font-medium text-cyan mb-3">Upload Ready</h4>
+					<div class="space-y-2 text-sm text-soft-blue/80">
+						<div>• File: {uploadedFile?.name || 'No file selected'}</div>
+						<div>• Size: {validationResults?.fileSize || 'N/A'}</div>
+						<div>• Valid rows: {validationResults?.data?.validRows || 'N/A'}</div>
+						<div>• Location: {validationResults?.metadata?.location_name || 'N/A'}</div>
+						<div>• Time aggregation: {validationResults?.metadata?.time_aggregation || 'N/A'}</div>
+						<div>• Data Type: {dataType}</div>
+						<div>• Date Range: {dateRange}</div>
 					</div>
 				</div>
+
 			</div>
 		</div>
 	</div>

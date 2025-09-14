@@ -9,6 +9,7 @@ export default {
         'teal-dark': '#024950',
         'alert-red': '#DC2626',
         'alert-orange': '#EA580C',
+        'alert-green': '#059669',
         'cyan': '#0FA4AF',
         'soft-blue': '#AFDDE5',
         'glass-white': 'rgba(255, 255, 255, 0.05)',
