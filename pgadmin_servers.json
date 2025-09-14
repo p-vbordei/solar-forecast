@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Solar Forecast DB",
+      "Group": "Development",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "solar_forecast",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Solar forecast TimescaleDB instance"
+    }
+  }
+}
