@@ -403,20 +403,22 @@
 						Location
 					</h3>
 					<div class="space-y-2">
-						{@const location = locations.find(l => l.id === selectedLocation)}
-						{#if location}
-							<div class="flex items-center justify-between">
-								<span class="text-sm text-soft-blue">Name</span>
-								<span class="text-cyan font-mono text-xs">{location.name}</span>
-							</div>
-							<div class="flex items-center justify-between">
-								<span class="text-sm text-soft-blue">Code</span>
-								<span class="text-cyan font-mono">{location.code}</span>
-							</div>
-							<div class="flex items-center justify-between">
-								<span class="text-sm text-soft-blue">Capacity</span>
-								<span class="text-cyan font-mono">{location.capacityMW} MW</span>
-							</div>
+						{#if selectedLocation && locations.length > 0}
+							{@const location = locations.find(l => l.id === selectedLocation)}
+							{#if location}
+								<div class="flex items-center justify-between">
+									<span class="text-sm text-soft-blue">Name</span>
+									<span class="text-cyan font-mono text-xs">{location.name}</span>
+								</div>
+								<div class="flex items-center justify-between">
+									<span class="text-sm text-soft-blue">Code</span>
+									<span class="text-cyan font-mono">{location.code}</span>
+								</div>
+								<div class="flex items-center justify-between">
+									<span class="text-sm text-soft-blue">Capacity</span>
+									<span class="text-cyan font-mono">{location.capacityMW} MW</span>
+								</div>
+							{/if}
 						{/if}
 					</div>
 				</div>

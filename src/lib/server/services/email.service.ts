@@ -22,7 +22,7 @@ export class EmailService {
 
     // Dynamic import for nodemailer to handle ES module issues
     const nodemailer = await import('nodemailer');
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: smtpConfig.host,
       port: smtpConfig.port,
       secure: smtpConfig.secure,
