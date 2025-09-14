@@ -152,7 +152,7 @@ export class LocationsRepository {
     async softDelete(locationId: string) {
         // Industry standard soft delete using deletedAt timestamp
         const location = await db.location.update({
-            where: { 
+            where: {
                 id: locationId,
                 deletedAt: null // Only delete if not already deleted
             },
@@ -169,8 +169,25 @@ export class LocationsRepository {
                 }
             }
         });
-        
+
         return location;
+    }
+
+    /**
+     * Count locations with given conditions
+     */
+    async count(whereConditions: any): Promise<number> {
+        // Add deletedAt filter to where conditions (industry standard soft delete)
+        const whereWithDeleted = {
+            ...whereConditions,
+            deletedAt: null
+        };
+
+        const count = await db.location.count({
+            where: whereWithDeleted
+        });
+
+        return count;
     }
 
 }

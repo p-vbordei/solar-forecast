@@ -302,27 +302,6 @@
     selectedReport = '';
   }
 
-  function generateQuickReport(reportType: string, period: 'daily' | 'weekly' | 'monthly') {
-    const today = new Date();
-    let startDate: Date;
-    
-    switch (period) {
-      case 'daily':
-        startDate = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case 'weekly':
-        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'monthly':
-        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-    }
-    
-    dateRange.start = startDate.toISOString().split('T')[0];
-    dateRange.end = today.toISOString().split('T')[0];
-    selectedReport = reportType;
-    generateReport();
-  }
 
   function addEmail() {
     if (newEmail.trim() && !emailList.includes(newEmail.trim())) {
@@ -502,68 +481,6 @@
 
 <div class="space-y-6">
 
-  <!-- Quick Actions -->
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('production-summary', 'daily')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">Daily Production</h3>
-            <p class="text-sm text-soft-blue">Generate daily production report</p>
-          </div>
-          <SunIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
-    
-    <div class="card-glass">
-      <button 
-        on:click={() => generateQuickReport('forecast-accuracy', 'weekly')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">Weekly Forecast Accuracy</h3>
-            <p class="text-sm text-soft-blue">Generate weekly forecast analysis</p>
-          </div>
-          <TrendingUpIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
-
-    <div class="card-glass">
-      <button 
-        on:click={() => selectReportType('forecast-d1-d5')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">D+1/+5 Forecast</h3>
-            <p class="text-sm text-soft-blue">Next 5 days forecast report</p>
-          </div>
-          <CloudIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
-
-    <div class="card-glass">
-      <button 
-        on:click={() => selectReportType('forecast-monthly-continued')}
-        class="w-full text-left"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-semibold text-white">Monthly Continued</h3>
-            <p class="text-sm text-soft-blue">Extended monthly forecast</p>
-          </div>
-          <ClockIcon className="w-6 h-6 text-cyan" />
-        </div>
-      </button>
-    </div>
-  </div>
 
   <!-- Report Categories Filter -->
   <div class="card-glass mb-6">
