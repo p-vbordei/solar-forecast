@@ -136,10 +136,13 @@ async function main() {
 
   console.log('✅ Admin user created');
 
+  // Get created locations to reference their IDs
+  const createdLocations = await prisma.location.findMany();
+
   // Create sample alerts
   const alerts = [
     {
-      locationId: locations[0].clientId === client1.id ? 1 : 2,
+      locationId: createdLocations[0]?.id,
       userId: adminUser.id,
       type: 'PRODUCTION_LOW' as const,
       severity: 'WARNING' as const,
@@ -149,7 +152,7 @@ async function main() {
       triggeredAt: new Date(Date.now() - 1000 * 60 * 30) // 30 minutes ago
     },
     {
-      locationId: locations[2].clientId === client2.id ? 3 : 4,
+      locationId: createdLocations[2]?.id,
       userId: adminUser.id,
       type: 'MAINTENANCE_DUE' as const,
       severity: 'INFO' as const,
@@ -184,15 +187,18 @@ async function main() {
     {
       name: 'solar-forecast-lstm',
       version: '1.0.0',
-      type: 'ML' as const,
+      type: 'ML_LSTM' as const,
       description: 'LSTM-based solar production forecasting model',
       algorithm: 'Long Short-Term Memory (LSTM)',
+      framework: 'TensorFlow',
       modelPath: '/models/lstm_v1.0.0.pkl',
       status: 'ACTIVE' as const,
       isDefault: true,
-      trainedAt: new Date('2024-10-01'),
       trainDataStart: new Date('2023-01-01'),
-      trainDataEnd: new Date('2024-09-30')
+      trainDataEnd: new Date('2024-09-30'),
+      features: ['temperature', 'irradiance', 'wind_speed', 'cloud_cover'],
+      targetVariable: 'power_output_mw',
+      trainedBy: 'system'
     },
     {
       name: 'solar-forecast-physical',
@@ -200,10 +206,13 @@ async function main() {
       type: 'PHYSICAL' as const,
       description: 'Physics-based solar irradiance model',
       algorithm: 'Clear Sky Model with Cloud Cover Correction',
+      framework: 'Scikit-learn',
       modelPath: '/models/physical_v1.0.0.pkl',
       status: 'ACTIVE' as const,
       isDefault: false,
-      trainedAt: new Date('2024-09-15')
+      features: ['ghi', 'dni', 'dhi', 'solar_zenith_angle'],
+      targetVariable: 'power_output_mw',
+      trainedBy: 'system'
     },
     {
       name: 'solar-forecast-hybrid',
@@ -211,15 +220,26 @@ async function main() {
       type: 'HYBRID' as const,
       description: 'Hybrid model combining ML and physical approaches',
       algorithm: 'Ensemble (LSTM + Physical)',
+      framework: 'PyTorch',
       modelPath: '/models/hybrid_v2.0.0.pkl',
       status: 'TRAINING' as const,
-      isDefault: false
+      isDefault: false,
+      features: ['temperature', 'irradiance', 'wind_speed', 'ghi', 'dni'],
+      targetVariable: 'power_output_mw',
+      trainedBy: 'system'
     }
   ];
 
   for (const model of models) {
-    await prisma.mLModel.create({
-      data: model
+    await prisma.mLModel.upsert({
+      where: {
+        name_version: {
+          name: model.name,
+          version: model.version
+        }
+      },
+      update: {},
+      create: model
     });
   }
 
@@ -250,15 +270,15 @@ async function main() {
         }
         
         productionData.push({
-          time,
+          timestamp: time,
+          time: time,
           locationId: location.id,
+          powerMW: parseFloat(powerOutput.toFixed(2)),
           powerOutputMW: parseFloat(powerOutput.toFixed(2)),
           energyMWh: parseFloat((powerOutput * 1).toFixed(2)), // 1 hour
           efficiency: powerOutput > 0 ? parseFloat((powerOutput / location.capacityMW * 100).toFixed(1)) : 0,
           availability: 100,
           temperature: 20 + Math.random() * 10,
-          irradiance: powerOutput > 0 ? 200 + Math.random() * 600 : 0,
-          windSpeed: 2 + Math.random() * 8,
           dataQuality: 'GOOD' as const
         });
       }
@@ -294,18 +314,18 @@ async function main() {
         }
         
         forecastData.push({
-          time,
+          timestamp: time,
+          time: time,
           locationId: location.id,
+          powerMW: parseFloat(powerOutput.toFixed(2)),
           powerOutputMW: parseFloat(powerOutput.toFixed(2)),
           energyMWh: parseFloat((powerOutput * 1).toFixed(2)),
           confidence: parseFloat((85 + Math.random() * 10).toFixed(1)),
-          modelType: 'ML' as const,
+          modelType: 'ML_LSTM' as const,
           modelVersion: '1.0.0',
-          horizonHours: i,
+          horizonMinutes: i * 60, // Convert hours to minutes
+          resolution: 'HOURLY',
           temperature: 18 + Math.random() * 12,
-          irradiance: powerOutput > 0 ? 180 + Math.random() * 650 : 0,
-          cloudCover: Math.random() * 30,
-          windSpeed: 3 + Math.random() * 7,
           createdBy: adminUser.id
         });
       }

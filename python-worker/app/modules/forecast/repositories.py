@@ -269,9 +269,8 @@ class ForecastRepository:
         """Get weather data from TimescaleDB as DataFrame for forecast models"""
         query = text("""
             SELECT
-                timestamp, temperature, humidity, pressure,
-                "windSpeed", "cloudCover", ghi, dni, dhi,
-                "solarZenith", "solarAzimuth"
+                timestamp, temperature, humidity,
+                "windSpeed", "cloudCover", ghi, dni, dhi
             FROM weather_data
             WHERE "locationId" = :location_id
                 AND timestamp >= NOW() - INTERVAL '{} hours'
@@ -287,14 +286,15 @@ class ForecastRepository:
                 'timestamp': row[0],
                 'temp_air': row[1],
                 'humidity': row[2],
-                'pressure': row[3],
-                'wind_speed': row[4],
-                'cloud_cover': row[5],
-                'ghi': row[6],
-                'dni': row[7],
-                'dhi': row[8],
-                'solar_zenith': row[9],
-                'solar_azimuth': row[10]
+                'pressure': 1013.25,  # Default - not in schema
+                'wind_speed': row[3],
+                'cloud_cover': row[4],
+                'ghi': row[5] if row[5] is not None else 0,
+                'dni': row[6] if row[6] is not None else 0,
+                'dhi': row[7] if row[7] is not None else 0,
+                'solar_zenith': 45,  # Default - not in schema
+                'solar_azimuth': 180,  # Default - not in schema
+                'precipitable_water': 14.0  # Required for PVLIB
             })
 
         df = pd.DataFrame(data)
@@ -424,6 +424,20 @@ class ForecastRepository:
 
     def build_config_from_location(self, location: Dict) -> Dict[str, Any]:
         """Build forecast configuration from database location data"""
+        # Handle None or missing JSON fields
+        plant_data = location.get('plantData') or {}
+        performance_data = location.get('performanceData') or {}
+
+        # Get tilt and azimuth with defaults
+        tilt_angle = location.get('tiltAngle')
+        azimuth_angle = location.get('azimuthAngle')
+
+        # Ensure we have valid values for PVLIB
+        if tilt_angle is None:
+            tilt_angle = 30  # Default tilt angle
+        if azimuth_angle is None:
+            azimuth_angle = 180  # Default south-facing
+
         config = {
             'location': {
                 'latitude': location['latitude'],
@@ -435,23 +449,23 @@ class ForecastRepository:
                 'capacity_kw': location['capacityMW'] * 1000,  # MW to kW for forecast engine
                 'capacity_mw': location['capacityMW'],  # Keep MW for validation
                 # Parse from JSON fields or use defaults
-                'panels': location['plantData'].get('panels', {
-                    'tilt': location.get('tiltAngle', 30),
-                    'azimuth': location.get('azimuthAngle', 180),
+                'panels': {
+                    'tilt': plant_data.get('panels', {}).get('tilt', tilt_angle),
+                    'azimuth': plant_data.get('panels', {}).get('azimuth', azimuth_angle),
                     'technology': location.get('panelType', 'monocrystalline'),
                     'temperature_coefficient': -0.004,
                     'bifacial': False
-                }),
-                'inverter': location['plantData'].get('inverter', {
+                },
+                'inverter': plant_data.get('inverter', {
                     'efficiency': 0.95
                 }),
-                'physics_parameters': location['performanceData'].get('physics_parameters', {
+                'physics_parameters': performance_data.get('physics_parameters', {
                     'performance_ratio': 0.90,
                     'albedo': 0.2,
                     'dc_overpower_ratio': 1.1
                 }),
                 # PVLIB system losses configuration
-                'losses': location['performanceData'].get('losses', {
+                'losses': performance_data.get('losses', {
                     'soiling': 2,       # Soiling losses (%)
                     'shading': 3,       # Shading losses (%)
                     'snow': 0,          # Snow losses (%)

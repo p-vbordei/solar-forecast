@@ -66,9 +66,11 @@
 	let selectedParameters = ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
 	let activeTimeRange = 'Today';
 
-	// Mock forecast data - in real app this would come from API
+	// Real-time forecast data from API
 	let forecastData: any = null;
 	let chartContainer: HTMLDivElement;
+	let isLoading = false;
+	let errorMessage = '';
 
 	// Location-specific weather characteristics
 	const locationWeatherProfiles = {
@@ -102,7 +104,68 @@
 		}
 	};
 
-	// Generate mock data based on time range and location
+	// Fetch real data from API
+	async function fetchWeatherData(timeRange: string = 'Today') {
+		isLoading = true;
+		errorMessage = '';
+
+		try {
+			// Map parameter keys to API format
+			const paramMapping = {
+				'shortwave_radiation': 'ghi',
+				'direct_radiation': 'dni',
+				'diffuse_radiation': 'dhi',
+				'temperature_2m': 'temperature',
+				'cloud_cover': 'cloudCover',
+				'wind_speed_10m': 'windSpeed',
+				'relative_humidity_2m': 'humidity'
+			};
+
+			const params = selectedParameters.map(p => paramMapping[p] || p).join(',');
+
+			// Fetch real data from our API
+			const response = await fetch(`/api/weather/chart-data?location_id=${locationId}&time_range=${timeRange}&parameters=${params}`);
+			const result = await response.json();
+
+			if (result.success && result.data) {
+				// Map API data back to component format
+				const mappedData = {
+					labels: result.data.labels,
+					datasets: result.data.datasets.map(dataset => {
+						// Find original parameter key
+						const originalParam = selectedParameters.find(p => {
+							const mapped = paramMapping[p] || p;
+							return dataset.label.toLowerCase().includes(mapped.toLowerCase()) ||
+								   weatherParameters[p]?.name === dataset.label;
+						});
+
+						if (originalParam && weatherParameters[originalParam]) {
+							return {
+								...dataset,
+								label: weatherParameters[originalParam].name,
+								borderColor: weatherParameters[originalParam].color,
+								backgroundColor: weatherParameters[originalParam].color + '20'
+							};
+						}
+						return dataset;
+					})
+				};
+				return mappedData;
+			} else {
+				console.warn('Using mock data from API:', result.message);
+				return result.data;
+			}
+		} catch (error) {
+			console.error('Error fetching weather data:', error);
+			errorMessage = 'Failed to load weather data';
+			// Fall back to generating mock data locally
+			return generateMockData(timeRange);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Generate mock data based on time range and location (fallback)
 	function generateMockData(timeRange: string = 'Today') {
 		let timePoints: any[] = [];
 		let labels: string[] = [];
@@ -184,41 +247,42 @@
 		return { data, labels, timePoints };
 	}
 
-	function updateChart() {
+	async function updateChart() {
 		if (!chartContainer || typeof window === 'undefined') return;
 
 		// Import ECharts dynamically
-		import('echarts').then((echarts) => {
+		import('echarts').then(async (echarts) => {
 			const chart = echarts.init(chartContainer, 'dark');
-			
-			const mockData = generateMockData(activeTimeRange);
-			const { data, labels, timePoints } = mockData;
-			
-			const series = selectedParameters.map(paramKey => {
-				const param = weatherParameters[paramKey];
+
+			// Fetch real data from API
+			const chartData = await fetchWeatherData(activeTimeRange);
+			const { labels, datasets } = chartData;
+
+			// Convert datasets to ECharts series format
+			const series = datasets.map((dataset, index) => {
 				return {
-					name: param.name,
+					name: dataset.label,
 					type: 'line',
 					smooth: true,
-					data: timePoints.map(point => data[timePoints.indexOf(point)][paramKey]),
+					data: dataset.data,
 					lineStyle: {
-						color: param.color,
+						color: dataset.borderColor,
 						width: 2
 					},
 					itemStyle: {
-						color: param.color
+						color: dataset.borderColor
 					},
 					areaStyle: {
 						color: {
 							type: 'linear',
 							x: 0, y: 0, x2: 0, y2: 1,
 							colorStops: [
-								{offset: 0, color: param.color + '40'},
-								{offset: 1, color: param.color + '10'}
+								{offset: 0, color: dataset.borderColor + '40'},
+								{offset: 1, color: dataset.borderColor + '10'}
 							]
 						}
 					},
-					yAxisIndex: selectedParameters.indexOf(paramKey) % 2 // Alternate between left and right y-axis
+					yAxisIndex: index % 2 // Alternate between left and right y-axis
 				};
 			});
 
@@ -235,17 +299,16 @@
 					formatter: function(params: any) {
 						let content = `<div style="font-weight: 600; margin-bottom: 6px;">${params[0].axisValue}</div>`;
 						params.forEach((param: any) => {
-							const paramInfo = weatherParameters[selectedParameters[param.seriesIndex]];
 							content += `<div style="margin: 2px 0;">
-								<span style="color: ${param.color};">●</span> 
-								${param.seriesName}: <strong>${param.value.toFixed(1)} ${paramInfo.unit}</strong>
+								<span style="color: ${param.color};">●</span>
+								${param.seriesName}: <strong>${param.value.toFixed(1)}</strong>
 							</div>`;
 						});
 						return content;
 					}
 				},
 				legend: {
-					data: selectedParameters.map(key => weatherParameters[key].name),
+					data: datasets.map(d => d.label),
 					textStyle: {
 						color: '#AFDDE5'
 					},
@@ -324,26 +387,35 @@
 				selectedParameters = [...selectedParameters, paramKey];
 			}
 		}
+		updateChartData();
+	}
+
+	// Update chart data when parameters change
+	async function updateChartData() {
+		const data = await fetchWeatherData(activeTimeRange);
+		forecastData = data;
 		updateChart();
 	}
 
 	// Handle time range change
 	function handleTimeRangeChange(range: string) {
 		activeTimeRange = range;
-		updateChart();
+		updateChartData();
 	}
 
-	onMount(() => {
-		updateChart();
+	onMount(async () => {
+		// Fetch data first, then update chart
+		await updateChartData();
 	});
 
-	$: if (chartContainer) {
+	// Update chart when container is available and we have data
+	$: if (chartContainer && forecastData) {
 		updateChart();
 	}
-	
+
 	// Update chart when location changes
 	$: if (locationId) {
-		updateChart();
+		updateChartData();
 	}
 </script>
 
@@ -410,25 +482,29 @@
 	</div>
 	
 	<!-- Current Values Summary -->
+	{#if forecastData && forecastData.datasets && forecastData.labels}
 	<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-		{#each selectedParameters as paramKey}
+		{#each selectedParameters as paramKey, index}
 			{@const param = weatherParameters[paramKey]}
-			{@const mockData = generateMockData(activeTimeRange)}
-			{@const currentValue = activeTimeRange === '7 Days' ? 
-				mockData.data[0][paramKey] : 
-				mockData.data[new Date().getHours()] ? mockData.data[new Date().getHours()][paramKey] : mockData.data[0][paramKey]}
+			{@const dataset = forecastData.datasets.find(d => d.label === param.name)}
+			{@const now = new Date()}
+			{@const currentTimeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+			{@const currentIndex = forecastData.labels.findIndex(label => label === currentTimeLabel)}
+			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (forecastData.labels.length - 1))}
+			{@const currentValue = dataset?.data?.[validIndex] ?? 0}
 			<div class="bg-glass-white rounded-lg p-3">
 				<div class="flex items-center space-x-2 mb-1">
-					<div 
-						class="w-2 h-2 rounded-full" 
+					<div
+						class="w-2 h-2 rounded-full"
 						style="background-color: {param.color}"
 					></div>
 					<span class="text-xs text-soft-blue/70">{param.name}</span>
 				</div>
 				<div class="text-lg font-mono text-soft-blue">
-					{currentValue.toFixed(1)}<span class="text-sm ml-1">{param.unit}</span>
+					{typeof currentValue === 'number' ? currentValue.toFixed(1) : '0.0'}<span class="text-sm ml-1">{param.unit}</span>
 				</div>
 			</div>
 		{/each}
 	</div>
+	{/if}
 </div>

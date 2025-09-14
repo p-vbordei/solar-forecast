@@ -35,12 +35,10 @@ class WeatherRepository:
         try:
             query = text(f"""
                 SELECT
-                    id, timestamp, time, "locationId",
-                    temperature, humidity, pressure,
-                    "windSpeed", "windDirection", "cloudCover",
-                    visibility, precipitation, "precipitationType",
-                    ghi, dni, dhi, gti, extraterrestrial,
-                    "solarZenith", "solarAzimuth", "solarElevation", "airMass",
+                    id, timestamp, "locationId",
+                    temperature, humidity,
+                    "windSpeed", "cloudCover",
+                    ghi, dni, dhi,
                     source, "dataQuality"
                 FROM weather_data
                 WHERE "locationId" = :location_id
@@ -87,12 +85,10 @@ class WeatherRepository:
         try:
             query = text("""
                 SELECT
-                    id, timestamp, time, "locationId",
-                    temperature, humidity, pressure,
-                    "windSpeed", "windDirection", "cloudCover",
-                    visibility, precipitation, "precipitationType",
-                    ghi, dni, dhi, gti, extraterrestrial,
-                    "solarZenith", "solarAzimuth", "solarElevation", "airMass",
+                    id, timestamp, "locationId",
+                    temperature, humidity,
+                    "windSpeed", "cloudCover",
+                    ghi, dni, dhi,
                     source, "dataQuality"
                 FROM weather_data
                 WHERE "locationId" = :location_id
@@ -135,12 +131,10 @@ class WeatherRepository:
         try:
             query = text("""
                 SELECT
-                    id, timestamp, time, "locationId",
-                    temperature, humidity, pressure,
-                    "windSpeed", "windDirection", "cloudCover",
-                    visibility, precipitation, "precipitationType",
-                    ghi, dni, dhi, gti, extraterrestrial,
-                    "solarZenith", "solarAzimuth", "solarElevation", "airMass",
+                    id, timestamp, "locationId",
+                    temperature, humidity,
+                    "windSpeed", "cloudCover",
+                    ghi, dni, dhi,
                     source, "dataQuality"
                 FROM weather_data
                 WHERE "locationId" = :location_id
@@ -212,26 +206,26 @@ class WeatherRepository:
         return WeatherData(
             id=row.id,
             timestamp=row.timestamp,
-            time=row.time or row.timestamp,
+            time=row.timestamp,  # Use timestamp as time since time column doesn't exist
             locationId=row.locationId,
             temperature=float(row.temperature),
             humidity=float(row.humidity),
-            pressure=float(row.pressure),
+            pressure=1013.25,  # Default pressure - not in Prisma schema
             windSpeed=float(row.windSpeed),
             cloudCover=float(row.cloudCover),
-            windDirection=float(row.windDirection) if row.windDirection is not None else None,
-            visibility=float(row.visibility) if row.visibility is not None else None,
-            precipitation=float(row.precipitation) if row.precipitation is not None else None,
-            precipitationType=row.precipitationType,
-            ghi=float(row.ghi) if row.ghi is not None else None,
-            dni=float(row.dni) if row.dni is not None else None,
-            dhi=float(row.dhi) if row.dhi is not None else None,
-            gti=float(row.gti) if row.gti is not None else None,
-            extraterrestrial=float(row.extraterrestrial) if row.extraterrestrial is not None else None,
-            solarZenith=float(row.solarZenith) if row.solarZenith is not None else None,
-            solarAzimuth=float(row.solarAzimuth) if row.solarAzimuth is not None else None,
-            solarElevation=float(row.solarElevation) if row.solarElevation is not None else None,
-            airMass=float(row.airMass) if row.airMass is not None else None,
+            windDirection=0.0,  # Default - not in Prisma schema
+            visibility=10.0,  # Default - not in Prisma schema
+            precipitation=0.0,  # Default - not in Prisma schema
+            precipitationType=None,  # Not in Prisma schema
+            ghi=float(row.ghi) if row.ghi is not None else 0.0,
+            dni=float(row.dni) if row.dni is not None else 0.0,
+            dhi=float(row.dhi) if row.dhi is not None else 0.0,
+            gti=None,  # Not in Prisma schema
+            extraterrestrial=None,  # Not in Prisma schema
+            solarZenith=None,  # Not in Prisma schema
+            solarAzimuth=None,  # Not in Prisma schema
+            solarElevation=None,  # Not in Prisma schema
+            airMass=None,  # Not in Prisma schema
             # Fields not in database - set to None
             dewPoint=None,
             uvIndex=None,

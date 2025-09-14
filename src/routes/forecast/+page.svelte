@@ -150,12 +150,12 @@
 		return data;
 	}
 	
-	function exportForecast(format: 'csv' | 'excel' | 'pdf') {
+	function exportForecast(format: 'csv' | 'excel') {
 		if (!forecastData || !chartData.length) {
 			alert('Please generate a forecast first');
 			return;
 		}
-		
+
 		// Mock export functionality
 		console.log(`Exporting forecast as ${format}...`);
 		alert(`Forecast exported as ${format.toUpperCase()}`);
@@ -342,14 +342,6 @@
 						>
 							<DownloadIcon className="w-4 h-4" />
 							Excel
-						</button>
-						<button
-							on:click={() => exportForecast('pdf')}
-							class="btn btn-secondary text-sm"
-							disabled={!forecastData}
-						>
-							<DownloadIcon className="w-4 h-4" />
-							PDF
 						</button>
 					</div>
 				</div>
