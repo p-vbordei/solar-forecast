@@ -373,23 +373,23 @@ enum ModelType {
   STATISTICAL
 }
 
-// Production Data - TimescaleDB Hypertable  
-// Actual solar production measurements converted to hypertable
+// Production Data - TimescaleDB Hypertable
+// Optimized for historical analysis and ML training
 // Supports compression and retention policies for efficient storage
 model Production {
   id                String    @id @default(uuid())
   timestamp         DateTime
   time              DateTime  // Legacy field name compatibility
   locationId        String
-  
-  // Core production data (ML training targets)
-  powerMW           Float     // Actual AC power - PRIMARY TARGET
-  capacityFactor    Float?    // Actual/Nominal capacity
+
+  // Core production metrics (essential for ML training & historical analysis)
+  powerMW           Float     // Actual AC power in MW - PRIMARY TARGET
+  capacityFactor    Float?    // Actual/Nominal capacity ratio
   availability      Float?    // System availability percentage
   
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])
-  
+
   // TimescaleDB optimized indexes - time dimension first for hypertables
   @@index([timestamp, locationId], name: "production_time_location_idx")
   @@index([locationId, timestamp(sort: Desc)], name: "production_location_time_desc_idx")
@@ -409,45 +409,24 @@ enum DataQuality {
 // Meteorological data converted to hypertable for efficient time-series storage
 // Includes solar irradiance components optimized for solar forecasting
 model WeatherData {
-  id                String    @id @default(uuid())
-  timestamp         DateTime
-  time              DateTime  // Legacy field name compatibility
-  locationId        String
-  
-  // Basic weather metrics
-  temperature       Float     // Celsius
-  humidity          Float     // Percentage
-  pressure          Float     // hPa
-  windSpeed         Float     // m/s
-  windDirection     Float     // Degrees
-  cloudCover        Float     // Percentage (0-100)
-  visibility        Float?    // km
-  precipitation     Float?    // mm
-  precipitationType String?   // rain, snow, etc.
-  
-  // Solar radiation components (industry standard)
-  ghi               Float?    // Global Horizontal Irradiance W/m²
-  dni               Float?    // Direct Normal Irradiance W/m²
-  dhi               Float?    // Diffuse Horizontal Irradiance W/m²
-  gti               Float?    // Global Tilted Irradiance W/m² (POA)
-  extraterrestrial  Float?    // Extraterrestrial radiation W/m²
-  
-  // Solar position
-  solarZenith       Float?    // Degrees
-  solarAzimuth      Float?    // Degrees
-  solarElevation    Float?    // Degrees
-  airMass           Float?    // Air mass coefficient
-  
-  // Additional metrics
-  albedo            Float?    // Surface reflectivity (0-1)
-  soilingLoss       Float?    // Soiling loss percentage
-  snowDepth         Float?    // cm
-  moduleTemp        Float?    // Estimated module temperature
-  
+  id           String    @id @default(uuid())
+  timestamp    DateTime
+  locationId   String
+
+  // Essential weather metrics for solar forecasting
+  temperature  Float     // Celsius - affects panel efficiency
+  humidity     Float     // Percentage - affects atmospheric transparency
+  windSpeed    Float     // m/s - affects panel cooling
+  cloudCover   Float     // Percentage (0-100) - primary solar impact factor
+
+  // Solar radiation components (essential for forecasting)
+  ghi          Float?    // Global Horizontal Irradiance W/m²
+  dni          Float?    // Direct Normal Irradiance W/m²
+  dhi          Float?    // Diffuse Horizontal Irradiance W/m²
+
   // Source and quality
-  source            String    // OpenWeather, Satellite, Station, etc.
-  stationId         String?   // Weather station identifier
-  dataQuality       DataQuality @default(GOOD)
+  source       String    // OpenWeather, Open-Meteo, etc.
+  dataQuality  DataQuality @default(GOOD)
   
   // Relations
   location          Location  @relation(fields: [locationId], references: [id])

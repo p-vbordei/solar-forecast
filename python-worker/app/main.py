@@ -55,11 +55,59 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Solar Forecast Worker",
-    description="Python backend service for solar energy forecasting",
+    description="""🌞 **Production-Ready Solar Energy Forecasting Service**
+
+    Advanced ML-powered solar power forecasting system featuring:
+
+    ## 🚀 Core Features
+    - **Real CatBoost ML Models**: Quantile regression with uncertainty bands (P10, P25, P75, P90)
+    - **PVLIB Physics Engine**: Complete solar modeling with ModelChain calculations
+    - **Hybrid Forecasting**: Combines ML predictions with physics-based calculations
+    - **TimescaleDB Integration**: Optimized time-series data storage and retrieval
+    - **Async Processing**: Background task processing for long-running forecasts
+
+    ## 📊 Forecast Capabilities
+    - Horizon: 1-168 hours (up to 7 days)
+    - Resolution: 15 minutes to daily
+    - Confidence bands for uncertainty quantification
+    - Weather-driven predictions using real meteorological data
+    - Capacity constraint enforcement
+
+    ## 🏭 Production Features
+    - Database-driven configuration
+    - Model fallback strategies
+    - Comprehensive error handling
+    - Performance monitoring
+    - Bulk operations support
+
+    ## 🔧 Architecture
+    - NO CLASSES: Pure function architecture in core modules
+    - NO MOCK DATA: 100% real data processing
+    - CSR Pattern: Controller/Service/Repository layers
+    - UTC timestamp handling throughout
+    """,
     version=settings.VERSION,
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    openapi_tags=[
+        {
+            "name": "Solar Forecasting",
+            "description": "Generate and manage solar power forecasts using ML models and physics calculations"
+        },
+        {
+            "name": "weather",
+            "description": "Weather data management and synchronization"
+        },
+        {
+            "name": "analysis",
+            "description": "Advanced analysis and performance metrics"
+        },
+        {
+            "name": "pipeline",
+            "description": "Data pipeline operations"
+        }
+    ]
 )
 
 # Add CORS middleware
@@ -84,8 +132,8 @@ async def health_check():
 # Include routers
 app.include_router(
     forecast_router,
-    prefix="/api/v1/forecast",
-    tags=["forecast"]
+    prefix="/api/v1/forecasts",
+    tags=["Solar Forecasting"]
 )
 
 app.include_router(

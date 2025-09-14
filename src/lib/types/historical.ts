@@ -1,8 +1,8 @@
 // Historical Data Types for TimescaleDB-powered solar analytics
 export interface HistoricalDataRequest {
   // Location filtering
-  locationIds?: number[];
-  locationId?: number;  // Single location support
+  locationIds?: string[];
+  locationId?: string;  // Single location support
   
   // Time range
   startDate: string;    // ISO date string
@@ -105,7 +105,7 @@ export interface HistoricalDataMetadata {
 }
 
 export interface LocationMetadata {
-  id: number;
+  id: string;
   name: string;
   capacityMW: number;
   recordCount: number;

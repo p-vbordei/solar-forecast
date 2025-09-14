@@ -63,39 +63,8 @@ const createPrismaClient = () => {
 export const db = globalForPrisma.prisma ?? createPrismaClient();
 
 // Prisma Client event listeners for TimescaleDB monitoring
-// Only add listeners if we have a real database connection
-if (process.env.DATABASE_URL) {
-  db.$on('query', (e) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Query: ' + e.query);
-      console.log('Params: ' + e.params);
-      console.log('Duration: ' + e.duration + 'ms');
-    }
-    
-    // Log slow queries in production (>1000ms)
-    if (process.env.NODE_ENV === 'production' && e.duration > 1000) {
-      console.warn(`Slow TimescaleDB query (${e.duration}ms):`, {
-        query: e.query,
-        duration: e.duration,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
-  db.$on('error', (e) => {
-    console.error('TimescaleDB Prisma Error:', e);
-  });
-
-  db.$on('info', (e) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.info('TimescaleDB Prisma Info:', e.message);
-    }
-  });
-
-  db.$on('warn', (e) => {
-    console.warn('TimescaleDB Prisma Warning:', e.message);
-  });
-}
+// Note: Prisma v5+ uses $extends for logging, but we configure logging in the client constructor above
+// The 'log' configuration with emit: 'event' is the modern approach
 
 // Prisma Middleware for TimescaleDB Optimizations
 // Only add middleware if we have a real database connection

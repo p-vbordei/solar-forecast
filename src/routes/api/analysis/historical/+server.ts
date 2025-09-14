@@ -36,8 +36,10 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Parse location IDs
     let parsedLocationIds: string[] = [];
+    let parsedLocationIds: string[] = [];
     try {
       if (locationIds) {
+        parsedLocationIds = locationIds.split(',').map(id => id.trim());
         parsedLocationIds = locationIds.split(',').map(id => id.trim());
       } else if (location) {
         parsedLocationIds = [location];

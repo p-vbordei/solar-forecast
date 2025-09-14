@@ -2,6 +2,7 @@
 	import MetricCard from '$lib/components/dashboard/MetricCard.svelte';
 	import DashboardSolarForecast from '$lib/components/dashboard/DashboardSolarForecast.svelte';
 	import DashboardProductionForecast from '$lib/components/dashboard/DashboardProductionForecast.svelte';
+	import WeatherSyncButton from '$lib/components/weather/WeatherSyncButton.svelte';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
 	
@@ -27,9 +28,19 @@
 
 <div class="space-y-6">
 	<!-- Page Header -->
-	<div>
-		<h1 class="text-3xl font-bold text-soft-blue">Energy Dashboard</h1>
-		<p class="text-soft-blue/60 mt-2">Real-time solar energy production monitoring and forecasting</p>
+	<div class="flex justify-between items-start">
+		<div>
+			<h1 class="text-3xl font-bold text-soft-blue">Energy Dashboard</h1>
+			<p class="text-soft-blue/60 mt-2">Real-time solar energy production monitoring and forecasting</p>
+		</div>
+
+		<!-- Weather Sync Controls -->
+		<div class="mt-2">
+			<WeatherSyncButton
+				on:syncSuccess={() => console.log('Weather sync successful - dashboard can refresh')}
+				on:syncError={(e) => console.error('Weather sync error:', e.detail)}
+			/>
+		</div>
 	</div>
 	
 	<!-- Metrics Grid -->

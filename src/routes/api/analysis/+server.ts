@@ -20,7 +20,7 @@ export const GET: RequestHandler = async ({ url }) => {
         switch (type) {
             case 'performance':
                 analysisData = {
-                    locationId: parseInt(locationId),
+                    locationId: locationId,
                     periodDays: days,
                     capacityFactor: 23.5 + Math.random() * 5,
                     performanceRatio: 84.7 + Math.random() * 5,
@@ -34,7 +34,7 @@ export const GET: RequestHandler = async ({ url }) => {
                 
             case 'efficiency':
                 analysisData = {
-                    locationId: parseInt(locationId),
+                    locationId: locationId,
                     periodDays: days,
                     overallEfficiency: 85.3 + Math.random() * 5,
                     panelEfficiency: 21.5 + Math.random() * 2,
@@ -46,7 +46,7 @@ export const GET: RequestHandler = async ({ url }) => {
                 
             case 'losses':
                 analysisData = {
-                    locationId: parseInt(locationId),
+                    locationId: locationId,
                     periodDays: days,
                     soiling: 2.1 + Math.random() * 0.5,
                     shading: 1.5 + Math.random() * 0.3,
@@ -78,7 +78,7 @@ export const GET: RequestHandler = async ({ url }) => {
                     });
                 }
                 analysisData = {
-                    locationId: parseInt(locationId),
+                    locationId: locationId,
                     periodDays: days,
                     anomaliesDetected: anomalies.length,
                     anomalies
@@ -87,7 +87,7 @@ export const GET: RequestHandler = async ({ url }) => {
                 
             default:
                 analysisData = {
-                    locationId: parseInt(locationId),
+                    locationId: locationId,
                     periodDays: days,
                     message: 'Analysis type not recognized'
                 };

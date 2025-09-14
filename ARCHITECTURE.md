@@ -16,7 +16,7 @@ The Solar Forecast Platform is a modern, microservices-based application for sol
 │                    SVELTEKIT BACKEND (Port 5173)                │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                   API Routes (Controllers)                │  │
-│  │               /api/locations, /api/forecasts              │  │
+│  │         /api/locations, /api/weather, /api/forecasts     │  │
 │  └────────────────────────┬─────────────────────────────────┘  │
 │  ┌────────────────────────▼─────────────────────────────────┐  │
 │  │                    Service Layer                          │  │
@@ -34,13 +34,74 @@ The Solar Forecast Platform is a modern, microservices-based application for sol
 │  ┌──────────────────┐   │  │  ┌─────────────────────────────┐  │
 │  │ Tables:          │   │  │  │ ML Modules:                 │  │
 │  │ - Users          │   │  │  │ - Forecast (LSTM/Prophet)   │  │
-│  │ - Locations      │   │  │  │ - Weather (OpenWeather API) │  │
+│  │ - Locations      │   │  │  │ - Weather (Open-Meteo API)  │  │
 │  │ - Forecasts      │   │  │  │ - Analysis (Performance)    │  │
 │  │ - Production     │   │  │  │ - Pipeline (Training)       │  │
 │  │ - Alerts         │   │  │  └─────────────────────────────┘  │
 │  │ - WeatherData    │   │  └────────────────────────────────────┘
 │  └──────────────────┘   │
 └─────────────────────────┘
+```
+
+## Recent Additions - Weather Data Integration
+
+### Weather API Integration Architecture
+The platform now includes comprehensive weather data integration following the CSR pattern:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Weather Data Flow                             │
+├─────────────────────────────────────────────────────────────────┤
+│ Open-Meteo API → WeatherController → WeatherService →           │
+│ WeatherRepository → TimescaleDB (weather_data table)           │
+├─────────────────────────────────────────────────────────────────┤
+│ Features:                                                       │
+│ • Real-time weather and solar radiation data                   │
+│ • GUID-based location references                               │
+│ • TimescaleDB time-series optimization                         │
+│ • UTC timezone standardization (all data in UTC+0)            │
+│ • Health monitoring and automated sync                         │
+│ • Comprehensive Swagger documentation                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Weather Feature Structure
+```
+src/lib/features/weather/
+├── controllers/    # HTTP request handling
+├── services/      # Business logic & Open-Meteo integration
+├── repositories/  # TimescaleDB operations
+├── models/        # DTOs and request/response types
+└── helpers/       # Data transformation utilities
+
+src/lib/integrations/open-meteo/
+└── OpenMeteoClient.ts  # External API client with retry logic
+
+src/routes/api/weather/
+├── +server.ts     # Main weather endpoints
+├── [id]/+server.ts    # Weather record by ID
+└── health/+server.ts  # System health monitoring
+```
+
+#### Timezone Management
+The weather system implements strict UTC timezone handling for data consistency:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    UTC Timezone Flow                            │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Open-Meteo API called with timezone=UTC parameter           │
+│ 2. All timestamps converted to UTC+0 before database storage   │
+│ 3. TimescaleDB stores all weather_data.timestamp in UTC        │
+│ 4. API responses return timestamps in ISO 8601 UTC format      │
+│ 5. Frontend converts UTC to local timezone for display only    │
+├─────────────────────────────────────────────────────────────────┤
+│ Benefits:                                                       │
+│ • Consistent time-series queries across global locations       │
+│ • Accurate historical data comparisons                         │
+│ • Simplified aggregation and forecasting calculations          │
+│ • Timezone-independent data storage and processing             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Layer Responsibilities

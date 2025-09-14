@@ -11,6 +11,63 @@
 		4: 'Coastal Solar Array - Constanta'
 	};
 
+	// Available timezones for display
+	const availableTimezones = [
+		{ value: 'UTC', label: 'UTC', offset: 0 },
+		{ value: 'Europe/London', label: 'London (GMT)', offset: 0 },
+		{ value: 'Europe/Paris', label: 'Paris (CET)', offset: 1 },
+		{ value: 'Europe/Bucharest', label: 'Bucharest (EET)', offset: 2 },
+		{ value: 'America/New_York', label: 'New York (EST)', offset: -5 },
+		{ value: 'America/Chicago', label: 'Chicago (CST)', offset: -6 },
+		{ value: 'America/Denver', label: 'Denver (MST)', offset: -7 },
+		{ value: 'America/Los_Angeles', label: 'Los Angeles (PST)', offset: -8 },
+		{ value: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 9 },
+		{ value: 'Asia/Shanghai', label: 'Shanghai (CST)', offset: 8 },
+		{ value: 'Australia/Sydney', label: 'Sydney (AEDT)', offset: 11 }
+	];
+
+	// Selected timezone for display
+	let selectedTimezone = 'Europe/Bucharest';
+
+	// Save timezone preference when changed
+	function handleTimezoneChange() {
+		if (typeof window !== 'undefined') {
+			localStorage.setItem(`timezone_location_${locationId}`, selectedTimezone);
+		}
+		updateChart();
+	}
+
+	// Format labels based on selected timezone
+	function formatLabelsForTimezone(labels: string[], fromOffset: number = 2): string[] {
+		const selectedTz = availableTimezones.find(tz => tz.value === selectedTimezone);
+		if (!selectedTz) return labels;
+
+		const offsetDiff = selectedTz.offset - fromOffset;
+
+		return labels.map(label => {
+			// Parse the time from the label
+			const [time, period] = label.split(' ');
+			const [hours, minutes] = time.split(':').map(Number);
+			let hour24 = hours;
+			if (period === 'PM' && hours !== 12) hour24 += 12;
+			if (period === 'AM' && hours === 12) hour24 = 0;
+
+			// Apply timezone offset
+			let newHour = hour24 + offsetDiff;
+
+			// Handle day boundaries
+			if (newHour < 0) newHour += 24;
+			if (newHour >= 24) newHour -= 24;
+
+			// Format back to 12-hour format
+			const isPM = newHour >= 12;
+			let hour12 = newHour % 12;
+			if (hour12 === 0) hour12 = 12;
+
+			return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+		});
+	}
+
 	// Location-specific weather characteristics
 	const locationWeatherProfiles = {
 		1: { // Solar Farm Alpha - Bucharest
@@ -56,105 +113,165 @@
 	let selectedParameters = ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
 	let activeTimeRange = 'Today';
 
-	// Mock forecast data - in real app this would come from API
+	// Real-time forecast data from API
 	let forecastData: any = null;
+	let originalLabels: string[] = []; // Store original labels before timezone conversion
 	let chartContainer: HTMLDivElement;
+	let isLoading = false;
+	let errorMessage = '';
 
-	// Generate mock data based on time range
-	function generateMockData(timeRange: string = 'Today') {
-		let timePoints: any[] = [];
-		let labels: string[] = [];
-		
-		if (timeRange === 'Today' || timeRange === 'Tomorrow') {
-			// Hourly data for 24 hours
-			timePoints = Array.from({length: 24}, (_, i) => i);
-			labels = timePoints.map(hour => `${hour.toString().padStart(2, '0')}:00`);
-		} else if (timeRange === '7 Days') {
-			// Daily data for 7 days
-			timePoints = Array.from({length: 7}, (_, i) => i);
-			const today = new Date();
-			labels = timePoints.map(day => {
-				const date = new Date(today);
-				date.setDate(today.getDate() + day);
-				return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-			});
-		}
-		
-		const data: any = {};
-		const locationProfile = locationWeatherProfiles[locationId] || locationWeatherProfiles[1];
-		
-		timePoints.forEach((point, index) => {
-			let sunIntensity = 1;
-			let weatherVariation = 1;
-			
-			if (timeRange === 'Today') {
-				// Today: normal weather
-				const sunAngle = Math.sin((point - 6) * Math.PI / 12);
-				sunIntensity = Math.max(0, sunAngle * locationProfile.solarEfficiency);
-				weatherVariation = 1 + Math.sin(point * 0.3) * 0.1;
-			} else if (timeRange === 'Tomorrow') {
-				// Tomorrow: slightly cloudier
-				const sunAngle = Math.sin((point - 6) * Math.PI / 12);
-				sunIntensity = Math.max(0, sunAngle * 0.8 * locationProfile.solarEfficiency); // 20% less sun
-				weatherVariation = 1 + Math.sin(point * 0.5) * 0.2;
-			} else if (timeRange === '7 Days') {
-				// Weekly: varying weather patterns
-				sunIntensity = (0.6 + 0.4 * Math.sin(point * Math.PI / 3)) * locationProfile.solarEfficiency;
-				weatherVariation = 1 + Math.sin(point * 0.8) * 0.3;
+	// Fetch real data from API
+	async function fetchWeatherData(timeRange: string = 'Today') {
+		console.log('Fetching weather data:', { locationId, timeRange, params: selectedParameters });
+		isLoading = true;
+		errorMessage = '';
+
+		try {
+			// Build parameters list based on selected parameters
+			const params = selectedParameters.join(',');
+
+			// Fetch real data from our API
+			const response = await fetch(`/api/weather/chart-data?location_id=${locationId}&time_range=${timeRange}&parameters=${params}`);
+			const result = await response.json();
+			console.log('API response:', result);
+
+			if (result.success && result.data) {
+				return result.data;
+			} else {
+				// If no real data, the API will return mock data
+				console.warn('Using mock data from API:', result.message);
+				return result.data;
 			}
-			
-			const isDay = sunIntensity > 0;
-			const cloudiness = (timeRange === 'Tomorrow' ? 0.6 : timeRange === '7 Days' ? 0.4 : 0.3) * locationProfile.cloudiness;
-			const tempBase = locationProfile.tempBase;
-			
-			data[index] = {
-				// Most important solar forecasting parameters
-				shortwave_radiation: Math.max(0, sunIntensity * 800 * weatherVariation + Math.random() * 100),
-				temperature_2m: tempBase + sunIntensity * 10 * weatherVariation + Math.random() * 3,
-				cloud_cover: cloudiness * 80 + Math.random() * 20,
-				wind_speed_10m: (5 + cloudiness * 10 + Math.random() * 10) * locationProfile.windiness,
-				relative_humidity_2m: 40 * locationProfile.humidity + cloudiness * 40 + Math.random() * 20
-			};
-		});
-		
-		return { data, labels, timePoints };
+		} catch (error) {
+			console.error('Error fetching weather data:', error);
+			errorMessage = 'Failed to load weather data';
+			// Fall back to generating mock data locally
+			const mockData = generateMockData(timeRange);
+			console.log('Generated mock data:', mockData);
+			return mockData;
+		} finally {
+			isLoading = false;
+		}
 	}
 
-	function updateChart() {
-		if (!chartContainer || typeof window === 'undefined') return;
+	// Generate mock data as fallback
+	function generateMockData(timeRange: string = 'Today') {
+		let labels: string[] = [];
+		let datasets: any[] = [];
+
+		if (timeRange === 'Today' || timeRange === 'Tomorrow') {
+			// Hourly data for 24 hours
+			for (let i = 0; i < 24; i++) {
+				labels.push(`${i.toString().padStart(2, '0')}:00`);
+			}
+		} else if (timeRange === '7 Days') {
+			// Daily data for 7 days
+			const today = new Date();
+			for (let i = 0; i < 7; i++) {
+				const date = new Date(today);
+				date.setDate(today.getDate() + i);
+				labels.push(date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+			}
+		}
+
+		const locationProfile = locationWeatherProfiles[locationId] || locationWeatherProfiles[1];
+
+		// Generate datasets for selected parameters
+		selectedParameters.forEach(param => {
+			const paramConfig = weatherParameters[param];
+			if (paramConfig) {
+				const data = labels.map((_, index) => {
+					const point = timeRange === '7 Days' ? index * 24 : index;
+					const sunAngle = Math.sin((point - 6) * Math.PI / 12);
+
+					switch (param) {
+						case 'shortwave_radiation':
+							return Math.max(0, sunAngle * 800 * locationProfile.solarEfficiency + Math.random() * 100);
+						case 'temperature_2m':
+							return locationProfile.tempBase + sunAngle * 10 + Math.random() * 2;
+						case 'cloud_cover':
+							return Math.max(0, Math.min(100, locationProfile.cloudiness * 100 + Math.random() * 20));
+						case 'wind_speed_10m':
+							return locationProfile.windiness * 10 + Math.random() * 5;
+						case 'relative_humidity_2m':
+							return locationProfile.humidity * 100 + Math.random() * 10;
+						default:
+							return Math.random() * 50;
+					}
+				});
+
+				datasets.push({
+					label: paramConfig.name,
+					data,
+					borderColor: paramConfig.color,
+					backgroundColor: paramConfig.color + '20',
+					tension: 0.4,
+					fill: false
+				});
+			}
+		});
+
+		return { labels, datasets };
+	}
+
+	// Update chart data when parameters change
+	async function updateChartData() {
+		const data = await fetchWeatherData(activeTimeRange);
+		forecastData = data;
+		if (data && data.labels) {
+			originalLabels = [...data.labels]; // Store original labels
+		}
+		// Wait a tick to ensure DOM is ready
+		await new Promise(resolve => setTimeout(resolve, 0));
+		updateChart();
+	}
+
+	async function updateChart() {
+		if (!chartContainer || typeof window === 'undefined' || !forecastData) {
+			console.log('Chart update skipped:', {
+				hasContainer: !!chartContainer,
+				isBrowser: typeof window !== 'undefined',
+				hasData: !!forecastData
+			});
+			return;
+		}
 
 		// Import ECharts dynamically
-		import('echarts').then((echarts) => {
+		import('echarts').then(async (echarts) => {
+			console.log('Initializing chart with data:', forecastData);
 			const chart = echarts.init(chartContainer, 'dark');
-			
-			const mockData = generateMockData(activeTimeRange);
-			const { data, labels, timePoints } = mockData;
-			
-			const series = selectedParameters.map(paramKey => {
-				const param = weatherParameters[paramKey];
+
+			// Use the already fetched data
+			const { labels, datasets } = forecastData;
+
+			// Apply timezone conversion to labels
+			const adjustedLabels = formatLabelsForTimezone(labels, 2); // Romania is UTC+2
+
+			// Convert datasets to ECharts series format
+			const series = datasets.map((dataset, index) => {
 				return {
-					name: param.name,
+					name: dataset.label,
 					type: 'line',
 					smooth: true,
-					data: timePoints.map(point => data[timePoints.indexOf(point)][paramKey]),
+					data: dataset.data,
 					lineStyle: {
-						color: param.color,
+						color: dataset.borderColor,
 						width: 2
 					},
 					itemStyle: {
-						color: param.color
+						color: dataset.borderColor
 					},
 					areaStyle: {
 						color: {
 							type: 'linear',
 							x: 0, y: 0, x2: 0, y2: 1,
 							colorStops: [
-								{offset: 0, color: param.color + '40'},
-								{offset: 1, color: param.color + '10'}
+								{offset: 0, color: dataset.borderColor + '40'},
+								{offset: 1, color: dataset.borderColor + '10'}
 							]
 						}
 					},
-					yAxisIndex: selectedParameters.indexOf(paramKey) % 2 // Alternate between left and right y-axis
+					yAxisIndex: index % 2 // Alternate between left and right y-axis
 				};
 			});
 
@@ -171,17 +288,16 @@
 					formatter: function(params: any) {
 						let content = `<div style="font-weight: 600; margin-bottom: 6px;">${params[0].axisValue}</div>`;
 						params.forEach((param: any) => {
-							const paramInfo = weatherParameters[selectedParameters[param.seriesIndex]];
 							content += `<div style="margin: 2px 0;">
-								<span style="color: ${param.color};">●</span> 
-								${param.seriesName}: <strong>${param.value.toFixed(1)} ${paramInfo.unit}</strong>
+								<span style="color: ${param.color};">●</span>
+								${param.seriesName}: <strong>${param.value.toFixed(1)}</strong>
 							</div>`;
 						});
 						return content;
 					}
 				},
 				legend: {
-					data: selectedParameters.map(key => weatherParameters[key].name),
+					data: datasets.map(d => d.label),
 					textStyle: {
 						color: '#AFDDE5'
 					},
@@ -195,7 +311,7 @@
 				},
 				xAxis: {
 					type: 'category',
-					data: labels,
+					data: adjustedLabels,
 					axisLine: {
 						lineStyle: { color: '#0FA4AF' }
 					},
@@ -236,6 +352,7 @@
 				series: series
 			};
 
+			console.log('Setting chart options:', { option, series: series.length, labels: adjustedLabels.length });
 			chart.setOption(option);
 			
 			// Handle window resize
@@ -260,26 +377,38 @@
 				selectedParameters = [...selectedParameters, paramKey];
 			}
 		}
-		updateChart();
+		updateChartData();
 	}
 
 	// Handle time range change
 	function handleTimeRangeChange(range: string) {
 		activeTimeRange = range;
-		updateChart();
+		updateChartData();
 	}
 
-	onMount(() => {
-		updateChart();
+	let mounted = false;
+
+	onMount(async () => {
+		mounted = true;
+		// Load saved timezone preference
+		if (typeof window !== 'undefined') {
+			const savedTimezone = localStorage.getItem(`timezone_location_${locationId}`);
+			if (savedTimezone && availableTimezones.find(tz => tz.value === savedTimezone)) {
+				selectedTimezone = savedTimezone;
+			}
+		}
+		// Fetch data first, then update chart
+		await updateChartData();
 	});
 
-	$: if (chartContainer) {
+	// Update chart when container is available and we have data
+	$: if (chartContainer && forecastData && typeof window !== 'undefined') {
 		updateChart();
 	}
-	
-	// Update chart when location changes
-	$: if (locationId) {
-		updateChart();
+
+	// Update chart when location changes (only in browser after mount)
+	$: if (mounted && locationId) {
+		updateChartData();
 	}
 </script>
 
@@ -305,11 +434,33 @@
 		</div>
 	</div>
 
+	<!-- Timezone Selector -->
+	<div class="mb-4 flex items-center gap-4">
+		<label for="dashboard-timezone-select" class="text-sm font-medium text-soft-blue">
+			Display Timezone:
+		</label>
+		<select
+			id="dashboard-timezone-select"
+			bind:value={selectedTimezone}
+			on:change={handleTimezoneChange}
+			class="bg-glass-white border border-soft-blue/20 rounded-lg px-3 py-1.5 text-sm text-soft-blue focus:outline-none focus:border-cyan"
+		>
+			{#each availableTimezones as tz}
+				<option value={tz.value} class="bg-dark-petrol text-soft-blue">
+					{tz.label}
+				</option>
+			{/each}
+		</select>
+		<span class="text-xs text-soft-blue/60">
+			Local time: {locations[locationId] || 'Selected Location'} (EET/UTC+2)
+		</span>
+	</div>
+
 	<!-- Parameter Selector -->
 	<div class="mb-6">
-		<label class="block text-sm font-medium text-soft-blue mb-2">
+		<div class="block text-sm font-medium text-soft-blue mb-2">
 			Weather Parameters ({selectedParameters.length}/4 selected)
-		</label>
+		</div>
 		<div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
 			{#each Object.entries(weatherParameters) as [key, param]}
 				<button
@@ -340,25 +491,48 @@
 	</div>
 	
 	<!-- Current Values Summary -->
+	{#if forecastData && forecastData.datasets && originalLabels.length > 0}
 	<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-		{#each selectedParameters as paramKey}
+		{#each selectedParameters as paramKey, index}
 			{@const param = weatherParameters[paramKey]}
-			{@const mockData = generateMockData(activeTimeRange)}
-			{@const currentValue = activeTimeRange === '7 Days' ? 
-				mockData.data[0][paramKey] : 
-				mockData.data[new Date().getHours()] ? mockData.data[new Date().getHours()][paramKey] : mockData.data[0][paramKey]}
+			{@const dataset = forecastData.datasets.find(d => d.label === param.name)}
+			{@const now = new Date()}
+			{@const currentTimeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+			{@const currentIndex = originalLabels.findIndex(label => label === currentTimeLabel)}
+			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (originalLabels.length - 1))}
+			{@const currentValue = (() => {
+				if (!dataset?.data) return 0;
+
+				// Special handling for Solar Radiation parameters
+				if (paramKey === 'shortwave_radiation') {
+					// Get all non-null values
+					const nonNullValues = dataset.data.filter(val => val !== null && val !== undefined && val > 0);
+					if (nonNullValues.length === 0) return 0;
+
+					// Sort values in descending order and get top 10
+					const sortedValues = nonNullValues.sort((a, b) => b - a);
+					const top10Values = sortedValues.slice(0, 10);
+
+					// Return average of top 10 values
+					return top10Values.reduce((sum, val) => sum + val, 0) / top10Values.length;
+				}
+
+				// For other parameters, use current time value
+				return dataset.data[validIndex] ?? 0;
+			})()}
 			<div class="bg-glass-white rounded-lg p-3">
 				<div class="flex items-center space-x-2 mb-1">
-					<div 
-						class="w-2 h-2 rounded-full" 
+					<div
+						class="w-2 h-2 rounded-full"
 						style="background-color: {param.color}"
 					></div>
 					<span class="text-xs text-soft-blue/70">{param.name}</span>
 				</div>
 				<div class="text-lg font-mono text-soft-blue">
-					{currentValue.toFixed(1)}<span class="text-sm ml-1">{param.unit}</span>
+					{typeof currentValue === 'number' ? currentValue.toFixed(1) : '0.0'}<span class="text-sm ml-1">{param.unit}</span>
 				</div>
 			</div>
 		{/each}
 	</div>
+	{/if}
 </div>

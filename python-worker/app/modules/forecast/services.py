@@ -6,11 +6,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 import uuid
 import asyncio
+import pandas as pd
+import logging
 
 from .repositories import ForecastRepository
 from .models_api import ForecastTaskResponse, ForecastAccuracyResponse
 from app.modules.ml_models.services import MLModelService
 from app.modules.weather.services import WeatherService
+
+# Import the real forecast engine (NO CLASSES - pure functions)
+try:
+    from .core.unified_forecast import run_unified_forecast
+    REAL_FORECAST_AVAILABLE = True
+except ImportError:
+    REAL_FORECAST_AVAILABLE = False
+    logging.warning("Real forecast engine not available - using fallback")
+
+logger = logging.getLogger(__name__)
 
 
 class ForecastService:
@@ -25,16 +37,16 @@ class ForecastService:
         # In-memory task tracking (should use Redis in production)
         self.tasks: Dict[str, Dict] = {}
     
-    async def validate_location(self, location_id: int) -> bool:
-        """Validate if location exists and is active"""
-        location = await self.repo.get_location(location_id)
-        return location is not None and location.get("status") == "ACTIVE"
+    async def validate_location(self, location_id: str) -> bool:
+        """Validate if location exists and is active (database-driven)"""
+        location = await self.repo.get_location_full(location_id)
+        return location is not None
     
     async def queue_forecast_generation(
         self,
-        location_id: int,
+        location_id: str,
         horizon_hours: int = 48,
-        model_type: str = "ML"
+        model_type: str = "ML_ENSEMBLE"
     ) -> str:
         """Queue a forecast generation task"""
         task_id = str(uuid.uuid4())
@@ -54,119 +66,118 @@ class ForecastService:
         return task_id
     
     async def process_forecast_task(self, task_id: str) -> None:
-        """Process forecast generation task (async background)"""
+        """Process forecast generation task using database-driven approach"""
         if task_id not in self.tasks:
             return
-        
+
         task = self.tasks[task_id]
-        
+
         try:
             # Update status
             task["status"] = "processing"
             task["progress"] = 10
-            
-            # Get location data
-            location = await self.repo.get_location(task["location_id"])
+            logger.info(f"Starting forecast task {task_id} for location {task['location_id']}")
+
+            # 1. Get location from database (not YAML)
+            location = await self.repo.get_location_full(task["location_id"])
             if not location:
-                raise ValueError("Location not found")
-            
+                raise ValueError(f"Location {task['location_id']} not found in database")
+
             task["progress"] = 20
-            
-            # Get weather forecast
-            weather_data = await self.weather_service.get_forecast(
-                latitude=location["latitude"],
-                longitude=location["longitude"],
-                days=max(1, task["horizon_hours"] // 24)
+            logger.info(f"Location loaded: {location['name']} ({location['capacityMW']} MW)")
+
+            # 2. Build config from database fields
+            config = self.repo.build_config_from_location(location)
+
+            task["progress"] = 30
+
+            # 3. Get weather from database (not API)
+            weather_df = await self.repo.get_recent_weather(
+                location_id=task["location_id"],
+                hours=task["horizon_hours"] + 24  # Extra for features
             )
-            
+
+            if weather_df.empty:
+                raise ValueError(f"No weather data found for location {task['location_id']}")
+
             task["progress"] = 40
-            
-            # Load ML model
-            model = await self.ml_service.get_model(task["model_type"])
-            
-            task["progress"] = 50
-            
-            # Generate forecasts
-            forecasts = await self._generate_forecasts(
-                location=location,
-                weather_data=weather_data,
-                model=model,
-                horizon_hours=task["horizon_hours"]
-            )
-            
+            logger.info(f"Weather data loaded: {len(weather_df)} records")
+
+            # 4. Load ML models for this location
+            location_code = location.get("code")
+            models = None
+            if location_code:
+                models = await self.ml_service.load_location_models(location_code)
+                if models:
+                    logger.info(f"Loaded models for {location_code}: {models['model_type']}")
+                else:
+                    logger.warning(f"No models found for {location_code}, will use physics-only")
+
+            task["progress"] = 60
+
+            # 5. Run unified forecast (REAL FORECAST ENGINE - NO MOCK DATA)
+            if REAL_FORECAST_AVAILABLE:
+                forecast_type = "hybrid" if models else "physics"
+
+                logger.info(f"Running {forecast_type} forecast with unified engine")
+                forecast_df = run_unified_forecast(
+                    weather_data=weather_df,
+                    config=config,
+                    forecast_type=forecast_type,
+                    client_id=location_code
+                )
+
+                # Add model metadata to forecast
+                if models:
+                    forecast_df['model_type'] = models['model_type']
+                    forecast_df['model_version'] = models['version']
+                else:
+                    forecast_df['model_type'] = 'PHYSICS_ONLY'
+                    forecast_df['model_version'] = '1.0'
+
+                # Convert kW to MW for database storage
+                if 'prediction' in forecast_df.columns:
+                    forecast_df['power_mw'] = forecast_df['prediction'] / 1000
+
+                # Add capacity constraint validation (CRITICAL SAFETY)
+                max_capacity_mw = location['capacityMW']
+                forecast_df['power_mw'] = forecast_df['power_mw'].clip(upper=max_capacity_mw)
+
+                # Calculate capacity factor
+                forecast_df['capacity_factor'] = forecast_df['power_mw'] / max_capacity_mw
+
+            else:
+                # Fallback if core modules not available
+                raise ImportError("Real forecast engine not available")
+
             task["progress"] = 80
-            
-            # Save forecasts to database
-            saved_count = await self.repo.save_forecasts(forecasts)
-            
+            logger.info(f"Forecast generated: {len(forecast_df)} points")
+
+            # 6. Save to database using TimescaleDB bulk operations
+            saved_count = await self.repo.bulk_save_forecasts(
+                location_id=task["location_id"],
+                forecasts=forecast_df
+            )
+
             task["progress"] = 100
             task["status"] = "completed"
             task["result"] = {
                 "forecast_count": saved_count,
-                "start_time": forecasts[0]["time"] if forecasts else None,
-                "end_time": forecasts[-1]["time"] if forecasts else None
+                "start_time": forecast_df.index[0].isoformat() if len(forecast_df) > 0 else None,
+                "end_time": forecast_df.index[-1].isoformat() if len(forecast_df) > 0 else None,
+                "model_type": forecast_df.iloc[0]['model_type'] if len(forecast_df) > 0 else None,
+                "location_name": location['name'],
+                "capacity_mw": location['capacityMW']
             }
-            
+
+            logger.info(f"Task {task_id} completed successfully: {saved_count} forecasts saved")
+
         except Exception as e:
             task["status"] = "failed"
             task["error"] = str(e)
+            logger.error(f"Task {task_id} failed: {e}", exc_info=True)
     
-    async def _generate_forecasts(
-        self,
-        location: Dict,
-        weather_data: List[Dict],
-        model: Any,
-        horizon_hours: int
-    ) -> List[Dict]:
-        """Generate forecast data points"""
-        forecasts = []
-        now = datetime.utcnow()
-        
-        for hour in range(horizon_hours):
-            forecast_time = now + timedelta(hours=hour + 1)
-            hour_of_day = forecast_time.hour
-            
-            # Simple solar production curve simulation
-            # In production, this would use the actual ML model
-            power_output = 0.0
-            confidence = 95.0
-            
-            if 6 <= hour_of_day <= 18:
-                # Daylight hours
-                peak_hour = 12
-                max_capacity = location["capacity_mw"] * 0.85
-                hour_diff = abs(hour_of_day - peak_hour)
-                
-                # Base production curve
-                power_output = max_capacity * max(0, 1 - (hour_diff / 6))
-                
-                # Apply weather factors if available
-                if hour < len(weather_data):
-                    weather = weather_data[hour]
-                    cloud_factor = 1 - (weather.get("cloud_cover", 0) / 100 * 0.5)
-                    power_output *= cloud_factor
-                    confidence -= weather.get("cloud_cover", 0) / 10
-                
-                # Add some variation
-                power_output *= (0.9 + np.random.random() * 0.2)
-                power_output = max(0, min(power_output, location["capacity_mw"]))
-            
-            forecasts.append({
-                "time": forecast_time,
-                "location_id": location["id"],
-                "power_output_mw": round(power_output, 2),
-                "energy_mwh": round(power_output * 1, 2),  # 1 hour
-                "confidence": round(confidence, 1),
-                "model_type": model.get("type", "ML"),
-                "model_version": model.get("version", "1.0.0"),
-                "horizon_hours": hour + 1,
-                "temperature": weather_data[min(hour, len(weather_data)-1)].get("temperature", 20) if weather_data else 20,
-                "irradiance": round(power_output * 1000 / location["capacity_mw"], 1) if power_output > 0 else 0,
-                "cloud_cover": weather_data[min(hour, len(weather_data)-1)].get("cloud_cover", 0) if weather_data else 0,
-                "wind_speed": weather_data[min(hour, len(weather_data)-1)].get("wind_speed", 5) if weather_data else 5,
-            })
-        
-        return forecasts
+    # REMOVED: _generate_forecasts() - now using real unified_forecast engine
     
     async def get_task_status(self, task_id: str) -> Optional[ForecastTaskResponse]:
         """Get current status of a forecast task"""
@@ -187,7 +198,7 @@ class ForecastService:
     
     async def get_forecasts(
         self,
-        location_id: int,
+        location_id: str,
         start_time: datetime,
         end_time: datetime,
         model_type: Optional[str] = None
@@ -202,7 +213,7 @@ class ForecastService:
     
     async def calculate_accuracy(
         self,
-        location_id: int,
+        location_id: str,
         days: int = 7
     ) -> Optional[ForecastAccuracyResponse]:
         """Calculate forecast accuracy metrics"""
@@ -250,7 +261,7 @@ class ForecastService:
     
     async def delete_old_forecasts(
         self,
-        location_id: int,
+        location_id: str,
         before_date: datetime
     ) -> int:
         """Delete forecasts older than specified date"""

@@ -9,7 +9,6 @@
 		{ href: '/', label: 'Dashboard', icon: 'dashboard' },
 		{ href: '/locations', label: 'Locations', icon: 'location' },
 		{ href: '/forecast', label: 'Forecast', icon: 'forecast' },
-		{ href: '/analysis', label: 'Analysis', icon: 'analysis' },
 		{ href: '/historical', label: 'Historical', icon: 'historical' },
 		{ href: '/reports', label: 'Reports', icon: 'report' },
 	];
