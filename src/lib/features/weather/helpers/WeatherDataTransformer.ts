@@ -62,6 +62,7 @@ export class WeatherDataTransformer {
     const length = timeArray.length;
 
     for (let i = 0; i < length; i++) {
+      // Create UTC timestamp from Open-Meteo ISO string (now returns UTC since we set timezone: 'UTC')
       const timestamp = new Date(timeArray[i]);
 
       // Skip invalid timestamps

@@ -25,7 +25,7 @@ async def test_end_to_end_weather():
     print("="*60)
     
     # Test configuration
-    location_id = "1"  # Use existing location
+    location_guid = "550e8400-e29b-41d4-a716-446655440001"  # Bucharest Solar Test Farm
     sveltekit_url = "http://localhost:5173"
     python_url = "http://localhost:8001"
     
@@ -62,16 +62,14 @@ async def test_end_to_end_weather():
     async with AsyncSessionLocal() as db:
         result = await db.execute(text("""
             SELECT id, name, latitude, longitude 
-            FROM locations 
+            FROM locations
             WHERE id = :location_id
-        """), {"location_id": location_id})
+        """), {"location_id": location_guid})
         
         location = result.fetchone()
         if location:
             print(f"✓ Location found: {location.name}")
             print(f"  Coordinates: {location.latitude}, {location.longitude}")
-            # Create a proper GUID for the location if needed
-            location_guid = "550e8400-e29b-41d4-a716-446655440001"  # Example GUID
         else:
             print("✗ Location not found in database")
             return
@@ -83,9 +81,9 @@ async def test_end_to_end_weather():
     async with AsyncSessionLocal() as db:
         await db.execute(text("""
             DELETE FROM weather_data 
-            WHERE "locationId" = :location_id 
+            WHERE "locationId" = :location_id
             AND timestamp < NOW() - INTERVAL '1 hour'
-        """), {"location_id": location_id})
+        """), {"location_id": location_guid})
         await db.commit()
         print("✓ Old weather data cleared")
     
@@ -144,7 +142,7 @@ async def test_end_to_end_weather():
             FROM weather_data 
             WHERE "locationId" = :location_id
             AND timestamp >= NOW() - INTERVAL '1 hour'
-        """), {"location_id": location_id})
+        """), {"location_id": location_guid})
         
         stats = result.fetchone()
         if stats and stats.count > 0:
@@ -165,7 +163,7 @@ async def test_end_to_end_weather():
         
         # Test get_weather_with_freshness
         weather = await service.get_weather_with_freshness(
-            str(location_id),
+            location_guid,
             max_age_minutes=60
         )
         
@@ -185,7 +183,7 @@ async def test_end_to_end_weather():
     async with httpx.AsyncClient() as client:
         # Test current weather endpoint
         response = await client.get(
-            f"{python_url}/api/v1/weather/current/{location_id}"
+            f"{python_url}/api/v1/weather/current/{location_guid}"
         )
         
         if response.status_code == 200:
@@ -221,7 +219,7 @@ async def test_end_to_end_weather():
             "id": stale_id,
             "timestamp": stale_time,
             "time": stale_time,
-            "location_id": location_id,
+            "location_id": location_guid,
             "temperature": 15.0,
             "humidity": 50.0,
             "pressure": 1010.0,
@@ -240,7 +238,7 @@ async def test_end_to_end_weather():
         
         print("\n  Testing freshness check and sync trigger...")
         weather = await service.get_weather_with_freshness(
-            str(location_id),
+            location_guid,
             max_age_minutes=15  # Data older than 15 minutes triggers sync
         )
         
@@ -266,7 +264,7 @@ async def test_end_to_end_weather():
                    COUNT(CASE WHEN source = 'open-meteo' THEN 1 END) as from_api
             FROM weather_data
             WHERE "locationId" = :location_id
-        """), {"location_id": location_id})
+        """), {"location_id": location_guid})
         
         summary = result.fetchone()
         

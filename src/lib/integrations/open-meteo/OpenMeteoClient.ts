@@ -68,7 +68,7 @@ export class OpenMeteoClient {
       longitude,
       hourly: hourlyParams,
       forecast_days: 1,
-      timezone: 'auto'
+      timezone: 'UTC'
     };
 
     return this.getForecast(request);
@@ -89,7 +89,7 @@ export class OpenMeteoClient {
       longitude,
       hourly: hourlyParams,
       forecast_days: Math.min(days, 16), // Open-Meteo limit
-      timezone: 'auto'
+      timezone: 'UTC'
     };
 
     return this.getForecast(request);
@@ -112,7 +112,7 @@ export class OpenMeteoClient {
       hourly: hourlyParams,
       start_date: startDate,
       end_date: endDate,
-      timezone: 'auto'
+      timezone: 'UTC'
     };
 
     return this.getForecast(request);

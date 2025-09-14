@@ -253,23 +253,30 @@ The platform integrates with Open-Meteo API for real-time weather and solar radi
 - **Comprehensive Data** - Weather parameters + solar radiation components
 - **GUID-Based Architecture** - Consistent with location management
 - **TimescaleDB Optimized** - High-performance time-series storage
+- **UTC Timezone Standard** - All weather data stored and retrieved in UTC+0
 - **Health Monitoring** - Real-time system health checks
 - **Automated Sync** - Scheduled data synchronization jobs
 
 ### API Endpoints
-- `GET /api/weather` - Current weather for location
-- `GET /api/weather?days={1-16}` - Weather forecast
-- `GET /api/weather?start_date={date}&end_date={date}` - Historical data
-- `GET /api/weather?interval={15min|1hour|6hour|1day}&hours={1-720}` - Aggregated data
+- `GET /api/weather` - Current weather for location (UTC timestamps)
+- `GET /api/weather?days={1-16}` - Weather forecast (UTC timestamps)
+- `GET /api/weather?start_date={date}&end_date={date}` - Historical data (UTC timestamps)
+- `GET /api/weather?interval={15min|1hour|6hour|1day}&hours={1-720}` - Aggregated data (UTC timestamps)
 - `POST /api/weather/sync` - Manual synchronization
-- `GET /api/weather/{id}` - Weather record by ID
+- `GET /api/weather/{id}` - Weather record by ID (UTC timestamp)
 - `GET /api/weather/health` - System health check
 
 ### Solar Radiation Components
-- **GHI** - Global Horizontal Irradiance (W/m²)
-- **DNI** - Direct Normal Irradiance (W/m²)
-- **DHI** - Diffuse Horizontal Irradiance (W/m²)
-- **GTI** - Global Tilted Irradiance (W/m²)
+- **GHI** - Global Horizontal Irradiance (W/m²) - Measured at UTC time
+- **DNI** - Direct Normal Irradiance (W/m²) - Measured at UTC time
+- **DHI** - Diffuse Horizontal Irradiance (W/m²) - Measured at UTC time
+- **GTI** - Global Tilted Irradiance (W/m²) - Measured at UTC time
+
+### Timezone Handling
+- **Storage**: All weather timestamps stored in database as UTC+0
+- **Open-Meteo API**: Requests made with UTC timezone parameter
+- **TimescaleDB**: Time-series queries performed in UTC for consistency
+- **Client Display**: Frontend can convert UTC to local timezone for display
 
 ### Documentation
 - **Interactive Swagger UI**: `/swagger`
