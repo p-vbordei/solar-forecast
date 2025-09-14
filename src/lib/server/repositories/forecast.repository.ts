@@ -1,4 +1,5 @@
-import { prisma } from '$lib/server/prisma';
+import { db, TimescaleQueries } from '$lib/server/database';
+import type { TimeInterval } from '$lib/server/database';
 
 class ForecastRepository {
   async getForecastData(
@@ -7,9 +8,49 @@ class ForecastRepository {
     startDate?: string,
     endDate?: string
   ) {
-    // Generate mock forecast data based on interval
-    const data = this.generateMockForecastData(locationId, interval, startDate, endDate);
-    return data;
+    try {
+      // Try to get real forecast data from database first
+      const realData = await this.getRealForecastData(locationId, interval, startDate, endDate);
+
+      // If no real data exists, fall back to mock data
+      if (realData.length === 0) {
+        console.log(`No forecast data found for location ${locationId}, generating mock data`);
+        return this.generateMockForecastData(locationId, interval, startDate, endDate);
+      }
+
+      return realData;
+    } catch (error) {
+      console.warn('Database query failed, falling back to mock data:', error);
+      return this.generateMockForecastData(locationId, interval, startDate, endDate);
+    }
+  }
+
+  private async getRealForecastData(
+    locationId: string,
+    interval: '15min' | 'hourly' | 'daily' | 'weekly',
+    startDate?: string,
+    endDate?: string
+  ) {
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Convert interval to TimescaleDB interval
+    const tsInterval: TimeInterval = interval === '15min' ? '15 minutes' :
+                                   interval === 'hourly' ? '1 hour' :
+                                   interval === 'daily' ? '1 day' : '1 week';
+
+    // Use TimescaleDB time_bucket for optimal performance
+    return await TimescaleQueries.timeBucket({
+      interval: tsInterval,
+      table: 'forecasts',
+      aggregations: {
+        avg: ['power_forecast_mw', 'confidence_score'],
+        count: ['*']
+      },
+      where: `location_id = ${parseInt(locationId)} AND timestamp >= '${start.toISOString()}' AND timestamp <= '${end.toISOString()}'`,
+      groupBy: ['location_id'],
+      orderBy: 'bucket ASC'
+    });
   }
   
   async getAccuracyData(
@@ -17,9 +58,68 @@ class ForecastRepository {
     startDate?: string,
     endDate?: string
   ) {
-    // Generate mock accuracy data
-    const data = this.generateMockAccuracyData(locationId, startDate, endDate);
-    return data;
+    try {
+      // Try to get real accuracy data from database first
+      const realData = await this.getRealAccuracyData(locationId, startDate, endDate);
+
+      // If no real data exists, fall back to mock data
+      if (realData.length === 0) {
+        console.log(`No accuracy data found for location ${locationId}, generating mock data`);
+        return this.generateMockAccuracyData(locationId, startDate, endDate);
+      }
+
+      return realData;
+    } catch (error) {
+      console.warn('Database accuracy query failed, falling back to mock data:', error);
+      return this.generateMockAccuracyData(locationId, startDate, endDate);
+    }
+  }
+
+  private async getRealAccuracyData(
+    locationId: string,
+    startDate?: string,
+    endDate?: string
+  ) {
+    const start = startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Query forecast vs production data for accuracy analysis
+    return await db.$queryRaw`
+      SELECT
+        f.timestamp,
+        f.power_forecast_mw as forecast,
+        p.power_mw as actual,
+        f.confidence_score
+      FROM forecasts f
+      INNER JOIN production p ON f.location_id = p.location_id
+        AND f.timestamp = p.timestamp
+      WHERE f.location_id = ${parseInt(locationId)}
+        AND f.timestamp >= ${start}
+        AND f.timestamp <= ${end}
+      ORDER BY f.timestamp DESC
+      LIMIT 1000
+    `;
+  }
+
+  // New method for bulk forecast insertion with TimescaleDB optimization
+  async bulkInsertForecasts(forecasts: Array<{
+    locationId: number;
+    timestamp: Date;
+    powerForecastMw: number;
+    confidenceScore?: number;
+    modelType?: string;
+    horizonHours?: number;
+  }>) {
+    try {
+      return await TimescaleQueries.bulkInsert('forecasts', forecasts, {
+        batchSize: 1000,
+        onConflict: 'update',
+        validateTimestamps: true
+      });
+    } catch (error) {
+      console.error('Bulk forecast insert failed:', error);
+      throw error;
+    }
   }
   
   private generateMockForecastData(

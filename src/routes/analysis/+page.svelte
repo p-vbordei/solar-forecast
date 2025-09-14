@@ -378,13 +378,6 @@
         <DownloadIcon className="w-4 h-4" />
         Export Excel
       </button>
-      <button
-        on:click={() => exportForecast('pdf')}
-        class="btn btn-secondary"
-      >
-        <DownloadIcon className="w-4 h-4" />
-        Export PDF
-      </button>
     </div>
   </div>
 
