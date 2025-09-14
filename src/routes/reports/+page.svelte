@@ -17,7 +17,7 @@
   let selectedReport = '';
   let selectedLocations: string[] = [];
   let selectedPlant = '';
-  let selectedFormat = 'pdf';
+  let selectedFormat = 'excel';
   let selectedAggregation = '1h';
   let selectedTimezone = 'UTC';
   let locationDisplay = 'individual'; // 'individual' or 'aggregated'
@@ -46,7 +46,7 @@
       description: 'Overview of solar power generation across all locations',
       icon: SunIcon,
       category: 'Production',
-      formats: ['pdf', 'excel', 'csv'],
+      formats: ['excel', 'csv'],
       filters: ['location', 'dateRange', 'aggregation', 'timezone']
     },
     {
@@ -55,7 +55,7 @@
       description: 'Comparison of forecasted vs actual production',
       icon: TrendingUpIcon,
       category: 'Analytics',
-      formats: ['pdf', 'excel'],
+      formats: ['excel'],
       filters: ['location', 'dateRange', 'aggregation', 'timezone']
     },
     {
@@ -64,7 +64,7 @@
       description: 'Short-term forecast for the next 1 to 5 days using historical forecasts from current month',
       icon: CloudIcon,
       category: 'Forecast',
-      formats: ['pdf', 'excel', 'csv'],
+      formats: ['excel', 'csv'],
       filters: ['location', 'aggregation', 'timezone']
     },
     {
@@ -73,7 +73,7 @@
       description: 'Extended monthly forecast using historical data from month start to present, projecting next 5 days',
       icon: ClockIcon,
       category: 'Forecast',
-      formats: ['pdf', 'excel', 'csv'],
+      formats: ['excel', 'csv'],
       filters: ['location', 'aggregation', 'timezone']
     }
   ];
@@ -165,26 +165,12 @@
         return;
       }
 
-      if (selectedFormat === 'pdf') {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${selectedReport}_${dateRange.start}_to_${dateRange.end}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        alert(`PDF report "${selectedReport}" generated and downloaded successfully!`);
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`Report "${selectedReport}" generated successfully! Contains ${result.data?.summary?.totalRecords || 0} records.`);
       } else {
-        const result = await response.json();
-        
-        if (result.success) {
-          alert(`Report "${selectedReport}" generated successfully! Contains ${result.data?.summary?.totalRecords || 0} records.`);
-        } else {
-          alert(`Error generating report: ${result.error || 'Unknown error'}`);
-        }
+        alert(`Error generating report: ${result.error || 'Unknown error'}`);
       }
       
       await loadRecentReports();
@@ -848,7 +834,7 @@
             <!-- Format Selection -->
             <div>
               <label class="label">Output Format</label>
-              <div class="grid grid-cols-3 gap-2 mt-2">
+              <div class="grid grid-cols-2 gap-2 mt-2">
                 {#each reportTypes.find(r => r.id === selectedReport)?.formats || [] as format}
                   <button
                     on:click={() => selectedFormat = format}
@@ -1165,60 +1151,6 @@
     {/if}
   </div>
 
-  <!-- Recent Reports -->
-  <div class="card-glass">
-    <h2 class="text-xl font-semibold text-white mb-4">Recent Reports</h2>
-    
-    <div class="overflow-x-auto">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Report Type</th>
-            <th>Date Generated</th>
-            <th>Status</th>
-            <th>Size</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#if recentReports.length === 0}
-            <tr>
-              <td colspan="5" class="text-center py-8 text-soft-blue/60">
-                No recent reports available
-              </td>
-            </tr>
-          {:else}
-            {#each recentReports as report}
-              <tr class="hover:bg-glass-white transition-colors">
-                <td class="font-medium">{report.name}</td>
-                <td>{report.displayDate}</td>
-                <td>
-                  <span class="{report.status === 'completed' ? 'status-active' : report.status === 'generating' ? 'status-warning' : 'status-critical'}">
-                    {report.status === 'completed' ? 'Completed' : report.status === 'generating' ? 'Generating' : 'Failed'}
-                  </span>
-                </td>
-                <td>{report.displayFileSize}</td>
-                <td>
-                  {#if report.status === 'completed'}
-                    <button
-                      on:click={() => downloadReport(report)}
-                      class="text-cyan hover:text-soft-blue font-medium"
-                    >
-                      Download
-                    </button>
-                  {:else if report.status === 'generating'}
-                    <span class="text-soft-blue">Processing...</span>
-                  {:else}
-                    <span class="text-alert-red">Failed</span>
-                  {/if}
-                </td>
-              </tr>
-            {/each}
-          {/if}
-        </tbody>
-      </table>
-    </div>
-  </div>
 
   <!-- Understanding Solar Production Reports -->
   <div class="card-glass">
