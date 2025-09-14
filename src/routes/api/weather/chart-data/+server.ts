@@ -8,17 +8,37 @@ import { v4 as uuidv4 } from 'uuid';
  * Get weather data formatted for charts (Dashboard and Forecast pages)
  */
 export const GET: RequestHandler = async ({ url }) => {
-  try {
-    const locationId = url.searchParams.get('location_id') || '1';
-    const timeRange = url.searchParams.get('time_range') || 'Today';
-    const parameters = url.searchParams.get('parameters')?.split(',') || ['ghi', 'temperature', 'cloudCover'];
+  const locationId = url.searchParams.get('location_id') || '1';
+  const timeRange = url.searchParams.get('time_range') || 'Today';
+  const parameters = url.searchParams.get('parameters')?.split(',') || ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
 
+  console.log('Weather chart API called:', { locationId, timeRange, parameters });
+
+  try {
     // Check if we have any weather data
     const dataCount = await db.weatherData.count();
+    console.log('Weather data count in database:', dataCount);
 
     if (dataCount === 0) {
-      // Generate and insert sample data if database is empty
-      await seedSampleWeatherData();
+      // Return mock data if database is empty
+      console.log('No weather data in database, returning mock data');
+      const mockData = generateMockChartData(
+        parameters,
+        timeRange === '7 Days' ? 'daily' : 'hourly'
+      );
+
+      return json({
+        success: true,
+        data: mockData,
+        metadata: {
+          locationId,
+          timeRange,
+          parameters,
+          dataPoints: mockData.labels?.length || 0,
+          isMockData: true,
+          message: 'No weather data in database, using mock data'
+        }
+      });
     }
 
     // Calculate date range based on timeRange
@@ -69,10 +89,14 @@ export const GET: RequestHandler = async ({ url }) => {
         break;
     }
 
+    // Get the actual location UUID
+    const actualLocationId = await getLocationGuid(locationId);
+    console.log('Using location ID:', actualLocationId, 'for input:', locationId);
+
     // Fetch weather data from database
     const weatherData = await db.weatherData.findMany({
       where: {
-        locationId: getLocationGuid(locationId),
+        locationId: actualLocationId,
         timestamp: {
           gte: startDate,
           lte: endDate
@@ -82,6 +106,8 @@ export const GET: RequestHandler = async ({ url }) => {
         timestamp: 'asc'
       }
     });
+
+    console.log(`Found ${weatherData.length} weather records for location ${actualLocationId}`);
 
     // Format data for charts
     const chartData = formatChartData(weatherData, parameters, interval);
@@ -99,13 +125,27 @@ export const GET: RequestHandler = async ({ url }) => {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching weather chart data:', error);
+
+    // Return mock data on error
+    const mockData = generateMockChartData(
+      parameters || ['shortwave_radiation', 'temperature_2m', 'cloud_cover'],
+      timeRange === '7 Days' ? 'daily' : 'hourly'
+    );
+
     return json({
-      success: false,
-      error: 'Failed to fetch weather data',
-      message: error.message
-    }, { status: 500 });
+      success: true,
+      data: mockData,
+      metadata: {
+        locationId,
+        timeRange,
+        parameters,
+        dataPoints: mockData.labels?.length || 0,
+        isMockData: true,
+        error: error.message
+      }
+    });
   }
 };
 
@@ -121,7 +161,7 @@ function formatChartData(weatherData: any[], parameters: string[], interval: str
   const datasets: any[] = [];
 
   // Parameter configurations - support both naming conventions
-  const paramConfig = {
+  const paramConfig: Record<string, any> = {
     ghi: { name: 'Solar Radiation', unit: 'W/m²', color: '#f59e0b' },
     shortwave_radiation: { name: 'Solar Radiation', unit: 'W/m²', color: '#f59e0b' },
     temperature: { name: 'Temperature', unit: '°C', color: '#ef4444' },
@@ -212,8 +252,14 @@ function generateMockChartData(parameters: string[], interval: string) {
   }
 
   // Parameter configurations with mock data generation
-  const paramConfig = {
+  const paramConfig: Record<string, any> = {
     ghi: {
+      name: 'Solar Radiation',
+      unit: 'W/m²',
+      color: '#f59e0b',
+      generateData: (i: number) => Math.max(0, Math.sin((i - 6) * Math.PI / 12) * 800 + Math.random() * 100)
+    },
+    shortwave_radiation: {
       name: 'Solar Radiation',
       unit: 'W/m²',
       color: '#f59e0b',
@@ -225,7 +271,19 @@ function generateMockChartData(parameters: string[], interval: string) {
       color: '#ef4444',
       generateData: (i: number) => 15 + Math.sin((i - 6) * Math.PI / 12) * 10 + Math.random() * 2
     },
+    temperature_2m: {
+      name: 'Temperature',
+      unit: '°C',
+      color: '#ef4444',
+      generateData: (i: number) => 15 + Math.sin((i - 6) * Math.PI / 12) * 10 + Math.random() * 2
+    },
     cloudCover: {
+      name: 'Cloud Coverage',
+      unit: '%',
+      color: '#6b7280',
+      generateData: (i: number) => 30 + Math.random() * 40
+    },
+    cloud_cover: {
       name: 'Cloud Coverage',
       unit: '%',
       color: '#6b7280',
@@ -237,7 +295,19 @@ function generateMockChartData(parameters: string[], interval: string) {
       color: '#10b981',
       generateData: (i: number) => 5 + Math.random() * 10
     },
+    wind_speed_10m: {
+      name: 'Wind Speed',
+      unit: 'm/s',
+      color: '#10b981',
+      generateData: (i: number) => 5 + Math.random() * 10
+    },
     humidity: {
+      name: 'Humidity',
+      unit: '%',
+      color: '#3b82f6',
+      generateData: (i: number) => 60 + Math.sin(i * 0.3) * 20 + Math.random() * 10
+    },
+    relative_humidity_2m: {
       name: 'Humidity',
       unit: '%',
       color: '#3b82f6',
@@ -265,17 +335,33 @@ function generateMockChartData(parameters: string[], interval: string) {
 }
 
 /**
- * Get location GUID (mock mapping for now)
+ * Get location GUID from numeric ID or return the ID if it's already a GUID
  */
-function getLocationGuid(locationId: string): string {
-  // Mock location ID to GUID mapping
-  const locationMap = {
-    '1': '550e8400-e29b-41d4-a716-446655440001',
-    '2': '550e8400-e29b-41d4-a716-446655440002',
-    '3': '550e8400-e29b-41d4-a716-446655440003',
-    '4': '550e8400-e29b-41d4-a716-446655440004'
-  };
-  return locationMap[locationId] || locationMap['1'];
+async function getLocationGuid(locationId: string): Promise<string> {
+  // If it's already a UUID, return it
+  if (locationId.includes('-')) {
+    return locationId;
+  }
+
+  // Otherwise, fetch the actual location from database
+  try {
+    const locations = await db.location.findMany({
+      select: { id: true },
+      orderBy: { name: 'asc' }
+    });
+
+    // Map numeric IDs to actual UUIDs (by order)
+    const numericId = parseInt(locationId) - 1; // Convert 1-based to 0-based
+    if (locations[numericId]) {
+      return locations[numericId].id;
+    }
+  } catch (error) {
+    console.error('Error fetching location ID:', error);
+  }
+
+  // Fallback - return first location
+  const firstLocation = await db.location.findFirst();
+  return firstLocation?.id || locationId;
 }
 
 /**

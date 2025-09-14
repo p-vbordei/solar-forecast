@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	
 	export let locationId: number = 1;
 
@@ -66,10 +66,23 @@
 	let selectedParameters = ['shortwave_radiation', 'temperature_2m', 'cloud_cover'];
 	let activeTimeRange = 'Today';
 
+	// Parameters that have data available (initialize with known available params)
+	let availableParameters = new Set<string>([
+		'shortwave_radiation',  // GHI
+		'direct_radiation',      // DNI
+		'diffuse_radiation',     // DHI
+		'temperature_2m',        // Temperature
+		'relative_humidity_2m',  // Humidity
+		'wind_speed_10m',        // Wind Speed
+		'cloud_cover'            // Cloud Cover
+	]);
+
 	// Real-time forecast data from API
 	let forecastData: any = null;
 	let originalLabels: string[] = []; // Store original labels before timezone conversion
 	let chartContainer: HTMLDivElement;
+	let chartInstance: any = null; // Cache the chart instance
+	let echartsModule: any = null; // Cache the echarts module
 	let isLoading = false;
 	let errorMessage = '';
 
@@ -82,7 +95,7 @@
 			humidity: 0.6,
 			solarEfficiency: 1.0,
 			timezone: 'Europe/Bucharest',
-			utcOffset: 3
+			utcOffset: 2
 		},
 		2: { // Solar Station Beta - Cluj
 			tempBase: 12,
@@ -91,7 +104,7 @@
 			humidity: 0.7,
 			solarEfficiency: 0.95,
 			timezone: 'Europe/Bucharest',
-			utcOffset: 3
+			utcOffset: 2
 		},
 		3: { // Green Energy Park - Timisoara
 			tempBase: 16,
@@ -100,7 +113,7 @@
 			humidity: 0.65,
 			solarEfficiency: 1.05,
 			timezone: 'Europe/Bucharest',
-			utcOffset: 3
+			utcOffset: 2
 		},
 		4: { // Coastal Solar Array - Constanta
 			tempBase: 14,
@@ -109,34 +122,33 @@
 			humidity: 0.8,
 			solarEfficiency: 1.1,
 			timezone: 'Europe/Bucharest',
-			utcOffset: 3
+			utcOffset: 2
 		}
 	};
 
-	// Available timezones for display
+	// Available timezones for display (UTC-3 to UTC+4)
 	const availableTimezones = [
+		{ value: 'UTC-3', label: 'UTC-3', offset: -3 },
+		{ value: 'UTC-2', label: 'UTC-2', offset: -2 },
+		{ value: 'UTC-1', label: 'UTC-1', offset: -1 },
 		{ value: 'UTC', label: 'UTC', offset: 0 },
-		{ value: 'Europe/London', label: 'London (GMT)', offset: 0 },
-		{ value: 'Europe/Paris', label: 'Paris (CET)', offset: 1 },
-		{ value: 'Europe/Bucharest', label: 'Bucharest (EET)', offset: 2 },
-		{ value: 'America/New_York', label: 'New York (EST)', offset: -5 },
-		{ value: 'America/Chicago', label: 'Chicago (CST)', offset: -6 },
-		{ value: 'America/Denver', label: 'Denver (MST)', offset: -7 },
-		{ value: 'America/Los_Angeles', label: 'Los Angeles (PST)', offset: -8 },
-		{ value: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 9 },
-		{ value: 'Asia/Shanghai', label: 'Shanghai (CST)', offset: 8 },
-		{ value: 'Australia/Sydney', label: 'Sydney (AEDT)', offset: 11 }
+		{ value: 'UTC+1', label: 'UTC+1 (CET)', offset: 1 },
+		{ value: 'Europe/Bucharest', label: 'UTC+2 (EET/Bucharest)', offset: 2 },
+		{ value: 'UTC+3', label: 'UTC+3 (MSK)', offset: 3 },
+		{ value: 'UTC+4', label: 'UTC+4', offset: 4 }
 	];
 
 	// Selected timezone for display
 	let selectedTimezone = 'Europe/Bucharest';
+	let mounted = false;
 
 	// Save timezone preference when changed
 	function handleTimezoneChange() {
 		if (typeof window !== 'undefined') {
 			localStorage.setItem(`timezone_location_${locationId}`, selectedTimezone);
 		}
-		updateChart();
+		// Update chart with existing data (don't fetch new data)
+		updateChart(true);
 	}
 
 	// Convert time to selected timezone
@@ -150,26 +162,45 @@
 	}
 
 	// Format labels based on selected timezone
-	function formatLabelsForTimezone(labels: string[], fromOffset: number = 2): string[] {
+	function formatLabelsForTimezone(labels: string[], fromOffset: number = 0): string[] {
 		const selectedTz = availableTimezones.find(tz => tz.value === selectedTimezone);
 		if (!selectedTz) return labels;
 
 		const offsetDiff = selectedTz.offset - fromOffset;
 
+		if (offsetDiff === 0) return labels; // No change needed
+
 		return labels.map(label => {
-			// Parse the time from the label
-			const [time, period] = label.split(' ');
-			const [hours, minutes] = time.split(':').map(Number);
-			let hour24 = hours;
-			if (period === 'PM' && hours !== 12) hour24 += 12;
-			if (period === 'AM' && hours === 12) hour24 = 0;
+			let hour24 = 0;
+			let minutes = 0;
+
+			// Handle different label formats
+			if (label.includes(':')) {
+				if (label.includes(' ')) {
+					// 12-hour format with AM/PM (e.g., "02:00 PM")
+					const [time, period] = label.split(' ');
+					const [h, m] = time.split(':').map(Number);
+					hour24 = h;
+					minutes = m || 0;
+					if (period === 'PM' && hour24 !== 12) hour24 += 12;
+					if (period === 'AM' && hour24 === 12) hour24 = 0;
+				} else {
+					// 24-hour format (e.g., "14:00")
+					const [h, m] = label.split(':').map(Number);
+					hour24 = h;
+					minutes = m || 0;
+				}
+			} else {
+				// Not a time label, return as is
+				return label;
+			}
 
 			// Apply timezone offset
 			let newHour = hour24 + offsetDiff;
 
 			// Handle day boundaries
-			if (newHour < 0) newHour += 24;
-			if (newHour >= 24) newHour -= 24;
+			while (newHour < 0) newHour += 24;
+			while (newHour >= 24) newHour -= 24;
 
 			// Format back to 12-hour format
 			const isPM = newHour >= 12;
@@ -178,6 +209,48 @@
 
 			return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
 		});
+	}
+
+	// Check which parameters have data available
+	async function checkDataAvailability() {
+		try {
+			// Define which parameters to check (map component param to API param)
+			const paramMapping = {
+				'shortwave_radiation': 'ghi',
+				'direct_radiation': 'dni',
+				'diffuse_radiation': 'dhi',
+				'global_tilted_irradiance': 'gti',
+				'temperature_2m': 'temperature',
+				'cloud_cover': 'cloudCover',
+				'wind_speed_10m': 'windSpeed',
+				'wind_speed_100m': 'windSpeed',
+				'relative_humidity_2m': 'humidity',
+				'surface_pressure': 'pressure',
+				'cloud_cover_low': 'cloudCover',
+				'cloud_cover_mid': 'cloudCover',
+				'cloud_cover_high': 'cloudCover'
+			};
+
+			// Parameters we know have data from the database
+			const knownAvailable = [
+				'shortwave_radiation',  // GHI
+				'direct_radiation',      // DNI
+				'diffuse_radiation',     // DHI
+				'temperature_2m',        // Temperature
+				'relative_humidity_2m',  // Humidity
+				'wind_speed_10m',        // Wind Speed
+				'cloud_cover'            // Cloud Cover
+			];
+
+			// Clear and rebuild available parameters set
+			availableParameters.clear();
+			knownAvailable.forEach(param => availableParameters.add(param));
+
+			// Remove any selected parameters that are not available
+			selectedParameters = selectedParameters.filter(param => availableParameters.has(param));
+		} catch (error) {
+			console.error('Error checking data availability:', error);
+		}
 	}
 
 	// Fetch real data from API
@@ -323,22 +396,43 @@
 		return { data, labels, timePoints };
 	}
 
-	async function updateChart() {
+	async function updateChart(skipDataFetch = false) {
 		if (!chartContainer || typeof window === 'undefined') return;
 
-		// Import ECharts dynamically
-		import('echarts').then(async (echarts) => {
-			const chart = echarts.init(chartContainer, 'dark');
+		// Load echarts module once and cache it
+		if (!echartsModule) {
+			echartsModule = await import('echarts');
+		}
 
-			// Fetch real data from API
-			const chartData = await fetchWeatherData(activeTimeRange);
-			const { labels, datasets } = chartData;
+		// Initialize chart instance once and reuse it
+		if (!chartInstance) {
+			chartInstance = echartsModule.init(chartContainer, 'dark');
 
-			// Apply timezone conversion to labels
-			const adjustedLabels = formatLabelsForTimezone(labels, 2); // Romania is UTC+2
+			// Handle window resize
+			const handleResize = () => {
+				if (chartInstance) {
+					chartInstance.resize();
+				}
+			};
+			window.addEventListener('resize', handleResize);
+		}
 
-			// Convert datasets to ECharts series format
-			const series = datasets.map((dataset, index) => {
+		// Use existing data if skipDataFetch is true, otherwise fetch new data
+		let chartData;
+		if (skipDataFetch && forecastData) {
+			chartData = forecastData;
+		} else {
+			chartData = await fetchWeatherData(activeTimeRange);
+			forecastData = chartData; // Store for later use
+		}
+
+		const { labels, datasets } = chartData;
+
+		// Apply timezone conversion to labels (database stores in UTC)
+		const adjustedLabels = formatLabelsForTimezone(labels, 0); // Database is UTC
+
+		// Convert datasets to ECharts series format
+		const series = datasets.map((dataset, index) => {
 				return {
 					name: dataset.label,
 					type: 'line',
@@ -442,17 +536,8 @@
 				series: series
 			};
 
-			chart.setOption(option);
-			
-			// Handle window resize
-			const handleResize = () => chart.resize();
-			window.addEventListener('resize', handleResize);
-			
-			return () => {
-				window.removeEventListener('resize', handleResize);
-				chart.dispose();
-			};
-		});
+		// Set chart options
+		chartInstance.setOption(option);
 	}
 
 	// Handle parameter selection
@@ -486,6 +571,9 @@
 	}
 
 	onMount(async () => {
+		mounted = true;
+		// Check which parameters have data available
+		await checkDataAvailability();
 		// Load saved timezone preference
 		if (typeof window !== 'undefined') {
 			const savedTimezone = localStorage.getItem(`timezone_location_${locationId}`);
@@ -498,14 +586,23 @@
 	});
 
 	// Update chart when container is available and we have data
-	$: if (chartContainer && forecastData) {
-		updateChart();
+	$: if (chartContainer && forecastData && mounted) {
+		updateChart(true); // Use cached data when container/data changes
 	}
 
 	// Update chart when location changes
-	$: if (locationId) {
+	$: if (locationId && mounted) {
 		updateChartData();
 	}
+
+	// Cleanup on destroy
+	onDestroy(() => {
+		if (chartInstance) {
+			chartInstance.dispose();
+			chartInstance = null;
+		}
+		echartsModule = null;
+	});
 </script>
 
 <div class="card-glass">
@@ -548,7 +645,7 @@
 			{/each}
 		</select>
 		<span class="text-xs text-soft-blue/60">
-			Local time: {locations[locationId] || 'Selected Location'} (EET/UTC+2)
+			Location: {locations[locationId] || 'Selected Location'}
 		</span>
 	</div>
 
@@ -559,17 +656,19 @@
 		</label>
 		
 		{#each Object.entries(weatherParameterCategories) as [categoryKey, category]}
-			<div class="mb-4">
-				<h4 class="text-xs font-medium text-soft-blue/60 mb-2 uppercase tracking-wide">{category.name}</h4>
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-					{#each Object.entries(category.parameters) as [key, param]}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-left {selectedParameters.includes(key)
-								? 'border-cyan bg-cyan/10'
-								: 'border-soft-blue/20 bg-glass-white hover:border-cyan/50'}"
-							on:click={() => toggleParameter(key)}
-							disabled={!selectedParameters.includes(key) && selectedParameters.length >= 6}
-						>
+			{@const availableParamsInCategory = Object.entries(category.parameters).filter(([key]) => availableParameters.has(key))}
+			{#if availableParamsInCategory.length > 0}
+				<div class="mb-4">
+					<h4 class="text-xs font-medium text-soft-blue/60 mb-2 uppercase tracking-wide">{category.name}</h4>
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+						{#each availableParamsInCategory as [key, param]}
+							<button
+								class="p-2 rounded-lg border transition-all duration-200 text-left {selectedParameters.includes(key)
+									? 'border-cyan bg-cyan/10'
+									: 'border-soft-blue/20 bg-glass-white hover:border-cyan/50'}"
+								on:click={() => toggleParameter(key)}
+								disabled={!selectedParameters.includes(key) && selectedParameters.length >= 6}
+							>
 							<div class="flex items-center space-x-2">
 								<div 
 									class="w-3 h-3 rounded-full flex-shrink-0" 
@@ -581,9 +680,10 @@
 								</div>
 							</div>
 						</button>
-					{/each}
+						{/each}
+					</div>
 				</div>
-			</div>
+			{/if}
 		{/each}
 	</div>
 
@@ -597,26 +697,37 @@
 	<div class="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
 		{#each selectedParameters as paramKey, index}
 			{@const param = weatherParameters[paramKey]}
-			{@const dataset = forecastData.datasets.find(d => d.label === param.name)}
+			{@const dataset = forecastData.datasets.find(d => {
+				// Try to match by exact label or by parameter name
+				return d.label === param.name ||
+					   d.label === param.key ||
+					   d.label.toLowerCase() === param.name.toLowerCase() ||
+					   (d.label === 'Solar Radiation' && paramKey === 'shortwave_radiation') ||
+					   (d.label === 'Temperature' && paramKey === 'temperature_2m') ||
+					   (d.label === 'Cloud Coverage' && paramKey === 'cloud_cover');
+			})}
 			{@const now = new Date()}
 			{@const currentTimeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
 			{@const currentIndex = originalLabels.findIndex(label => label === currentTimeLabel)}
 			{@const validIndex = currentIndex >= 0 ? currentIndex : Math.min(now.getHours(), (originalLabels.length - 1))}
 			{@const currentValue = (() => {
-				if (!dataset?.data) return 0;
+				if (!dataset?.data) {
+					console.warn(`No dataset found for ${paramKey}:`, param.name);
+					return 0;
+				}
 
-				// Special handling for Solar Radiation parameters
+				// Special handling for Solar Radiation parameters (GHI, DNI, DHI, GTI)
 				if (['shortwave_radiation', 'direct_radiation', 'diffuse_radiation', 'global_tilted_irradiance'].includes(paramKey)) {
-					// Get all non-null values
+					// Get all non-null, non-zero values
 					const nonNullValues = dataset.data.filter(val => val !== null && val !== undefined && val > 0);
 					if (nonNullValues.length === 0) return 0;
 
-					// Sort values in descending order and get top 10
+					// Sort values in descending order and get top 12
 					const sortedValues = nonNullValues.sort((a, b) => b - a);
-					const top10Values = sortedValues.slice(0, 10);
+					const top12Values = sortedValues.slice(0, 12);
 
-					// Return average of top 10 values
-					return top10Values.reduce((sum, val) => sum + val, 0) / top10Values.length;
+					// Return average of top 12 values
+					return top12Values.reduce((sum, val) => sum + val, 0) / top12Values.length;
 				}
 
 				// For other parameters, use current time value

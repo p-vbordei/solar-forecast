@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	
 	export let locationId: number = 1;
 
@@ -45,26 +45,44 @@
 		const offsetDiff = selectedTz.offset - fromOffset;
 
 		return labels.map(label => {
-			// Parse the time from the label
-			const [time, period] = label.split(' ');
-			const [hours, minutes] = time.split(':').map(Number);
-			let hour24 = hours;
-			if (period === 'PM' && hours !== 12) hour24 += 12;
-			if (period === 'AM' && hours === 12) hour24 = 0;
+			// Handle different label formats
+			if (label.includes(':')) {
+				// Time format (e.g., "14:00" or "02:00 PM")
+				let hour24: number;
+				let minutes = 0;
 
-			// Apply timezone offset
-			let newHour = hour24 + offsetDiff;
+				if (label.includes(' ')) {
+					// 12-hour format with AM/PM
+					const [time, period] = label.split(' ');
+					const [hours, mins] = time.split(':').map(Number);
+					minutes = mins || 0;
+					hour24 = hours;
+					if (period === 'PM' && hours !== 12) hour24 += 12;
+					if (period === 'AM' && hours === 12) hour24 = 0;
+				} else {
+					// 24-hour format
+					const [hours, mins] = label.split(':').map(Number);
+					hour24 = hours;
+					minutes = mins || 0;
+				}
 
-			// Handle day boundaries
-			if (newHour < 0) newHour += 24;
-			if (newHour >= 24) newHour -= 24;
+				// Apply timezone offset
+				let newHour = hour24 + offsetDiff;
 
-			// Format back to 12-hour format
-			const isPM = newHour >= 12;
-			let hour12 = newHour % 12;
-			if (hour12 === 0) hour12 = 12;
+				// Handle day boundaries
+				if (newHour < 0) newHour += 24;
+				if (newHour >= 24) newHour -= 24;
 
-			return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+				// Format back to 12-hour format
+				const isPM = newHour >= 12;
+				let hour12 = newHour % 12;
+				if (hour12 === 0) hour12 = 12;
+
+				return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
+			} else {
+				// Date format, return as-is
+				return label;
+			}
 		});
 	}
 
@@ -226,6 +244,8 @@
 		updateChart();
 	}
 
+	let chartInstance: any = null;
+
 	async function updateChart() {
 		if (!chartContainer || typeof window === 'undefined' || !forecastData) {
 			console.log('Chart update skipped:', {
@@ -239,7 +259,14 @@
 		// Import ECharts dynamically
 		import('echarts').then(async (echarts) => {
 			console.log('Initializing chart with data:', forecastData);
-			const chart = echarts.init(chartContainer, 'dark');
+
+			// Dispose existing chart if it exists
+			if (chartInstance) {
+				chartInstance.dispose();
+			}
+
+			// Initialize new chart
+			chartInstance = echarts.init(chartContainer, 'dark');
 
 			// Use the already fetched data
 			const { labels, datasets } = forecastData;
@@ -353,16 +380,23 @@
 			};
 
 			console.log('Setting chart options:', { option, series: series.length, labels: adjustedLabels.length });
-			chart.setOption(option);
-			
+			chartInstance.setOption(option);
+
 			// Handle window resize
-			const handleResize = () => chart.resize();
-			window.addEventListener('resize', handleResize);
-			
-			return () => {
-				window.removeEventListener('resize', handleResize);
-				chart.dispose();
+			const handleResize = () => {
+				if (chartInstance) {
+					chartInstance.resize();
+				}
 			};
+			window.addEventListener('resize', handleResize);
+
+			// Store resize handler for cleanup
+			if (typeof window !== 'undefined') {
+				if ((window as any).resizeHandler) {
+					window.removeEventListener('resize', (window as any).resizeHandler);
+				}
+				(window as any).resizeHandler = handleResize;
+			}
 		});
 	}
 
@@ -402,7 +436,7 @@
 	});
 
 	// Update chart when container is available and we have data
-	$: if (chartContainer && forecastData && typeof window !== 'undefined') {
+	$: if (chartContainer && forecastData && typeof window !== 'undefined' && mounted) {
 		updateChart();
 	}
 
@@ -410,6 +444,17 @@
 	$: if (mounted && locationId) {
 		updateChartData();
 	}
+
+	// Cleanup on destroy
+	onDestroy(() => {
+		if (chartInstance) {
+			chartInstance.dispose();
+			chartInstance = null;
+		}
+		if (typeof window !== 'undefined' && (window as any).resizeHandler) {
+			window.removeEventListener('resize', (window as any).resizeHandler);
+		}
+	});
 </script>
 
 <div class="card-glass">
