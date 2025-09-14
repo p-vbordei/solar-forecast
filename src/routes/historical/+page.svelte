@@ -396,209 +396,9 @@
 		<p class="text-soft-blue/60 mt-2">Upload and analyze historical solar production data with forecast comparison</p>
 	</div>
 
-	<!-- Chart Section -->
-	<div class="card-glass">
-		<div class="h-96 w-full">
-			<div bind:this={chartContainer} class="h-full w-full"></div>
-		</div>
-		
-		<!-- Export Controls -->
-		<div class="mt-4 pt-4 border-t border-soft-blue/20">
-			<div class="flex flex-wrap gap-3">
-				<button on:click={exportCSV} class="btn btn-secondary text-sm">
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
-					</svg>
-					Export CSV
-				</button>
-				<button on:click={exportExcel} class="btn btn-secondary text-sm">
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-					</svg>
-					Export Excel
-				</button>
-				<button on:click={exportPDF} class="btn btn-secondary text-sm">
-					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-					</svg>
-					Export PDF
-				</button>
-			</div>
-		</div>
-	</div>
-
-	<!-- Controls -->
-	<div class="card-glass">
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- Location Selection -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Location</label>
-				<div class="grid grid-cols-2 gap-2">
-					{#each availableLocations as location}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-left {selectedLocation === location
-								? 'border-cyan bg-cyan/10 text-cyan'
-								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
-							on:click={() => handleLocationChange(location)}
-						>
-							<div class="font-medium text-sm capitalize">{location === 'all' ? 'All Locations' : location}</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Time Aggregation -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Time Aggregation</label>
-				<div class="grid grid-cols-4 gap-2">
-					{#each [
-						{ key: '15min', label: '15 Minutes', icon: 'M12 6V2m8 10h4M6 12H2m15.364-6.364l2.828-2.828M6.343 6.343L3.515 3.515m12.728 12.728l2.828 2.828M6.343 17.657l-2.828 2.828M12 8a4 4 0 100 8 4 4 0 000-8z' },
-						{ key: 'hourly', label: 'Hourly', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-						{ key: 'daily', label: 'Daily', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-						{ key: 'weekly', label: 'Weekly', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' }
-					] as agg}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-center {selectedAggregation === agg.key
-								? 'border-cyan bg-cyan/10 text-cyan'
-								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
-							on:click={() => handleAggregationChange(agg.key)}
-						>
-							<svg class="w-5 h-5 mb-1 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{agg.icon}"></path>
-							</svg>
-							<div class="text-xs font-medium">{agg.label}</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Template Generator -->
-	<TemplateGenerator />
-
-	<!-- Upload Section -->
-	<div class="card-glass">
-		<div class="flex items-center justify-between mb-4">
-			<h3 class="text-lg font-semibold text-soft-blue">Data Upload</h3>
-			<div class="text-sm text-soft-blue/60">
-				Supported formats: CSV (use template above)
-			</div>
-		</div>
-		
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- File Upload -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Upload Historical Data</label>
-				<div class="border-2 border-dashed border-soft-blue/30 rounded-lg p-6 text-center hover:border-cyan/50 transition-colors">
-					<input 
-						type="file" 
-						accept=".csv"
-						bind:this={fileInput}
-						on:change={handleFileUpload}
-						class="hidden"
-					/>
-					<button 
-						on:click={() => fileInput?.click()}
-						class="btn btn-primary"
-						disabled={isUploading}
-					>
-						{#if isUploading}
-							Uploading...
-						{:else}
-							<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-							</svg>
-							Upload CSV File
-						{/if}
-					</button>
-					<p class="text-sm text-soft-blue/60 mt-2">
-						Upload CSV file generated from template above, or custom format with: datetime, location, production, forecast
-					</p>
-					{#if uploadError}
-						<p class="text-alert-red text-sm mt-2">{uploadError}</p>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Data Summary -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Data Summary</label>
-				<div class="bg-glass-white rounded-lg p-4 space-y-3">
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Total Records:</span>
-						<span class="text-soft-blue font-mono">{uploadedData.length}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Locations:</span>
-						<span class="text-soft-blue font-mono">{availableLocations.length - 1}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-soft-blue/70">Date Range:</span>
-						<span class="text-soft-blue font-mono text-xs">
-							{#if uploadedData.length > 0}
-								{new Date(uploadedData[0].datetime).toLocaleDateString()} - 
-								{new Date(uploadedData[uploadedData.length - 1].datetime).toLocaleDateString()}
-							{:else}
-								No data
-							{/if}
-						</span>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Controls -->
-	<div class="card-glass">
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			<!-- Location Selection -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Location</label>
-				<div class="grid grid-cols-2 gap-2">
-					{#each availableLocations as location}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-left {selectedLocation === location
-								? 'border-cyan bg-cyan/10 text-cyan'
-								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
-							on:click={() => handleLocationChange(location)}
-						>
-							<div class="font-medium text-sm capitalize">{location === 'all' ? 'All Locations' : location}</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Time Aggregation -->
-			<div>
-				<label class="block text-sm font-medium text-soft-blue mb-2">Time Aggregation</label>
-				<div class="grid grid-cols-4 gap-2">
-					{#each [
-						{ key: '15min', label: '15 Minutes', icon: 'M12 6V2m8 10h4M6 12H2m15.364-6.364l2.828-2.828M6.343 6.343L3.515 3.515m12.728 12.728l2.828 2.828M6.343 17.657l-2.828 2.828M12 8a4 4 0 100 8 4 4 0 000-8z' },
-						{ key: 'hourly', label: 'Hourly', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-						{ key: 'daily', label: 'Daily', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-						{ key: 'weekly', label: 'Weekly', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' }
-					] as agg}
-						<button
-							class="p-2 rounded-lg border transition-all duration-200 text-center {selectedAggregation === agg.key
-								? 'border-cyan bg-cyan/10 text-cyan'
-								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
-							on:click={() => handleAggregationChange(agg.key)}
-						>
-							<svg class="w-5 h-5 mb-1 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{agg.icon}"></path>
-							</svg>
-							<div class="text-xs font-medium">{agg.label}</div>
-						</button>
-					{/each}
-				</div>
-			</div>
-		</div>
-	</div>
-
 	<!-- Understanding Historical Data -->
 	<div class="card-glass">
-		<button 
+		<button
 			on:click={() => showExplanation = !showExplanation}
 			class="flex items-center justify-between w-full text-left"
 		>
@@ -619,7 +419,7 @@
 				</svg>
 			</div>
 		</button>
-		
+
 		{#if showExplanation}
 			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-6">
 				<!-- Data Upload Guide -->
@@ -648,7 +448,7 @@
 									<li>• Download the generated template</li>
 								</ul>
 							</div>
-							
+
 							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
 								<div class="flex items-center space-x-2 mb-2">
 									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">2</div>
@@ -663,7 +463,7 @@
 								</ul>
 							</div>
 						</div>
-						
+
 						<div class="space-y-4">
 							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
 								<div class="flex items-center space-x-2 mb-2">
@@ -678,7 +478,7 @@
 									<li>• Check for any upload errors</li>
 								</ul>
 							</div>
-							
+
 							<div class="bg-dark-petrol/60 rounded-lg p-4 border border-cyan/30">
 								<div class="flex items-center space-x-2 mb-2">
 									<div class="w-6 h-6 bg-cyan rounded-full flex items-center justify-center text-dark-petrol font-bold text-sm">4</div>
@@ -914,5 +714,176 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Controls -->
+	<div class="card-glass">
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<!-- Location Selection -->
+			<div>
+				<label class="block text-sm font-medium text-soft-blue mb-2">Location</label>
+				<div class="grid grid-cols-2 gap-2">
+					{#each availableLocations as location}
+						<button
+							class="p-2 rounded-lg border transition-all duration-200 text-left {selectedLocation === location
+								? 'border-cyan bg-cyan/10 text-cyan'
+								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
+							on:click={() => handleLocationChange(location)}
+						>
+							<div class="font-medium text-sm capitalize">{location === 'all' ? 'All Locations' : location}</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Time Aggregation -->
+			<div>
+				<label class="block text-sm font-medium text-soft-blue mb-2">Time Aggregation</label>
+				<div class="grid grid-cols-4 gap-2">
+					{#each [
+						{ key: '15min', label: '15 Minutes', icon: 'M12 6V2m8 10h4M6 12H2m15.364-6.364l2.828-2.828M6.343 6.343L3.515 3.515m12.728 12.728l2.828 2.828M6.343 17.657l-2.828 2.828M12 8a4 4 0 100 8 4 4 0 000-8z' },
+						{ key: 'hourly', label: 'Hourly', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+						{ key: 'daily', label: 'Daily', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+						{ key: 'weekly', label: 'Weekly', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' }
+					] as agg}
+						<button
+							class="p-2 rounded-lg border transition-all duration-200 text-center {selectedAggregation === agg.key
+								? 'border-cyan bg-cyan/10 text-cyan'
+								: 'border-soft-blue/20 bg-glass-white text-soft-blue hover:border-cyan/50 hover:text-cyan'}"
+							on:click={() => handleAggregationChange(agg.key)}
+						>
+							<svg class="w-5 h-5 mb-1 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{agg.icon}"></path>
+							</svg>
+							<div class="text-xs font-medium">{agg.label}</div>
+						</button>
+					{/each}
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Chart Section -->
+	<div class="card-glass">
+		<div class="h-96 w-full">
+			<div bind:this={chartContainer} class="h-full w-full"></div>
+		</div>
+		
+		<!-- Export Controls -->
+		<div class="mt-4 pt-4 border-t border-soft-blue/20">
+			<div class="flex flex-wrap gap-3">
+				<button on:click={exportCSV} class="btn btn-secondary text-sm">
+					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+					</svg>
+					Export CSV
+				</button>
+				<button on:click={exportExcel} class="btn btn-secondary text-sm">
+					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+					</svg>
+					Export Excel
+				</button>
+				<button on:click={exportPDF} class="btn btn-secondary text-sm">
+					<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+					</svg>
+					Export PDF
+				</button>
+			</div>
+		</div>
+	</div>
+
+
+	<!-- Template Generator -->
+	<TemplateGenerator />
+
+	<!-- Upload Section -->
+	<div class="card-glass">
+		<div class="flex items-center justify-between mb-4">
+			<h3 class="text-lg font-semibold text-soft-blue">Data Upload</h3>
+			<div class="text-sm text-soft-blue/60">
+				Supported formats: CSV (use template above)
+			</div>
+		</div>
+		
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			<!-- File Upload -->
+			<div>
+				<label class="block text-sm font-medium text-soft-blue mb-2">Upload Historical Data</label>
+				<div class="border-2 border-dashed border-soft-blue/30 rounded-lg p-6 text-center hover:border-cyan/50 transition-colors">
+					<input 
+						type="file" 
+						accept=".csv"
+						bind:this={fileInput}
+						on:change={handleFileUpload}
+						class="hidden"
+					/>
+					<button 
+						on:click={() => fileInput?.click()}
+						class="btn btn-primary"
+						disabled={isUploading}
+					>
+						{#if isUploading}
+							Uploading...
+						{:else}
+							<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+							</svg>
+							Upload CSV File
+						{/if}
+					</button>
+					<p class="text-sm text-soft-blue/60 mt-2">
+						Upload CSV file generated from template above, or custom format with: datetime, location, production, forecast
+					</p>
+					{#if uploadError}
+						<p class="text-alert-red text-sm mt-2">{uploadError}</p>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Data Summary -->
+			<div>
+				<label class="block text-sm font-medium text-soft-blue mb-2">Data Summary</label>
+				<div class="bg-glass-white rounded-lg p-4 space-y-3">
+					<div class="flex justify-between">
+						<span class="text-soft-blue/70">Total Records With Timestamps:</span>
+						<span class="text-soft-blue font-mono">{uploadedData.length > 0 ? uploadedData.length : 'N/A'}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-soft-blue/70">De-Identified Locations:</span>
+						<span class="text-soft-blue font-mono">{availableLocations.length > 1 ? availableLocations.length - 1 : 'N/A'}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-soft-blue/70">Data Type:</span>
+						<span class="text-soft-blue font-mono">
+							{#if uploadedData.length > 0}
+								{#if uploadedData[0].production !== undefined}
+									Production
+								{:else if uploadedData[0].forecast !== undefined}
+									Forecast
+								{:else}
+									Weather
+								{/if}
+							{:else}
+								N/A
+							{/if}
+						</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-soft-blue/70">Date Range:</span>
+						<span class="text-soft-blue font-mono">
+							{#if uploadedData.length > 0}
+								{new Date(uploadedData[0].datetime).toLocaleDateString()} -
+								{new Date(uploadedData[uploadedData.length - 1].datetime).toLocaleDateString()}
+							{:else}
+								N/A
+							{/if}
+						</span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
 
 </div>
