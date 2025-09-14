@@ -1,64 +1,46 @@
 import { reportRepository } from '../repositories/report.repository';
+import ExcelJS from 'exceljs';
 
 export interface ReportParameters {
-  reportType: string;
+  reportType: 'forecast_d1_plus_5';
   startDate: string;
   endDate: string;
+  locationIds: string[];
+  dataAggregation: '15min' | '1hour' | '1week' | '1month';
+  timezone: string; // UTC-2 to UTC+4
   format?: string;
-  locationId?: string;
-  plantId?: string;
-  filters?: any;
 }
 
 class ReportService {
   async generateReport(params: ReportParameters) {
-    const { reportType, startDate, endDate, format, locationId, plantId, filters } = params;
+    const { reportType, startDate, endDate, locationIds, dataAggregation, timezone, format } = params;
 
-    // Fetch data based on report type
-    let reportData: any = {};
-    
-    switch (reportType) {
-      case 'production-summary':
-        reportData = await this.generateProductionSummary(startDate, endDate, locationId);
-        break;
-      case 'efficiency-analysis':
-        reportData = await this.generateEfficiencyAnalysis(startDate, endDate, locationId, plantId);
-        break;
-      case 'forecast-accuracy':
-        reportData = await this.generateForecastAccuracy(startDate, endDate, locationId);
-        break;
-      case 'maintenance-report':
-        reportData = await this.generateMaintenanceReport(startDate, endDate, locationId, plantId);
-        break;
-      case 'financial-summary':
-        reportData = await this.generateFinancialSummary(startDate, endDate, locationId);
-        break;
-      case 'compliance-report':
-        reportData = await this.generateComplianceReport(startDate, endDate, locationId);
-        break;
-      case 'weather-impact':
-        reportData = await this.generateWeatherImpactAnalysis(startDate, endDate, locationId);
-        break;
-      case 'location-comparison':
-        reportData = await this.generateLocationComparison(startDate, endDate);
-        break;
-      default:
-        throw new Error(`Unknown report type: ${reportType}`);
+    // Generate forecast D+1 to D+5 report
+    if (reportType === 'forecast_d1_plus_5') {
+      const reportData = await this.generateForecastD1Plus5(
+        startDate,
+        endDate,
+        locationIds,
+        dataAggregation,
+        timezone
+      );
+
+      // Save report metadata
+      await reportRepository.saveReportMetadata({
+        reportType,
+        startDate,
+        endDate,
+        format: format || 'excel',
+        locationId: locationIds[0], // Use first location for compatibility
+        plantId: undefined,
+        generatedAt: new Date(),
+        status: 'completed'
+      });
+
+      return reportData;
     }
 
-    // Save report metadata
-    await reportRepository.saveReportMetadata({
-      reportType,
-      startDate,
-      endDate,
-      format: format || 'json',
-      locationId,
-      plantId,
-      generatedAt: new Date(),
-      status: 'completed'
-    });
-
-    return reportData;
+    throw new Error(`Unknown report type: ${reportType}`);
   }
 
   async generatePDFReport(params: ReportParameters): Promise<Buffer> {
@@ -84,7 +66,7 @@ class ReportService {
     if (params.format === 'csv') {
       return this.convertToCSV(reportData);
     } else if (params.format === 'excel') {
-      return this.convertToExcel(reportData);
+      return await this.convertToExcel(reportData);
     } else {
       return this.generatePDFReport(params);
     }
@@ -108,153 +90,131 @@ class ReportService {
     }));
   }
 
-  private async generateProductionSummary(startDate: string, endDate: string, locationId?: string) {
-    const data = await reportRepository.getProductionData(startDate, endDate, locationId);
-    
+  private async generateForecastD1Plus5(
+    startDate: string,
+    endDate: string,
+    locationIds: string[],
+    dataAggregation: '15min' | '1hour' | '1week' | '1month',
+    timezone: string
+  ) {
+    // Mock data generation following the Maghebo Solar FC structure
+    const location = await this.getMockLocationData(locationIds[0]);
+
     return {
-      reportType: 'production-summary',
-      period: { startDate, endDate },
-      locationId,
+      reportType: 'forecast_d1_plus_5',
+      generatedAt: new Date().toISOString(),
       summary: {
-        totalProduction: data.totalProduction || 0,
-        averageDailyProduction: data.averageDailyProduction || 0,
-        peakProduction: data.peakProduction || 0,
-        capacityFactor: data.capacityFactor || 0,
-        totalRecords: data.totalRecords || 0
+        reportTitle: `${location.name} Solar Forecast Report`,
+        generatedAt: new Date().toLocaleString('en-US', { timeZone: this.mapTimezoneToStandard(timezone) }),
+        locationInfo: {
+          plantName: location.name,
+          capacity: location.capacity,
+          location: {
+            latitude: location.coordinates.latitude,
+            longitude: location.coordinates.longitude
+          },
+          timezone: timezone
+        },
+        period: { startDate, endDate },
+        dataAggregation,
+        locationIds
       },
-      details: data.details || []
+      hourlyForecast: this.generateMockHourlyForecast(startDate, endDate, dataAggregation, timezone),
+      detailedForecast: this.generateMockDetailedForecast(startDate, endDate, dataAggregation, timezone)
     };
   }
 
-  private async generateEfficiencyAnalysis(startDate: string, endDate: string, locationId?: string, plantId?: string) {
-    const data = await reportRepository.getEfficiencyData(startDate, endDate, locationId, plantId);
-    
+  private async getMockLocationData(locationId: string) {
+    // Mock location data - replace with real data in next phase
     return {
-      reportType: 'efficiency-analysis',
-      period: { startDate, endDate },
-      locationId,
-      plantId,
-      summary: {
-        averageEfficiency: data.averageEfficiency || 0,
-        peakEfficiency: data.peakEfficiency || 0,
-        performanceRatio: data.performanceRatio || 0,
-        degradationRate: data.degradationRate || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      details: data.details || []
+      id: locationId,
+      name: 'SC Maghebo SRL',
+      capacity: '870 kW (0.87 MW)',
+      coordinates: {
+        latitude: 47.5291042,
+        longitude: 25.5794844
+      }
     };
   }
 
-  private async generateForecastAccuracy(startDate: string, endDate: string, locationId?: string) {
-    const data = await reportRepository.getForecastAccuracyData(startDate, endDate, locationId);
-    
-    return {
-      reportType: 'forecast-accuracy',
-      period: { startDate, endDate },
-      locationId,
-      summary: {
-        mape: data.mape || 0, // Mean Absolute Percentage Error
-        rmse: data.rmse || 0, // Root Mean Square Error
-        accuracyPercentage: data.accuracyPercentage || 0,
-        totalForecasts: data.totalForecasts || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      details: data.details || []
-    };
+  private generateMockHourlyForecast(startDate: string, endDate: string, aggregation: string, timezone: string) {
+    const data = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Generate hourly intervals (similar to "Hourly Forecast" sheet)
+    let current = new Date(start);
+    let interval = 1;
+
+    while (current <= end) {
+      const hour = current.getHours();
+      const powerMw = hour >= 6 && hour <= 18 ? Math.random() * 0.87 : 0; // Solar production during daylight
+
+      data.push({
+        timestamp: current.toISOString(),
+        year: current.getFullYear(),
+        month: current.getMonth() + 1,
+        day: current.getDate(),
+        hourStart: hour,
+        hourEnd: (hour + 1) % 24,
+        dayEnd: hour === 23 ? current.getDate() + 1 : current.getDate(),
+        interval: interval++,
+        powerMw: Number(powerMw.toFixed(3)),
+        energyMwh: Number((powerMw * 1).toFixed(3)), // 1 hour * powerMw
+        q10: Number((powerMw * 0.8).toFixed(3)),
+        q25: Number((powerMw * 0.9).toFixed(3)),
+        q50: Number(powerMw.toFixed(3)),
+        q75: Number((powerMw * 1.1).toFixed(3)),
+        q90: Number((powerMw * 1.2).toFixed(3))
+      });
+
+      current.setHours(current.getHours() + 1);
+    }
+
+    return data;
   }
 
-  private async generateMaintenanceReport(startDate: string, endDate: string, locationId?: string, plantId?: string) {
-    const data = await reportRepository.getMaintenanceData(startDate, endDate, locationId, plantId);
-    
-    return {
-      reportType: 'maintenance-report',
-      period: { startDate, endDate },
-      locationId,
-      plantId,
-      summary: {
-        totalMaintenanceEvents: data.totalMaintenanceEvents || 0,
-        totalDowntime: data.totalDowntime || 0,
-        averageRepairTime: data.averageRepairTime || 0,
-        availability: data.availability || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      details: data.details || []
-    };
+  private generateMockDetailedForecast(startDate: string, endDate: string, aggregation: string, timezone: string) {
+    const data = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Generate 15-minute intervals (similar to "15 Minutes" sheet)
+    let current = new Date(start);
+
+    while (current <= end) {
+      const hour = current.getHours();
+      const productionMw = hour >= 6 && hour <= 18 ? Math.random() * 0.87 : 0;
+
+      data.push({
+        timestamp: current.toISOString(),
+        productionMw: Number(productionMw.toFixed(3)),
+        energyMwh: Number((productionMw * 0.25).toFixed(3)), // 15 min = 0.25 hour
+        q10: Number((productionMw * 0.8).toFixed(3)),
+        q25: Number((productionMw * 0.9).toFixed(3)),
+        q50: Number(productionMw.toFixed(3)),
+        q75: Number((productionMw * 1.1).toFixed(3)),
+        q90: Number((productionMw * 1.2).toFixed(3))
+      });
+
+      current.setMinutes(current.getMinutes() + 15);
+    }
+
+    return data;
   }
 
-  private async generateFinancialSummary(startDate: string, endDate: string, locationId?: string) {
-    const data = await reportRepository.getFinancialData(startDate, endDate, locationId);
-    
-    return {
-      reportType: 'financial-summary',
-      period: { startDate, endDate },
-      locationId,
-      summary: {
-        totalRevenue: data.totalRevenue || 0,
-        totalCosts: data.totalCosts || 0,
-        netProfit: data.netProfit || 0,
-        roi: data.roi || 0,
-        paybackPeriod: data.paybackPeriod || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      details: data.details || []
+  private mapTimezoneToStandard(timezone: string): string {
+    // Map timezone offset to standard timezone names
+    const timezoneMap: Record<string, string> = {
+      'UTC-2': 'Atlantic/Azores',
+      'UTC-1': 'Atlantic/Cape_Verde',
+      'UTC+0': 'UTC',
+      'UTC+1': 'Europe/London',
+      'UTC+2': 'Europe/Berlin',
+      'UTC+3': 'Europe/Moscow',
+      'UTC+4': 'Asia/Dubai'
     };
-  }
-
-  private async generateComplianceReport(startDate: string, endDate: string, locationId?: string) {
-    const data = await reportRepository.getComplianceData(startDate, endDate, locationId);
-    
-    return {
-      reportType: 'compliance-report',
-      period: { startDate, endDate },
-      locationId,
-      summary: {
-        complianceScore: data.complianceScore || 0,
-        totalAudits: data.totalAudits || 0,
-        passedAudits: data.passedAudits || 0,
-        pendingIssues: data.pendingIssues || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      certifications: data.certifications || [],
-      details: data.details || []
-    };
-  }
-
-  private async generateWeatherImpactAnalysis(startDate: string, endDate: string, locationId?: string) {
-    const data = await reportRepository.getWeatherImpactData(startDate, endDate, locationId);
-    
-    return {
-      reportType: 'weather-impact',
-      period: { startDate, endDate },
-      locationId,
-      summary: {
-        averageIrradiance: data.averageIrradiance || 0,
-        totalSunshineHours: data.totalSunshineHours || 0,
-        weatherDowntime: data.weatherDowntime || 0,
-        performanceImpact: data.performanceImpact || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      weatherPatterns: data.weatherPatterns || [],
-      details: data.details || []
-    };
-  }
-
-  private async generateLocationComparison(startDate: string, endDate: string) {
-    const data = await reportRepository.getLocationComparisonData(startDate, endDate);
-    
-    return {
-      reportType: 'location-comparison',
-      period: { startDate, endDate },
-      summary: {
-        totalLocations: data.totalLocations || 0,
-        bestPerformer: data.bestPerformer || '',
-        worstPerformer: data.worstPerformer || '',
-        averagePerformance: data.averagePerformance || 0,
-        totalRecords: data.totalRecords || 0
-      },
-      locationMetrics: data.locationMetrics || [],
-      rankings: data.rankings || []
-    };
+    return timezoneMap[timezone] || 'UTC';
   }
 
   private convertToCSV(data: any): Buffer {
@@ -279,21 +239,135 @@ class ReportService {
     return Buffer.from(rows.join('\n'));
   }
 
-  private convertToExcel(data: any): Buffer {
-    // For now, return JSON as buffer - in production use a proper Excel library
-    return Buffer.from(JSON.stringify(data, null, 2));
+  private async convertToExcel(data: any): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+
+    // Set workbook properties
+    workbook.creator = 'Solar Forecast Platform';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    // Create Summary sheet (matching original structure)
+    const summarySheet = workbook.addWorksheet('Summary', {
+      properties: { tabColor: { argb: '0FA4AF' } }
+    });
+
+    // Add summary content
+    summarySheet.addRow([data.summary.reportTitle, '']);
+    summarySheet.addRow(['', '']);
+    summarySheet.addRow([`Generated: ${data.summary.generatedAt}`, '']);
+    summarySheet.addRow(['', '']);
+    summarySheet.addRow(['Location Information', '']);
+    summarySheet.addRow(['Plant Name:', data.summary.locationInfo.plantName]);
+    summarySheet.addRow(['Plant Capacity:', data.summary.locationInfo.capacity]);
+    summarySheet.addRow(['Latitude:', data.summary.locationInfo.location.latitude]);
+    summarySheet.addRow(['Longitude:', data.summary.locationInfo.location.longitude]);
+    summarySheet.addRow(['Timezone:', data.summary.locationInfo.timezone]);
+    summarySheet.addRow(['', '']);
+    summarySheet.addRow(['Forecast Period:', `${data.summary.period.startDate} to ${data.summary.period.endDate}`]);
+    summarySheet.addRow(['Data Aggregation:', data.summary.dataAggregation]);
+    summarySheet.addRow(['Location Count:', data.summary.locationIds.length]);
+
+    // Style the summary sheet
+    summarySheet.getRow(1).font = { bold: true, size: 16 };
+    summarySheet.getRow(3).font = { italic: true };
+    summarySheet.getRow(5).font = { bold: true, size: 12 };
+
+    summarySheet.getColumn(1).width = 25;
+    summarySheet.getColumn(2).width = 30;
+
+    // Create Hourly Forecast sheet
+    if (data.hourlyForecast && data.hourlyForecast.length > 0) {
+      const hourlySheet = workbook.addWorksheet('Hourly Forecast', {
+        properties: { tabColor: { argb: '0FA4AF' } }
+      });
+
+      // Add headers
+      const hourlyHeaders = [
+        'timestamp', 'YEAR', 'MONTH', 'DAY', 'HOUR_START', 'HOUR_END',
+        'DAY_END', 'interval', 'power_mw', 'energy_mwh',
+        'q10', 'q25', 'q50', 'q75', 'q90'
+      ];
+
+      const headerRow = hourlySheet.addRow(hourlyHeaders);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5F7F9' }
+      };
+
+      // Add data rows
+      data.hourlyForecast.forEach((row: any) => {
+        hourlySheet.addRow([
+          row.timestamp, row.year, row.month, row.day, row.hourStart,
+          row.hourEnd, row.dayEnd, row.interval, row.powerMw, row.energyMwh,
+          row.q10, row.q25, row.q50, row.q75, row.q90
+        ]);
+      });
+
+      // Auto-fit columns
+      hourlySheet.columns.forEach((column) => {
+        let maxLength = 12;
+        column.eachCell({ includeEmpty: true }, cell => {
+          const columnLength = cell.value ? cell.value.toString().length : 10;
+          if (columnLength > maxLength) {
+            maxLength = columnLength;
+          }
+        });
+        column.width = Math.min(maxLength + 2, 20);
+      });
+    }
+
+    // Create 15 Minutes sheet (based on dataAggregation)
+    if (data.detailedForecast && data.detailedForecast.length > 0) {
+      const detailedSheet = workbook.addWorksheet('15 Minutes', {
+        properties: { tabColor: { argb: '0FA4AF' } }
+      });
+
+      // Add headers
+      const detailedHeaders = [
+        'timestamp', 'production_mw', 'energy_mwh',
+        'q10', 'q25', 'q50', 'q75', 'q90'
+      ];
+
+      const headerRow = detailedSheet.addRow(detailedHeaders);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5F7F9' }
+      };
+
+      // Add data rows
+      data.detailedForecast.forEach((row: any) => {
+        detailedSheet.addRow([
+          row.timestamp, row.productionMw, row.energyMwh,
+          row.q10, row.q25, row.q50, row.q75, row.q90
+        ]);
+      });
+
+      // Auto-fit columns
+      detailedSheet.columns.forEach((column) => {
+        let maxLength = 12;
+        column.eachCell({ includeEmpty: true }, cell => {
+          const columnLength = cell.value ? cell.value.toString().length : 10;
+          if (columnLength > maxLength) {
+            maxLength = columnLength;
+          }
+        });
+        column.width = Math.min(maxLength + 2, 20);
+      });
+    }
+
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   private getReportDisplayName(reportType: string): string {
     const names: Record<string, string> = {
-      'production-summary': 'Production Summary',
-      'efficiency-analysis': 'Efficiency Analysis',
-      'forecast-accuracy': 'Forecast Accuracy',
-      'maintenance-report': 'Maintenance Report',
-      'financial-summary': 'Financial Summary',
-      'compliance-report': 'Compliance Report',
-      'weather-impact': 'Weather Impact Analysis',
-      'location-comparison': 'Location Comparison'
+      'forecast_d1_plus_5': 'Solar Forecast D+1 to D+5'
     };
     return names[reportType] || reportType;
   }

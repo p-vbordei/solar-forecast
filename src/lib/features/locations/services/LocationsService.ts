@@ -317,10 +317,25 @@ export class LocationsService {
     async deleteLocation(locationId: string) {
         // Check if location exists (throws LocationNotFoundError if not found)
         await this.getLocationById(locationId);
-        
+
         // Perform soft delete through repository
         const result = await this.repository.softDelete(locationId);
-        
+
         return result;
+    }
+
+    /**
+     * Get total number of active locations
+     */
+    async getTotalNumberOfLocations(): Promise<number> {
+        // Build where clause for active locations only (business logic)
+        const whereConditions = {
+            status: LocationStatus.ACTIVE
+        };
+
+        // Get count from repository
+        const count = await this.repository.count(whereConditions);
+
+        return count;
     }
 }

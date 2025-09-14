@@ -21,6 +21,10 @@ export const swaggerSpec = {
   ],
   tags: [
     {
+      name: 'Dashboard',
+      description: 'Dashboard statistics and metrics'
+    },
+    {
       name: 'Locations',
       description: 'Solar panel location management'
     },
@@ -31,9 +35,50 @@ export const swaggerSpec = {
     {
       name: 'Health',
       description: 'System health monitoring and diagnostics'
+    },
+    {
+      name: 'Reports',
+      description: 'Report generation and management'
     }
   ],
   paths: {
+    '/api/dashboard': {
+      get: {
+        tags: ['Dashboard'],
+        summary: 'Get dashboard statistics',
+        description: 'Retrieve real-time dashboard metrics including active locations, total capacity, solar power, and current temperature',
+        responses: {
+          200: {
+            description: 'Dashboard statistics retrieved successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    data: { $ref: '#/components/schemas/DashboardStats' }
+                  }
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Internal server error',
+                  details: 'Failed to retrieve dashboard statistics',
+                  code: 'INTERNAL_ERROR'
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     '/api/locations': {
       get: {
         tags: ['Locations'],
@@ -732,6 +777,146 @@ export const swaggerSpec = {
           }
         }
       }
+    },
+    '/api/reports/{id}': {
+      get: {
+        tags: ['Reports'],
+        summary: 'Download a report',
+        description: 'Download a generated report by its GUID',
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            description: 'The GUID of the report to download',
+            required: true,
+            schema: {
+              type: 'string',
+              format: 'uuid'
+            },
+            example: '789a0123-b456-78c9-d012-345678901234'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Report downloaded successfully',
+            content: {
+              'application/pdf': {
+                schema: {
+                  type: 'string',
+                  format: 'binary'
+                }
+              },
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+                schema: {
+                  type: 'string',
+                  format: 'binary'
+                }
+              },
+              'text/csv': {
+                schema: {
+                  type: 'string',
+                  format: 'binary'
+                }
+              }
+            }
+          },
+          400: {
+            description: 'Bad request - Missing report ID',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          404: {
+            description: 'Report not found',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/api/reports/generate': {
+      post: {
+        tags: ['Reports'],
+        summary: 'Generate a new report',
+        description: 'Generate a new report in Excel format',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/GenerateReportRequest' },
+              example: {
+                reportType: 'forecast_d1_plus_5',
+                startDate: '2024-01-01',
+                endDate: '2024-01-06',
+                locationIds: ['123e4567-e89b-12d3-a456-426614174000'],
+                dataAggregation: '15min',
+                timezone: 'UTC+2'
+              }
+            }
+          }
+        },
+        responses: {
+          200: {
+            description: 'Report generated successfully in Excel format',
+            content: {
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+                schema: {
+                  type: 'string',
+                  format: 'binary'
+                }
+              }
+            }
+          },
+          400: {
+            description: 'Bad request - Invalid parameters',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Start date must be before end date',
+                  code: 'BAD_REQUEST'
+                }
+              }
+            }
+          },
+          422: {
+            description: 'Validation error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' },
+                example: {
+                  success: false,
+                  error: 'Invalid report type',
+                  field: 'reportType',
+                  code: 'VALIDATION_ERROR'
+                }
+              }
+            }
+          },
+          500: {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ErrorResponse' }
+              }
+            }
+          }
+        }
+      }
     }
   },
   components: {
@@ -1230,6 +1415,83 @@ export const swaggerSpec = {
                 }
               }
             }
+          }
+        }
+      },
+      DashboardStats: {
+        type: 'object',
+        required: ['activeLocations', 'totalCapacityMW', 'currentSolarPowerWM2', 'currentTemperatureC', 'lastUpdated'],
+        properties: {
+          activeLocations: {
+            type: 'integer',
+            description: 'Number of active solar locations',
+            example: 42
+          },
+          totalCapacityMW: {
+            type: 'number',
+            description: 'Total capacity across all locations in megawatts',
+            example: 125.4
+          },
+          currentSolarPowerWM2: {
+            type: 'number',
+            description: 'Current solar irradiance in watts per square meter',
+            example: 850
+          },
+          currentTemperatureC: {
+            type: 'number',
+            description: 'Current temperature in Celsius',
+            example: 22
+          },
+          lastUpdated: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Timestamp when the statistics were last updated',
+            example: '2024-09-14T12:53:41.000Z'
+          }
+        }
+      },
+      GenerateReportRequest: {
+        type: 'object',
+        required: ['reportType', 'startDate', 'endDate', 'locationIds', 'dataAggregation', 'timezone'],
+        properties: {
+          reportType: {
+            type: 'string',
+            description: 'Type of report to generate',
+            enum: ['forecast_d1_plus_5'],
+            example: 'forecast_d1_plus_5'
+          },
+          startDate: {
+            type: 'string',
+            format: 'date',
+            description: 'Start date for the forecast period',
+            example: '2024-01-01'
+          },
+          endDate: {
+            type: 'string',
+            format: 'date',
+            description: 'End date for the forecast period',
+            example: '2024-01-06'
+          },
+          locationIds: {
+            type: 'array',
+            items: {
+              type: 'string',
+              format: 'uuid'
+            },
+            description: 'Array of location GUIDs to include in the forecast',
+            example: ['123e4567-e89b-12d3-a456-426614174000', '456e7890-a12b-34c5-d678-901234567890']
+          },
+          dataAggregation: {
+            type: 'string',
+            enum: ['15min', '1hour', '1week', '1month'],
+            description: 'Data aggregation level',
+            example: '15min'
+          },
+          timezone: {
+            type: 'string',
+            enum: ['UTC-2', 'UTC-1', 'UTC+0', 'UTC+1', 'UTC+2', 'UTC+3', 'UTC+4'],
+            description: 'Timezone for the forecast data',
+            example: 'UTC+2'
           }
         }
       },
