@@ -110,12 +110,12 @@
 	let validatedData: any[] = [];
 
 	// Expected CSV template structure based on actual template
-	const expectedColumns = ['timestamp', 'production', 'capacity_factor', 'availability'];
+	const expectedColumns = ['timestamp', 'production (powerMw)', 'capacity_factor', 'availability'];
 
 	function validateCSVStructure(headers: string[]) {
 		const normalizedHeaders = headers.map(h => h.toLowerCase().trim());
 		const missingColumns = expectedColumns.filter(col =>
-			!normalizedHeaders.includes(col)
+			!normalizedHeaders.includes(col.toLowerCase())
 		);
 
 		return {
@@ -140,15 +140,15 @@
 		}
 
 		// Validate production value
-		const production = row.production;
+		const production = row['production (powerMw)'] || row.production;
 		if (production === null || production === undefined || production === '') {
-			errors.push(`Row ${index + 2}: Missing production value`);
+			errors.push(`Row ${index + 2}: Missing production (powerMw) value`);
 		} else {
 			const prodNum = parseFloat(production);
 			if (isNaN(prodNum)) {
-				errors.push(`Row ${index + 2}: Invalid production value "${production}". Must be a decimal number`);
+				errors.push(`Row ${index + 2}: Invalid production (powerMw) value "${production}". Must be a decimal number`);
 			} else if (prodNum < 0) {
-				errors.push(`Row ${index + 2}: Production value cannot be negative`);
+				errors.push(`Row ${index + 2}: Production (powerMw) value cannot be negative`);
 			}
 		}
 
@@ -196,10 +196,10 @@
 				const normalizedRow = {
 					datetime: row.timestamp,
 					location: locationName,
-					production: parseFloat(row.production || 0),
+					production: parseFloat(row['production (powerMw)'] || row.production || 0),
 					capacity_factor: parseFloat(row.capacity_factor || 0),
 					availability: parseFloat(row.availability || 0),
-					forecast: parseFloat(row.production || 0) // Use production as forecast for demo
+					forecast: parseFloat(row['production (powerMw)'] || row.production || 0) // Use production as forecast for demo
 				};
 				processedData.push(normalizedRow);
 			}
@@ -292,7 +292,7 @@
 					const parts = line.split(',').map(p => p.trim());
 
 					// Check if this line contains the data headers
-					if (parts.includes('timestamp') && parts.includes('production')) {
+					if (parts.includes('timestamp') && (parts.includes('production (powerMw)') || parts.includes('production'))) {
 						headerRowIndex = i;
 						headers = parts;
 						break;
@@ -305,7 +305,7 @@
 				}
 
 				if (headerRowIndex === -1) {
-					uploadError = 'Could not find data header row with timestamp and production columns.';
+					uploadError = 'Could not find data header row with timestamp and production (powerMw) columns.';
 					isUploading = false;
 					return;
 				}
@@ -1124,7 +1124,7 @@
 									Drag & drop your CSV file here, or click to browse
 								</p>
 								<p class="text-xs text-soft-blue/50 mt-1">
-									Expected format: timestamp, production, capacity_factor, availability
+									Expected format: timestamp, production (powerMw), capacity_factor, availability
 								</p>
 							</div>
 						</div>
