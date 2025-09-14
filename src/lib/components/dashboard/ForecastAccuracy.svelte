@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	
+
+	export let isMockData = false;
+
 	// Mock accuracy data
-	const accuracyData = [
+	const accuracyData = isMockData ? [
+		{ model: 'ML Model', accuracy: 0, mape: 0, rmse: 0 },
+		{ model: 'Physical Model', accuracy: 0, mape: 0, rmse: 0 },
+		{ model: 'Hybrid Model', accuracy: 0, mape: 0, rmse: 0 }
+	] : [
 		{ model: 'ML Model', accuracy: 94.2, mape: 5.8, rmse: 12.3 },
 		{ model: 'Physical Model', accuracy: 89.7, mape: 10.3, rmse: 18.5 },
 		{ model: 'Hybrid Model', accuracy: 96.1, mape: 3.9, rmse: 9.7 }
@@ -27,12 +33,28 @@
 
 <div class="card-glass min-h-[24rem] h-auto">
 	<div class="flex items-center justify-between mb-4">
-		<h3 class="text-lg font-semibold text-soft-blue">Forecast Accuracy Analysis</h3>
+		<div class="flex items-center gap-3">
+			<h3 class="text-lg font-semibold text-soft-blue">Forecast Accuracy Analysis</h3>
+			{#if isMockData}
+				<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-alert-orange/20 text-alert-orange border border-alert-orange/30">
+					Mock Data
+				</span>
+			{/if}
+		</div>
 		<button class="text-cyan text-sm hover:text-soft-blue transition-colors">
 			Details →
 		</button>
 	</div>
 	
+	<!-- Mock Data Warning -->
+	{#if isMockData}
+		<div class="mb-4 p-3 bg-alert-orange/10 border border-alert-orange/30 rounded-lg">
+			<p class="text-xs text-alert-orange">
+				⚠️ Accuracy metrics not available for simulated data. Connect real production data to see actual accuracy metrics.
+			</p>
+		</div>
+	{/if}
+
 	<!-- Model Comparison -->
 	<div class="space-y-2 mb-4">
 		{#each accuracyData as model}

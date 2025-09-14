@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	
+
 	export let locationId: number = 1;
+	export let isMockData: boolean = true; // Default to true since this component typically shows mock weather data
 
 	// Location names for display
 	const locations = {
@@ -460,8 +461,17 @@
 <div class="card-glass">
 	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
 		<div>
-			<h3 class="text-lg font-semibold text-soft-blue">Solar Forecast - Weather Parameters</h3>
-			<p class="text-sm text-soft-blue/60 mt-1">Real-time meteorological data for <span class="text-cyan font-medium">{locations[locationId] || 'Selected Location'}</span></p>
+			<div class="flex items-center gap-3">
+				<h3 class="text-lg font-semibold text-soft-blue">Solar Forecast - Weather Parameters</h3>
+				{#if isMockData}
+					<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-alert-orange/20 text-alert-orange border border-alert-orange/30">
+						Mock Data
+					</span>
+				{/if}
+			</div>
+			<p class="text-sm text-soft-blue/60 mt-1">
+				{isMockData ? 'Simulated' : 'Real-time'} meteorological data for <span class="text-cyan font-medium">{locations[locationId] || 'Selected Location'}</span>
+			</p>
 		</div>
 		
 		<!-- Time Range Buttons -->

@@ -133,32 +133,56 @@ export class ForecastService {
             // Get Python worker URL from environment
             const pythonWorkerUrl = process.env.PYTHON_WORKER_URL || 'http://localhost:8001';
 
-            // Map SvelteKit model type to Python worker model type
-            const modelTypeMapping: Record<string, string> = {
-                'lstm': 'catboost',  // Map all to catboost for now
-                'xgboost': 'catboost',
-                'random_forest': 'catboost',
-                'arima': 'catboost',
-                'prophet': 'catboost',
-                'ensemble': 'catboost',
-                'catboost': 'catboost'
-            };
+            // Call Python worker API for forecast generation with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-            // Call Python worker API for forecast generation
-            const pythonWorkerResponse = await fetch(`${pythonWorkerUrl}/api/v1/forecasts/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    location_id: params.locationId,  // Python worker expects GUID string
-                    forecast_hours: params.horizonHours,
-                    model_type: modelTypeMapping[params.modelType.toLowerCase()] || 'catboost',
-                    use_weather: params.useWeather !== false,  // Default to true
-                    confidence_level: params.confidenceLevel || 0.95
-                })
-            });
+            let pythonWorkerResponse;
+            try {
+                pythonWorkerResponse = await fetch(`${pythonWorkerUrl}/api/v1/forecasts/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location_id: params.locationId,  // Python worker expects GUID string
+                        forecast_hours: params.horizonHours,
+                        model_type: params.modelType,  // Pass model type directly as received
+                        use_weather: params.useWeather !== false,  // Default to true
+                        confidence_level: params.confidenceLevel || 0.95
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+
+                // Check if it's a timeout or connection error
+                if (fetchError.name === 'AbortError') {
+                    console.warn('Python worker timeout, falling back to mock data');
+                    throw new Error('Python worker timeout - using mock data fallback');
+                } else {
+                    console.warn('Python worker connection failed, falling back to mock data');
+                    throw new Error('Python worker not available - using mock data fallback');
+                }
+            }
 
             if (!pythonWorkerResponse.ok) {
                 const errorData = await pythonWorkerResponse.json().catch(() => ({}));
+
+                // Check for specific error cases
+                if (pythonWorkerResponse.status === 400) {
+                    const errorMessage = errorData.detail || errorData.error || '';
+
+                    // Check if it's a missing historical data error
+                    if (errorMessage.toLowerCase().includes('no historical data') ||
+                        errorMessage.toLowerCase().includes('insufficient data') ||
+                        errorMessage.toLowerCase().includes('no data found')) {
+                        throw new Error(`Cannot generate forecast: No historical data available for this location. CatBoost requires historical production data to train the model. Please ensure production data has been recorded for this location before attempting to generate forecasts.`);
+                    }
+
+                    // Other validation errors
+                    throw new Error(`Forecast generation failed: ${errorMessage}`);
+                }
+
                 throw new Error(errorData.detail || `Python worker returned ${pythonWorkerResponse.status}`);
             }
 
@@ -234,6 +258,46 @@ export class ForecastService {
             }
         } catch (error) {
             console.error('Forecast generation failed:', error);
+
+            // Check if we should fall back to mock data
+            const shouldUseMockData = error.message && (
+                error.message.includes('No historical data') ||
+                error.message.includes('timeout') ||
+                error.message.includes('not available') ||
+                error.message.includes('mock data fallback')
+            );
+
+            if (shouldUseMockData) {
+                console.warn('Falling back to mock forecast data:', error.message);
+
+                // Generate mock forecast data
+                const mockData = await this.generateEnhancedMockForecast(params);
+
+                // Store mock data in database
+                await this.repository.bulkInsertForecasts(mockData);
+
+                const warningMessage = error.message.includes('timeout')
+                    ? 'Python worker timeout. Using simulated data for demonstration.'
+                    : error.message.includes('not available')
+                    ? 'Python worker not available. Using simulated data for demonstration.'
+                    : 'No historical data available. Using simulated data for demonstration.';
+
+                return {
+                    success: true,
+                    forecastId: `mock_forecast_${Date.now()}`,
+                    data: mockData,
+                    metadata: {
+                        generatedAt: new Date().toISOString(),
+                        modelType: params.modelType,
+                        horizonHours: params.horizonHours,
+                        dataPoints: mockData.length,
+                        isMockData: true,
+                        message: warningMessage
+                    }
+                };
+            }
+
+            // Re-throw the error with more context
             throw new Error(`Failed to generate forecast: ${error.message}`);
         }
     }
@@ -275,8 +339,8 @@ export class ForecastService {
             throw new Error('Model type is required');
         }
 
-        const validModelTypes = ['catboost', 'lstm', 'xgboost', 'random_forest', 'arima', 'prophet', 'ensemble'];
-        if (!validModelTypes.includes(params.modelType.toLowerCase())) {
+        const validModelTypes = ['ML_ENSEMBLE', 'PHYSICS', 'HYBRID'];
+        if (!validModelTypes.includes(params.modelType)) {
             throw new Error(`Invalid model type. Valid types: ${validModelTypes.join(', ')}`);
         }
     }

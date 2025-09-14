@@ -7,6 +7,7 @@
   export let showConfidenceBands = true;
   export let showActual = false;
   export let height = 400;
+  export let isMockData = false;
   
   let chartContainer: HTMLDivElement;
   let chart: echarts.ECharts;
@@ -102,6 +103,34 @@
     
     const option = {
       backgroundColor: 'transparent',
+      graphic: isMockData ? [{
+        type: 'group',
+        right: 20,
+        top: 20,
+        children: [{
+          type: 'rect',
+          shape: {
+            width: 100,
+            height: 28
+          },
+          style: {
+            fill: 'rgba(234, 88, 12, 0.2)',
+            stroke: 'rgba(234, 88, 12, 0.5)',
+            lineWidth: 1
+          }
+        }, {
+          type: 'text',
+          style: {
+            text: '⚠️ Mock Data',
+            font: '12px sans-serif',
+            fill: '#EA580C',
+            x: 50,
+            y: 14,
+            textAlign: 'center',
+            textVerticalAlign: 'middle'
+          }
+        }]
+      }] : [],
       tooltip: {
         trigger: 'axis',
         axisPointer: {
