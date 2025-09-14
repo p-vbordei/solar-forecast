@@ -47,7 +47,7 @@ class ForecastRepository {
         avg: ['power_forecast_mw', 'confidence_score'],
         count: ['*']
       },
-      where: `location_id = ${parseInt(locationId)} AND timestamp >= '${start.toISOString()}' AND timestamp <= '${end.toISOString()}'`,
+      where: `location_id = '${locationId}' AND timestamp >= '${start.toISOString()}' AND timestamp <= '${end.toISOString()}'`,
       groupBy: ['location_id'],
       orderBy: 'bucket ASC'
     });
@@ -93,7 +93,7 @@ class ForecastRepository {
       FROM forecasts f
       INNER JOIN production p ON f.location_id = p.location_id
         AND f.timestamp = p.timestamp
-      WHERE f.location_id = ${parseInt(locationId)}
+      WHERE f.location_id = '${locationId}'
         AND f.timestamp >= ${start}
         AND f.timestamp <= ${end}
       ORDER BY f.timestamp DESC

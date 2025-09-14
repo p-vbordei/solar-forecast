@@ -49,7 +49,7 @@ export class AnalysisRepository {
         AVG("confidenceLevel") as avg_confidence,
         COUNT(*) as count
       FROM forecasts 
-      WHERE "locationId" = ${parseInt(locationId)}
+      WHERE "locationId" = '${locationId}'
         AND timestamp >= ${startDate}::timestamp
         AND timestamp <= ${endDate}::timestamp + INTERVAL '1 day'
       GROUP BY bucket
@@ -107,7 +107,7 @@ export class AnalysisRepository {
         AVG("capacityFactor") as avg_capacityFactor,
         COUNT(*) as count
       FROM production 
-      WHERE "locationId" = ${parseInt(locationId)}
+      WHERE "locationId" = '${locationId}'
         AND timestamp >= ${startDate}::timestamp
         AND timestamp <= ${endDate}::timestamp + INTERVAL '1 day'
       GROUP BY bucket
@@ -164,7 +164,7 @@ export class AnalysisRepository {
         AVG("cloudCover") as avg_cloudCover,
         COUNT(*) as count
       FROM weather_data 
-      WHERE "locationId" = ${parseInt(locationId)}
+      WHERE "locationId" = '${locationId}'
         AND timestamp >= ${startDate}::timestamp
         AND timestamp <= ${endDate}::timestamp + INTERVAL '1 day'
       GROUP BY bucket
@@ -225,7 +225,7 @@ export class AnalysisRepository {
         AVG("capacityFactor") as avg_capacityFactor,
         COUNT(*) as count
       FROM production 
-      WHERE "locationId" = ${parseInt(locationId)}
+      WHERE "locationId" = '${locationId}'
         AND timestamp >= ${historicalStart.toISOString()}::timestamp
         AND timestamp <= ${historicalEnd.toISOString()}::timestamp
       GROUP BY bucket
@@ -262,7 +262,7 @@ export class AnalysisRepository {
         AVG("skillScore") as avg_skill_score,
         SUM("sampleCount") as sample_count
       FROM forecast_accuracy 
-      WHERE "locationId" = ${parseInt(locationId)}
+      WHERE "locationId" = '${locationId}'
         AND date >= ${startDate}::date
         AND date <= ${endDate}::date
     `;
@@ -295,14 +295,13 @@ export class AnalysisRepository {
    * Verify location exists and is accessible
    */
   async validateLocation(locationId: string) {
-    const id = parseInt(locationId);
-    if (isNaN(id) || id < 1) {
+    if (!locationId || locationId.trim() === '') {
       return null;
     }
 
     const location = await db.location.findUnique({
       where: {
-        id: id
+        id: locationId
       },
       select: {
         id: true,

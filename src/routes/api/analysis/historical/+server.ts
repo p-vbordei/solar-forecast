@@ -35,21 +35,21 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     // Parse location IDs
-    let parsedLocationIds: number[] = [];
+    let parsedLocationIds: string[] = [];
     try {
       if (locationIds) {
-        parsedLocationIds = locationIds.split(',').map(id => parseInt(id.trim()));
+        parsedLocationIds = locationIds.split(',').map(id => id.trim());
       } else if (location) {
-        parsedLocationIds = [parseInt(location)];
+        parsedLocationIds = [location.trim()];
       }
 
-      // Validate location IDs are numbers
-      if (parsedLocationIds.some(id => isNaN(id))) {
+      // Validate location IDs are not empty
+      if (parsedLocationIds.some(id => !id)) {
         throw new Error('Invalid location ID format');
       }
     } catch (error) {
       return json(
-        { success: false, error: 'Invalid location ID format. Use comma-separated integers.' },
+        { success: false, error: 'Invalid location ID format. Use comma-separated location IDs.' },
         { status: 400 }
       );
     }

@@ -426,7 +426,7 @@ export class HistoricalRepository {
     return Array.from(buckets.entries()).map(([key, records]) => {
       const [timestampStr, locationIdStr] = key.split('_');
       const timestamp = timestampStr;
-      const locationId = Number(locationIdStr);
+      const locationId = locationIdStr;
       const locationName = records[0]?.location?.name;
 
       // Calculate averages
@@ -464,7 +464,7 @@ export class HistoricalRepository {
 
   // Get locations metadata for response
   async getLocationsMetadata(
-    locationIds: number[],
+    locationIds: string[],
     startDate: Date,
     endDate: Date
   ): Promise<LocationMetadata[]> {
