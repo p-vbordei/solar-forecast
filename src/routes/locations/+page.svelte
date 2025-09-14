@@ -8,7 +8,6 @@
 	import PencilIcon from '$lib/components/icons/PencilIcon.svelte';
 	import TrashIcon from '$lib/components/icons/TrashIcon.svelte';
 	import MapPinIcon from '$lib/components/icons/MapPinIcon.svelte';
-	import CogIcon from '$lib/components/icons/CogIcon.svelte';
 	
 	// UI State Management
 	let showExplanation = false;
@@ -119,7 +118,7 @@
 			loading = true;
 			const response = await fetch('/api/locations?view=summary');
 			const data = await response.json();
-			
+
 			if (data.success) {
 				locations = data.data;
 			} else {
@@ -133,10 +132,26 @@
 		}
 	}
 
+	// Refresh dashboard statistics (to update header)
+	async function refreshDashboard() {
+		try {
+			// Call the dashboard API to refresh data
+			await fetch('/api/dashboard');
+
+			// Dispatch custom event to notify header component to refresh immediately
+			window.dispatchEvent(new CustomEvent('dashboardRefresh'));
+		} catch (err) {
+			console.warn('Failed to refresh dashboard:', err);
+		}
+	}
+
 	// Smart form management
 	function openLocationModal() {
 		editingLocation = null;
 		resetForm();
+		// Clear any existing errors
+		formErrors = {};
+		formTouched = {};
 		showLocationModal = true;
 	}
 
@@ -421,11 +436,26 @@
 			
 			const endpoint = editingLocation ? `/api/locations/${editingLocation.id}` : '/api/locations';
 			const method = editingLocation ? 'PUT' : 'POST';
-			
+
+			// Transform formData to match API expectations
+			const apiData = {
+				name: formData.name,
+				coordinates: {
+					latitude: formData.latitude,
+					longitude: formData.longitude
+				},
+				// Include other form data as needed
+				basic: {
+					capacityMW: formData.plant?.capacity_mw || 1.0
+				}
+			};
+
+			console.log('Sending to API:', apiData);
+
 			const response = await fetch(endpoint, {
 				method,
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(formData)
+				body: JSON.stringify(apiData)
 			});
 			
 			const result = await response.json();
@@ -433,7 +463,10 @@
 			if (result.success) {
 				showLocationModal = false;
 				await loadLocations();
-				
+
+				// Refresh dashboard statistics to update header
+				await refreshDashboard();
+
 				// Show success message with smart defaults info
 				if (!editingLocation && result.message) {
 					// Could show a toast notification here
@@ -465,6 +498,9 @@
 				
 				if (result.success) {
 					await loadLocations();
+
+					// Refresh dashboard statistics to update header
+					await refreshDashboard();
 				} else {
 					alert('Failed to delete location: ' + result.error);
 				}
@@ -529,6 +565,105 @@
 				Add Location
 			</button>
 		</div>
+	</div>
+
+	<!-- Understanding Location Management Help -->
+	<div class="card-glass">
+		<button
+			on:click={() => showExplanation = !showExplanation}
+			class="flex items-center justify-between w-full text-left"
+		>
+			<div class="flex items-center space-x-3">
+				<div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
+					<DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
+				</div>
+				<div>
+					<h3 class="text-lg font-semibold text-white">Understanding Smart Location Management</h3>
+					<p class="text-sm text-soft-blue/80">Learn how the intelligent parameter system optimizes your solar configurations</p>
+				</div>
+			</div>
+			<div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
+				<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+				</svg>
+			</div>
+		</button>
+
+		{#if showExplanation}
+			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
+							<span>Intelligent Defaults System</span>
+						</h4>
+						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+							Only location name and GPS coordinates are mandatory. All technical parameters are automatically
+							optimized based on geographic location, climate data, and industry best practices.
+						</p>
+						<div class="bg-cyan/20 rounded-lg p-3 border border-cyan/30">
+							<p class="text-xs text-soft-blue/70">
+								<strong class="text-cyan">Smart Optimization:</strong> Panel tilt angles, timezone detection,
+								and climate-specific loss factors are automatically calculated from your GPS coordinates.
+							</p>
+						</div>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
+							<span>Expandable Technical Configuration</span>
+						</h4>
+						<div class="space-y-2">
+							<div class="flex items-start space-x-2">
+								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+								<p class="text-sm text-soft-blue/80"><strong class="text-white">Basic Mode:</strong> Just enter name and GPS coordinates</p>
+							</div>
+							<div class="flex items-start space-x-2">
+								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+								<p class="text-sm text-soft-blue/80"><strong class="text-white">Advanced Mode:</strong> Expand sections to customize technical parameters</p>
+							</div>
+							<div class="flex items-start space-x-2">
+								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
+								<p class="text-sm text-soft-blue/80"><strong class="text-white">Expert Mode:</strong> Full YAML-compatible parameter control</p>
+							</div>
+						</div>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
+							<span>Data Persistence & Versioning</span>
+						</h4>
+						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+							All location data is stored with full version control. Edit configurations anytime without
+							losing historical data. Export to YAML format for external systems integration.
+						</p>
+					</div>
+					<div>
+						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
+							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">4</span>
+							<span>Real-time Monitoring Integration</span>
+						</h4>
+						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
+							Location technical parameters directly feed into forecast models, production monitoring,
+							and performance analytics for accurate energy predictions and optimization.
+						</p>
+					</div>
+				</div>
+
+				<!-- Features Summary -->
+				<div class="bg-teal-dark/30 rounded-xl p-4 border border-cyan/20">
+					<h5 class="font-medium text-white mb-2">
+						<span>Key Smart Features</span>
+					</h5>
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+						<div class="text-soft-blue/80">• <strong class="text-white">GPS Optimization:</strong> Auto-tilt and timezone</div>
+						<div class="text-soft-blue/80">• <strong class="text-white">Climate Adaptation:</strong> Regional loss factors</div>
+						<div class="text-soft-blue/80">• <strong class="text-white">Industry Standards:</strong> PVLIB-compatible defaults</div>
+						<div class="text-soft-blue/80">• <strong class="text-white">Version Control:</strong> Track all configuration changes</div>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Locations Display -->
@@ -617,13 +752,6 @@
 						>
 							<PencilIcon className="w-4 h-4 mr-1" />
 							Edit
-						</button>
-						<button 
-							on:click={() => viewTechnicalDetails(location.id)}
-							class="btn btn-ghost btn-sm"
-							title="View technical specifications"
-						>
-							<CogIcon className="w-4 h-4" />
 						</button>
 						<button 
 							on:click={() => deleteLocation(location.id, location.name)}
@@ -821,12 +949,9 @@
 								on:click={() => toggleAdvancedSection('plantSpecs')}
 								class="flex items-center justify-between w-full text-left"
 							>
-								<div class="flex items-center space-x-3">
-									<CogIcon className="w-5 h-5 text-cyan" />
-									<div>
-										<h4 class="font-semibold text-white">Panel & Inverter Specifications</h4>
-										<p class="text-sm text-soft-blue/60">Advanced technical parameters with intelligent defaults</p>
-									</div>
+								<div>
+									<h4 class="font-semibold text-white">Panel & Inverter Specifications</h4>
+									<p class="text-sm text-soft-blue/60">Advanced technical parameters with intelligent defaults</p>
 								</div>
 								<div class="transform transition-transform duration-200 {showAdvancedSections.plantSpecs ? 'rotate-180' : 'rotate-0'}">
 									<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -929,12 +1054,9 @@
 								on:click={() => toggleAdvancedSection('losses')}
 								class="flex items-center justify-between w-full text-left"
 							>
-								<div class="flex items-center space-x-3">
-									<CogIcon className="w-5 h-5 text-cyan" />
-									<div>
-										<h4 class="font-semibold text-white">System Losses & Performance</h4>
-										<p class="text-sm text-soft-blue/60">Configure system losses and weather-dependent performance</p>
-									</div>
+								<div>
+									<h4 class="font-semibold text-white">System Losses & Performance</h4>
+									<p class="text-sm text-soft-blue/60">Configure system losses and weather-dependent performance</p>
 								</div>
 								<div class="transform transition-transform duration-200 {showAdvancedSections.losses ? 'rotate-180' : 'rotate-0'}">
 									<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1021,22 +1143,23 @@
 					</div>
 					
 					<div class="flex space-x-2">
-						<button 
+						<button
 							type="button"
-							on:click={() => showLocationModal = false} 
+							on:click={() => showLocationModal = false}
 							class="btn btn-ghost"
 						>
 							Cancel
 						</button>
-						<button 
+						<button
 							type="button"
-							on:click={saveLocation} 
+							on:click={saveLocation}
 							class="btn btn-primary"
 							disabled={!formData.name || !formData.latitude || !formData.longitude || Object.keys(formErrors).length > 0}
 						>
 							{editingLocation ? 'Update Location' : 'Create Location'}
 						</button>
 					</div>
+
 				</div>
 			</div>
 		</div>
@@ -1067,8 +1190,7 @@
 					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 						<!-- Plant Specifications -->
 						<div class="card-glass">
-							<h3 class="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
-								<CogIcon className="w-5 h-5 text-cyan" />
+							<h3 class="text-lg font-semibold text-white mb-4">
 								<span>Plant Specifications</span>
 							</h3>
 							<div class="space-y-3 text-sm">
@@ -1191,105 +1313,6 @@
 		</div>
 	{/if}
 
-	<!-- Understanding Location Management Help -->
-	<div class="card-glass mt-6">
-		<button 
-			on:click={() => showExplanation = !showExplanation}
-			class="flex items-center justify-between w-full text-left"
-		>
-			<div class="flex items-center space-x-3">
-				<div class="w-8 h-8 bg-gradient-to-br from-cyan to-soft-blue rounded-xl flex items-center justify-center shadow-lg shadow-cyan/30">
-					<DocumentTextIcon class="w-4 h-4 text-dark-petrol" />
-				</div>
-				<div>
-					<h3 class="text-lg font-semibold text-white">Understanding Smart Location Management</h3>
-					<p class="text-sm text-soft-blue/80">Learn how the intelligent parameter system optimizes your solar configurations</p>
-				</div>
-			</div>
-			<div class="transform transition-transform duration-200 {showExplanation ? 'rotate-180' : 'rotate-0'}">
-				<svg class="w-5 h-5 text-soft-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-				</svg>
-			</div>
-		</button>
-		
-		{#if showExplanation}
-			<div class="mt-6 pt-6 border-t border-soft-blue/20 space-y-4 animate-slide-down">
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">1</span>
-							<span>Intelligent Defaults System</span>
-						</h4>
-						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-							Only location name and GPS coordinates are mandatory. All technical parameters are automatically 
-							optimized based on geographic location, climate data, and industry best practices.
-						</p>
-						<div class="bg-cyan/20 rounded-lg p-3 border border-cyan/30">
-							<p class="text-xs text-soft-blue/70">
-								<strong class="text-cyan">Smart Optimization:</strong> Panel tilt angles, timezone detection, 
-								and climate-specific loss factors are automatically calculated from your GPS coordinates.
-							</p>
-						</div>
-					</div>
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">2</span>
-							<span>Expandable Technical Configuration</span>
-						</h4>
-						<div class="space-y-2">
-							<div class="flex items-start space-x-2">
-								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-								<p class="text-sm text-soft-blue/80"><strong class="text-white">Basic Mode:</strong> Just enter name and GPS coordinates</p>
-							</div>
-							<div class="flex items-start space-x-2">
-								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-								<p class="text-sm text-soft-blue/80"><strong class="text-white">Advanced Mode:</strong> Expand sections to customize technical parameters</p>
-							</div>
-							<div class="flex items-start space-x-2">
-								<span class="w-1.5 h-1.5 bg-cyan rounded-full mt-2 flex-shrink-0"></span>
-								<p class="text-sm text-soft-blue/80"><strong class="text-white">Expert Mode:</strong> Full YAML-compatible parameter control</p>
-							</div>
-						</div>
-					</div>
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">3</span>
-							<span>Data Persistence & Versioning</span>
-						</h4>
-						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-							All location data is stored with full version control. Edit configurations anytime without 
-							losing historical data. Export to YAML format for external systems integration.
-						</p>
-					</div>
-					<div>
-						<h4 class="font-semibold text-white mb-3 flex items-center space-x-2">
-							<span class="w-6 h-6 bg-cyan/20 rounded-full flex items-center justify-center text-cyan text-sm font-bold">4</span>
-							<span>Real-time Monitoring Integration</span>
-						</h4>
-						<p class="text-sm text-soft-blue/80 leading-relaxed mb-3">
-							Location technical parameters directly feed into forecast models, production monitoring, 
-							and performance analytics for accurate energy predictions and optimization.
-						</p>
-					</div>
-				</div>
-				
-				<!-- Features Summary -->
-				<div class="bg-teal-dark/30 rounded-xl p-4 border border-cyan/20">
-					<h5 class="font-medium text-white mb-2 flex items-center space-x-2">
-						<CogIcon class="w-4 h-4 text-cyan" />
-						<span>Key Smart Features</span>
-					</h5>
-					<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-						<div class="text-soft-blue/80">• <strong class="text-white">GPS Optimization:</strong> Auto-tilt and timezone</div>
-						<div class="text-soft-blue/80">• <strong class="text-white">Climate Adaptation:</strong> Regional loss factors</div>
-						<div class="text-soft-blue/80">• <strong class="text-white">Industry Standards:</strong> PVLIB-compatible defaults</div>
-						<div class="text-soft-blue/80">• <strong class="text-white">Version Control:</strong> Track all configuration changes</div>
-					</div>
-				</div>
-			</div>
-		{/if}
-	</div>
 </div>
 
 <style>

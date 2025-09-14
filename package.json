@@ -54,6 +54,7 @@
     "bcryptjs": "^2.4.3",
     "date-fns": "^3.6.0",
     "echarts": "^5.5.1",
+    "exceljs": "^4.4.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-svelte": "^0.454.0",
     "swagger-ui-dist": "^5.28.1",

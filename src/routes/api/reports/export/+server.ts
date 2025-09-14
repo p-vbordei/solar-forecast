@@ -4,12 +4,29 @@ import { reportService } from '$lib/server/services/report.service';
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const data = await request.json();
-    const { reportType, startDate, endDate, format } = data;
+    const { reportType, startDate, endDate, locationIds, dataAggregation, timezone, format } = data;
 
     // Validate required fields
-    if (!reportType || !startDate || !endDate || !format) {
+    if (!reportType || !startDate || !endDate || !locationIds || !dataAggregation || !timezone || !format) {
       return json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing required fields: reportType, startDate, endDate, locationIds, dataAggregation, timezone, format' },
+        { status: 400 }
+      );
+    }
+
+    // Validate timezone format
+    const validTimezones = ['UTC-2', 'UTC-1', 'UTC+0', 'UTC+1', 'UTC+2', 'UTC+3', 'UTC+4'];
+    if (!validTimezones.includes(timezone)) {
+      return json(
+        { success: false, error: 'Invalid timezone. Must be between UTC-2 and UTC+4' },
+        { status: 400 }
+      );
+    }
+
+    // Validate locationIds is array
+    if (!Array.isArray(locationIds) || locationIds.length === 0) {
+      return json(
+        { success: false, error: 'locationIds must be a non-empty array' },
         { status: 400 }
       );
     }
@@ -18,6 +35,9 @@ export const POST: RequestHandler = async ({ request }) => {
       reportType,
       startDate,
       endDate,
+      locationIds,
+      dataAggregation,
+      timezone,
       format
     });
 
