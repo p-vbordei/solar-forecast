@@ -152,7 +152,7 @@ export class HistoricalService {
 
   // Compare multiple locations
   async compareLocations(
-    locationIds: number[],
+    locationIds: string[],
     startDate: string,
     endDate: string,
     aggregationType: AggregationType = AggregationType.DAILY
@@ -179,7 +179,7 @@ export class HistoricalService {
   async getDataQualityReport(request: HistoricalDataRequest): Promise<{
     overallScore: number;
     locationReports: Array<{
-      locationId: number;
+      locationId: string;
       locationName: string;
       qualityScore: number;
       issues: string[];
@@ -707,8 +707,8 @@ export class HistoricalService {
     };
   }
 
-  private generateQualityRecommendations(analysis: any): Array<{locationId: number | null, recommendation: string}> {
-    const recommendations: Array<{locationId: number | null, recommendation: string}> = [];
+  private generateQualityRecommendations(analysis: any): Array<{locationId: string | null, recommendation: string}> {
+    const recommendations: Array<{locationId: string | null, recommendation: string}> = [];
 
     if (analysis.overallScore < 70) {
       recommendations.push({

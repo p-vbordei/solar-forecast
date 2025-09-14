@@ -295,14 +295,14 @@ export class AnalysisRepository {
    * Verify location exists and is accessible
    */
   async validateLocation(locationId: string) {
-    const id = parseInt(locationId);
-    if (isNaN(id) || id < 1) {
+    // Validate UUID format (basic check)
+    if (!locationId || typeof locationId !== 'string' || locationId.length < 1) {
       return null;
     }
 
     const location = await db.location.findUnique({
       where: {
-        id: id
+        id: locationId
       },
       select: {
         id: true,

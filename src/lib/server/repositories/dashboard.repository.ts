@@ -6,7 +6,7 @@ export class DashboardRepository {
   /**
    * Get current production data for a location
    */
-  async getCurrentProduction(locationId: number) {
+  async getCurrentProduction(locationId: string) {
     const result = await db.$queryRaw<Array<{
       current_power_mw: number;
       timestamp: Date;
@@ -27,7 +27,7 @@ export class DashboardRepository {
   /**
    * Get yesterday's production for comparison
    */
-  async getYesterdayProduction(locationId: number) {
+  async getYesterdayProduction(locationId: string) {
     const result = await db.$queryRaw<Array<{
       avg_power_mw: number;
     }>>`
@@ -44,7 +44,7 @@ export class DashboardRepository {
   /**
    * Get today's total energy production
    */
-  async getTodayEnergyProduction(locationId: number) {
+  async getTodayEnergyProduction(locationId: string) {
     const result = await db.$queryRaw<Array<{
       total_energy_mwh: number;
     }>>`
@@ -61,7 +61,7 @@ export class DashboardRepository {
   /**
    * Get yesterday's total energy production for comparison
    */
-  async getYesterdayEnergyProduction(locationId: number) {
+  async getYesterdayEnergyProduction(locationId: string) {
     const result = await db.$queryRaw<Array<{
       total_energy_mwh: number;
     }>>`
@@ -78,7 +78,7 @@ export class DashboardRepository {
   /**
    * Get recent forecast accuracy for a location
    */
-  async getForecastAccuracy(locationId: number) {
+  async getForecastAccuracy(locationId: string) {
     const result = await db.$queryRaw<Array<{
       avg_accuracy: number;
     }>>`
@@ -95,7 +95,7 @@ export class DashboardRepository {
   /**
    * Get yesterday's forecast accuracy for comparison
    */
-  async getYesterdayForecastAccuracy(locationId: number) {
+  async getYesterdayForecastAccuracy(locationId: string) {
     const result = await db.$queryRaw<Array<{
       avg_accuracy: number;
     }>>`
@@ -113,7 +113,7 @@ export class DashboardRepository {
   /**
    * Get weather data for time series visualization
    */
-  async getWeatherTimeSeries(locationId: number, timeRange: 'today' | 'tomorrow' | '7days') {
+  async getWeatherTimeSeries(locationId: string, timeRange: 'today' | 'tomorrow' | '7days') {
     let interval: string;
     let timeFilter: string;
 
@@ -150,7 +150,7 @@ export class DashboardRepository {
   /**
    * Get current weather conditions
    */
-  async getCurrentWeather(locationId: number) {
+  async getCurrentWeather(locationId: string) {
     const result = await db.$queryRaw<Array<{
       temperature: number;
       humidity: number;
@@ -199,7 +199,7 @@ export class DashboardRepository {
   /**
    * Get location details by ID
    */
-  async getLocationById(locationId: number) {
+  async getLocationById(locationId: string) {
     return await db.location.findUnique({
       where: {
         id: locationId

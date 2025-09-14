@@ -41,12 +41,23 @@
     end: new Date().toISOString().split('T')[0]
   };
 
-  let locations = [
-    { id: '1', name: 'Solar Farm Alpha', city: 'Bucharest', capacity: 50 },
-    { id: '2', name: 'Solar Station Beta', city: 'Cluj', capacity: 35 },
-    { id: '3', name: 'Green Energy Park', city: 'Timisoara', capacity: 40 },
-    { id: '4', name: 'Coastal Solar Array', city: 'Constanta', capacity: 45 }
-  ];
+  let locations: any[] = [];
+
+  async function loadLocations() {
+    try {
+      const response = await fetch('/api/dashboard/locations');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          locations = result.data;
+        }
+      } else {
+        console.error('Failed to load locations:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error loading locations:', error);
+    }
+  }
 
   async function loadForecastData() {
     if (!selectedLocation) return;
@@ -176,7 +187,10 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Load locations from API
+    await loadLocations();
+
     // Set default location
     if (locations.length > 0) {
       selectedLocation = locations[0].id;

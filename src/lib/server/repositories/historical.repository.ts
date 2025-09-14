@@ -449,10 +449,6 @@ export class HistoricalRepository {
           efficiency: avgEfficiency,
           availability: avgAvailability
         },
-        dataQuality: {
-          production: DataQualityLevel.GOOD,
-          overall: DataQualityLevel.GOOD
-        },
         aggregationInfo: {
           sampleCount: records.length,
           aggregationType,
@@ -464,7 +460,7 @@ export class HistoricalRepository {
 
   // Get locations metadata for response
   async getLocationsMetadata(
-    locationIds: number[],
+    locationIds: string[],
     startDate: Date,
     endDate: Date
   ): Promise<LocationMetadata[]> {
@@ -779,7 +775,7 @@ export class HistoricalRepository {
 
   // Multi-location comparison queries
   async getLocationComparison(
-    locationIds: number[],
+    locationIds: string[],
     startDate: Date,
     endDate: Date,
     aggregationType: AggregationType
