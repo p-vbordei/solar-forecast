@@ -11,6 +11,7 @@
   import MapPinIcon from '$lib/components/icons/MapPinIcon.svelte';
   import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
   import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
+  import ForecastGenerator from '$lib/components/forecast/ForecastGenerator.svelte';
   
   let showExplanation = false;
 
@@ -42,10 +43,10 @@
   };
 
   let locations = [
-    { id: '1', name: 'Solar Farm Alpha', city: 'Bucharest', capacity: 50 },
-    { id: '2', name: 'Solar Station Beta', city: 'Cluj', capacity: 35 },
-    { id: '3', name: 'Green Energy Park', city: 'Timisoara', capacity: 40 },
-    { id: '4', name: 'Coastal Solar Array', city: 'Constanta', capacity: 45 }
+    { id: '550e8400-e29b-41d4-a716-446655440000', name: 'Solar Farm Alpha', city: 'Bucharest', capacity: 50 },
+    { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Solar Station Beta', city: 'Cluj', capacity: 35 },
+    { id: '550e8400-e29b-41d4-a716-446655440002', name: 'Green Energy Park', city: 'Timisoara', capacity: 40 },
+    { id: '550e8400-e29b-41d4-a716-446655440004', name: 'Coastal Solar Array', city: 'Constanta', capacity: 45 }
   ];
 
   async function loadForecastData() {
@@ -174,6 +175,20 @@
     } else {
       clearInterval(refreshInterval);
     }
+  }
+
+  async function handleForecastGenerated(event) {
+    // When a forecast is generated, refresh the data to show the new forecast
+    console.log('Forecast generated:', event.detail);
+
+    // Refresh forecast data to display the new forecast
+    await loadForecastData();
+
+    // Also update accuracy metrics
+    await loadAccuracyMetrics();
+
+    // Show a success message
+    alert(`Forecast generated successfully! ${event.detail.data?.length || 0} data points created.`);
   }
 
   onMount(() => {
@@ -380,6 +395,13 @@
       </button>
     </div>
   </div>
+
+  <!-- Forecast Generator -->
+  <ForecastGenerator
+    locationId={selectedLocation}
+    locationName={locations.find(l => l.id === selectedLocation)?.name || ''}
+    on:forecastGenerated={handleForecastGenerated}
+  />
 
   <!-- Accuracy Metrics -->
   <AccuracyMetrics 
