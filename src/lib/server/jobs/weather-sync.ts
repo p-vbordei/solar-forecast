@@ -110,7 +110,7 @@ export class WeatherSyncScheduler {
   private isScheduled = false;
 
   /**
-   * Start the weather sync scheduler
+   * Start the weather sync scheduler - Daily sync at UTC 08:00
    */
   start(): void {
     if (this.isScheduled) {
@@ -118,25 +118,30 @@ export class WeatherSyncScheduler {
       return;
     }
 
-    console.log('Starting weather sync scheduler');
+    console.log('Starting weather sync scheduler - Daily sync at UTC 08:00');
 
-    // Schedule current weather sync every 15 minutes
-    const currentWeatherInterval = setInterval(async () => {
-      console.log('Executing scheduled current weather sync');
-      await weatherSyncJob.executeCurrentWeatherOnly();
-    }, 15 * 60 * 1000); // 15 minutes
-
-    // Schedule full forecast sync every hour
-    const forecastInterval = setInterval(async () => {
-      console.log('Executing scheduled forecast sync');
-      await weatherSyncJob.executeFullSync();
-    }, 60 * 60 * 1000); // 1 hour
-
-    // Schedule cleanup every day at 2 AM (relative to server time)
-    const cleanupInterval = setInterval(async () => {
+    // Schedule daily weather sync at UTC 08:00
+    const dailySyncInterval = setInterval(async () => {
       const now = new Date();
-      if (now.getHours() === 2 && now.getMinutes() < 15) {
-        console.log('Executing scheduled weather data cleanup');
+      const utcHour = now.getUTCHours();
+      const utcMinute = now.getUTCMinutes();
+
+      // Execute at UTC 08:00 (allow 10 minute window to avoid missing)
+      if (utcHour === 8 && utcMinute < 10) {
+        console.log('Executing daily weather sync at UTC 08:00');
+        await weatherSyncJob.executeFullSync();
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
+
+    // Schedule cleanup once per week at UTC 02:00 on Sunday
+    const weeklyCleanupInterval = setInterval(async () => {
+      const now = new Date();
+      const utcHour = now.getUTCHours();
+      const utcMinute = now.getUTCMinutes();
+      const dayOfWeek = now.getUTCDay(); // 0 = Sunday
+
+      if (dayOfWeek === 0 && utcHour === 2 && utcMinute < 10) {
+        console.log('Executing weekly weather data cleanup');
         try {
           const deletedCount = await new WeatherService().cleanupOldData(90); // Keep 90 days
           console.log(`Cleaned up ${deletedCount} old weather records`);
@@ -144,12 +149,12 @@ export class WeatherSyncScheduler {
           console.error('Weather data cleanup failed:', error);
         }
       }
-    }, 15 * 60 * 1000); // Check every 15 minutes for cleanup time
+    }, 10 * 60 * 1000); // Check every 10 minutes
 
-    this.intervals = [currentWeatherInterval, forecastInterval, cleanupInterval];
+    this.intervals = [dailySyncInterval, weeklyCleanupInterval];
     this.isScheduled = true;
 
-    console.log('Weather sync scheduler started successfully');
+    console.log('Weather sync scheduler started - Daily sync at UTC 08:00');
   }
 
   /**

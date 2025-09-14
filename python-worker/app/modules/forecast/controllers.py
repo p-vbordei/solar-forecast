@@ -79,34 +79,55 @@ async def get_forecast_task_status(
 
 @router.get("/location/{location_id}", response_model=List[ForecastResponse])
 async def get_location_forecasts(
-    location_id: int,
+    location_id: str,  # String UUID for database consistency
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     model_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> List[ForecastResponse]:
-    """Get forecasts for a specific location"""
+    """Get forecasts for a specific location (database-driven)"""
     service = ForecastService(db)
-    
-    # Default time range if not specified
-    if not start_time:
-        start_time = datetime.utcnow()
-    if not end_time:
-        end_time = start_time + timedelta(hours=48)
-    
-    forecasts = await service.get_forecasts(
-        location_id=location_id,
-        start_time=start_time,
-        end_time=end_time,
-        model_type=model_type
-    )
-    
-    return [ForecastResponse.from_orm(f) for f in forecasts]
+
+    try:
+        # Validate location exists in database
+        location_valid = await service.validate_location(location_id)
+        if not location_valid:
+            raise HTTPException(status_code=404, detail="Location not found")
+
+        # Default time range if not specified (UTC timestamps)
+        if not start_time:
+            start_time = datetime.utcnow()
+        if not end_time:
+            end_time = start_time + timedelta(hours=48)
+
+        forecasts = await service.get_forecasts(
+            location_id=location_id,
+            start_time=start_time,
+            end_time=end_time,
+            model_type=model_type
+        )
+
+        # Validate capacity constraints in response
+        for forecast in forecasts:
+            power_mw = forecast.get("power_output_mw", 0)
+            # Basic capacity validation (should be done at generation time)
+            if power_mw < 0:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Invalid forecast data: negative power"
+                )
+
+        return [ForecastResponse.from_orm(f) for f in forecasts]
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error retrieving forecasts")
 
 
 @router.get("/accuracy/{location_id}", response_model=ForecastAccuracyResponse)
 async def get_forecast_accuracy(
-    location_id: int,
+    location_id: str,
     days: int = 7,
     db: AsyncSession = Depends(get_db)
 ) -> ForecastAccuracyResponse:
@@ -129,7 +150,7 @@ async def get_forecast_accuracy(
 
 @router.post("/batch", response_model=List[ForecastTaskResponse])
 async def generate_batch_forecasts(
-    location_ids: List[int],
+    location_ids: List[str],  # String UUIDs
     background_tasks: BackgroundTasks,
     horizon_hours: int = 48,
     db: AsyncSession = Depends(get_db)
@@ -169,7 +190,7 @@ async def generate_batch_forecasts(
 
 @router.delete("/location/{location_id}")
 async def delete_location_forecasts(
-    location_id: int,
+    location_id: str,
     before_date: Optional[datetime] = None,
     db: AsyncSession = Depends(get_db)
 ) -> dict:

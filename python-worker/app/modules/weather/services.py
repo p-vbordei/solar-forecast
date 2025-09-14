@@ -44,8 +44,8 @@ class WeatherService:
             location_id = await self._get_location_id_from_coordinates(latitude, longitude)
 
             if not location_id:
-                logger.warning(f"No location found for coordinates {latitude}, {longitude}")
-                return self._generate_mock_weather_data(days)
+                logger.error(f"No location found for coordinates {latitude}, {longitude}")
+                raise ValueError(f"Location not found for coordinates {latitude}, {longitude}")
 
             # Get fresh weather data from database
             weather_data = await self.get_weather_with_freshness(
@@ -54,8 +54,8 @@ class WeatherService:
             )
 
             if not weather_data:
-                logger.warning(f"No weather data available for location {location_id}")
-                return self._generate_mock_weather_data(days)
+                logger.error(f"No weather data available for location {location_id}")
+                raise ValueError(f"No weather data available for location {location_id}")
 
             # Get recent weather data for forecast period
             hours = days * 24
@@ -66,7 +66,7 @@ class WeatherService:
 
         except Exception as e:
             logger.error(f"Error in get_forecast: {e}")
-            return self._generate_mock_weather_data(days)
+            raise ValueError(f"Failed to get weather forecast: {str(e)}")
 
     async def get_weather_with_freshness(
         self,
@@ -240,29 +240,6 @@ class WeatherService:
             logger.error(f"Error finding location ID for coordinates {latitude}, {longitude}: {e}")
             return None
 
-    def _generate_mock_weather_data(self, days: int = 3) -> List[Dict]:
-        """
-        Generate mock weather data as fallback when database is unavailable
-
-        Args:
-            days: Number of days to generate data for
-
-        Returns:
-            List of mock weather data dictionaries
-        """
-        logger.warning(f"Generating mock weather data for {days} days")
-
-        weather_data = []
-        for hour in range(days * 24):
-            weather_data.append({
-                "hour": hour,
-                "temperature": 15 + (hour % 24) / 2,
-                "cloud_cover": 20 + (hour % 12) * 5,
-                "wind_speed": 5 + (hour % 6),
-                "humidity": 60 + (hour % 8) * 2,
-                "pressure": 1013
-            })
-        return weather_data
 
     async def _transform_for_forecast_generation(
         self,
