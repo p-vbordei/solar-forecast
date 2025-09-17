@@ -240,21 +240,39 @@ export class ForecastService {
                                 console.log('Found', forecasts.length, 'forecasts from Python worker');
 
                                 // Transform the forecasts to our format
-                                const transformedData = forecasts.slice(0, params.horizonHours).map((f: any) => ({
-                                    locationId: params.locationId,
-                                    timestamp: new Date(f.time).toISOString(),
-                                    powerForecastMw: f.power_output_mw || 0,
-                                    energyMwh: f.energy_mwh,
-                                    capacityFactor: f.capacity_factor,
-                                    confidenceScore: f.quality_score || 0.95,
-                                    modelType: f.model_type || params.modelType,
-                                    horizonHours: params.horizonHours,
-                                    temperature: f.temperature,
-                                    ghi: f.ghi,
-                                    dni: f.dni,
-                                    cloudCover: f.cloud_cover,
-                                    windSpeed: f.wind_speed
-                                }));
+                                // Get the base time from the first forecast or use current time
+                                const firstTime = forecasts[0]?.time || forecasts[0]?.timestamp;
+                                const baseTime = firstTime ? new Date(firstTime) : new Date();
+
+                                const transformedData = forecasts.slice(0, params.horizonHours).map((f: any, index: number) => {
+                                    // Always create incremental timestamps to avoid duplicates
+                                    // Each forecast is 1 hour apart
+                                    const timestamp = new Date(baseTime.getTime() + index * 60 * 60 * 1000);
+
+                                    return {
+                                        locationId: params.locationId,
+                                        timestamp: timestamp,
+                                        powerForecastMw: f.power_output_mw || f.power_mw || 0,
+                                        energyMwh: f.energy_mwh || 0,
+                                        capacityFactor: f.capacity_factor || 0,
+                                        confidenceScore: f.quality_score || f.confidence_score || 0.95,
+                                        modelType: f.model_type || params.modelType,
+                                        horizonHours: params.horizonHours,
+                                        temperature: f.temperature || f.temperature_c,
+                                        ghi: f.ghi || f.ghi_w_m2,
+                                        dni: f.dni || f.dni_w_m2,
+                                        cloudCover: f.cloud_cover || f.cloud_cover_percent,
+                                        windSpeed: f.wind_speed || f.wind_speed_ms
+                                    };
+                                });
+
+                                // Log timestamp uniqueness check
+                                const timestamps = transformedData.map(d => d.timestamp.toISOString());
+                                const uniqueTimestamps = [...new Set(timestamps)];
+                                console.log(`Timestamp check: ${uniqueTimestamps.length} unique out of ${timestamps.length} total`);
+                                if (uniqueTimestamps.length < timestamps.length) {
+                                    console.warn('Duplicate timestamps detected!', timestamps.slice(0, 5));
+                                }
 
                                 // Store in our database
                                 await this.repository.bulkInsertForecasts(transformedData);
@@ -597,30 +615,49 @@ export class ForecastService {
 
             let baseForecast = 0;
             let confidence = 0.85;
+            let energyMwh = 0;
+            let capacityFactor = 0;
 
+            // Simulate solar production pattern
             if (hour >= 6 && hour <= 18) {
                 const peakHour = 12;
                 const hourDiff = Math.abs(hour - peakHour);
-                const maxPower = modelType === 'lstm' ? 52 :
-                                modelType === 'xgboost' ? 48 : 45;
+                const maxPower = modelType === 'ML_ENSEMBLE' ? 45 :
+                                modelType === 'PHYSICS' ? 42 : 43;
 
                 baseForecast = maxPower * Math.exp(-(hourDiff * hourDiff) / 20);
 
-                confidence = modelType === 'lstm' ? 0.90 + Math.random() * 0.08 :
-                            modelType === 'xgboost' ? 0.88 + Math.random() * 0.10 :
+                confidence = modelType === 'ML_ENSEMBLE' ? 0.90 + Math.random() * 0.08 :
+                            modelType === 'PHYSICS' ? 0.88 + Math.random() * 0.10 :
                             0.85 + Math.random() * 0.12;
 
+                // Add realistic variation
                 baseForecast += (Math.random() - 0.5) * 8;
                 baseForecast = Math.max(0, baseForecast);
+
+                // Calculate energy and capacity factor
+                energyMwh = baseForecast * (timeStepMs / (60 * 60 * 1000)); // Convert to MWh
+                capacityFactor = baseForecast / 50; // Assuming 50MW nominal capacity
             }
+
+            // Add weather parameters for realism
+            const temperature = 20 + Math.random() * 15 - (hour < 6 || hour > 18 ? 5 : 0);
+            const ghi = baseForecast > 0 ? 200 + baseForecast * 15 + Math.random() * 100 : 0;
+            const cloudCover = baseForecast > 0 ? Math.max(0, 30 - baseForecast * 0.5) + Math.random() * 20 : 80;
 
             forecasts.push({
                 locationId: locationId,
                 timestamp,
                 powerForecastMw: parseFloat(baseForecast.toFixed(2)),
+                energyMwh: parseFloat(energyMwh.toFixed(3)),
+                capacityFactor: parseFloat(capacityFactor.toFixed(3)),
                 confidenceScore: parseFloat(confidence.toFixed(3)),
                 modelType,
-                horizonHours
+                horizonHours,
+                temperature: parseFloat(temperature.toFixed(1)),
+                ghi: parseFloat(ghi.toFixed(0)),
+                cloudCover: parseFloat(cloudCover.toFixed(0)),
+                windSpeed: parseFloat((3 + Math.random() * 5).toFixed(1))
             });
         }
 

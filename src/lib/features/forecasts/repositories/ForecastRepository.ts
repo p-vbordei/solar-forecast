@@ -89,17 +89,73 @@ export class ForecastRepository {
      */
     async bulkInsertForecasts(forecasts: BulkForecastInsert[]) {
         try {
-            // For now, skip bulk insert and return mock result
-            // TODO: Fix Prisma schema to match our data model
-            console.log(`Mock inserting ${forecasts.length} forecasts for location ${forecasts[0]?.locationId}`);
+            if (!forecasts || forecasts.length === 0) {
+                return { count: 0 };
+            }
+
+            console.log(`Inserting ${forecasts.length} forecasts for location ${forecasts[0]?.locationId}`);
+
+            // Prepare data for Prisma bulk insert - map to correct field names
+            const forecastData = forecasts.map(f => ({
+                timestamp: f.timestamp,
+                locationId: f.locationId,
+                powerMW: f.powerForecastMw || 0,  // Primary power field
+                powerOutputMW: f.powerForecastMw || 0,  // Legacy compatibility
+                energyMWh: f.energyMwh || 0,
+                capacityFactor: f.capacityFactor || 0,
+                confidence: f.confidenceScore || 0.95,  // Legacy confidence field
+                confidenceLevel: (f.confidenceScore || 0.95) * 100,  // As percentage
+                modelType: this.normalizeModelType(f.modelType),
+                modelVersion: f.modelVersion || '1.0',
+                horizonMinutes: (f.horizonHours || 24) * 60,  // Convert to minutes
+                horizonDays: Math.ceil((f.horizonHours || 24) / 24),  // Convert to days
+                resolution: 'HOURLY',  // Default resolution
+                forecastType: 'OPERATIONAL',  // Default type
+                dataQuality: 'GOOD',  // Default quality
+                // Weather parameters
+                temperature: f.temperature,
+                ghi: f.ghi,
+                dni: f.dni,
+                cloudCover: f.cloudCover,
+                windSpeed: f.windSpeed,
+                // Add quality score
+                qualityScore: f.confidenceScore || 0.95,
+                isValidated: false
+            }));
+
+            // Use createMany for bulk insert
+            const result = await db.forecast.createMany({
+                data: forecastData,
+                skipDuplicates: true // Skip duplicates to avoid conflicts
+            });
+
+            console.log(`Successfully inserted ${result.count} forecasts`);
 
             return {
-                count: forecasts.length
+                count: result.count
             };
         } catch (error) {
             console.error('Bulk forecast insert failed:', error);
+            // Provide more details about the error
+            if (error.code === 'P2002') {
+                throw new Error('Duplicate forecast timestamps detected');
+            }
             throw new Error(`Failed to insert forecasts: ${error.message}`);
         }
+    }
+
+    /**
+     * Normalize model type to match Prisma enum
+     */
+    private normalizeModelType(modelType: string): string {
+        const typeMap: Record<string, string> = {
+            'ML_ENSEMBLE': 'ENSEMBLE',
+            'PHYSICS': 'PHYSICAL',
+            'HYBRID': 'HYBRID',
+            'LSTM': 'ML_ADVANCED',
+            'XGBOOST': 'ML_ADVANCED'
+        };
+        return typeMap[modelType] || 'ENSEMBLE';
     }
 
     /**
