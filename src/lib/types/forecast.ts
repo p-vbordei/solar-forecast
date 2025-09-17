@@ -57,11 +57,6 @@ export interface Forecast {
 }
 
 export enum ModelType {
-  ML_LSTM = 'ML_LSTM',
-  ML_GRU = 'ML_GRU',
-  ML_XGBOOST = 'ML_XGBOOST',
-  ML_RANDOMFOREST = 'ML_RANDOMFOREST',
-  ML_PROPHET = 'ML_PROPHET',
   PHYSICAL = 'PHYSICAL',
   HYBRID = 'HYBRID',
   ENSEMBLE = 'ENSEMBLE',

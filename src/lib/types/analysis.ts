@@ -144,12 +144,7 @@ export interface ExportResponse {
 
 export type TimeAggregation = '15min' | '1hour' | '1day' | '1week';
 
-export type ModelType = 
-  | 'ML_LSTM'
-  | 'ML_GRU' 
-  | 'ML_XGBOOST'
-  | 'ML_RANDOMFOREST'
-  | 'ML_PROPHET'
+export type ModelType =
   | 'PHYSICAL'
   | 'HYBRID'
   | 'ENSEMBLE'

@@ -123,11 +123,60 @@ export class ForecastRepository {
                 isValidated: false
             }));
 
-            // Use createMany for bulk insert
-            const result = await db.forecast.createMany({
-                data: forecastData,
-                skipDuplicates: true // Skip duplicates to avoid conflicts
-            });
+            // Debug: Check if any object has a 'time' field
+            const hasTimeField = forecastData.some((f: any) => 'time' in f);
+            if (hasTimeField) {
+                console.error('ERROR: forecastData contains "time" field!', Object.keys(forecastData[0]));
+            }
+
+            // Double-check the data structure before sending to database
+            console.log('Sample forecast data being sent to database:', JSON.stringify(forecastData[0], null, 2));
+
+            // Use raw SQL to bypass Prisma's mysterious 'time' field issue
+            // Build VALUES clause for raw SQL insert
+            const values = forecastData.map((f: any) => {
+                return `(
+                    '${f.timestamp.toISOString()}',
+                    '${f.locationId}',
+                    ${f.powerMW},
+                    ${f.powerOutputMW},
+                    ${f.energyMWh || 'NULL'},
+                    ${f.capacityFactor || 'NULL'},
+                    ${f.confidence || 'NULL'},
+                    ${f.confidenceLevel || 'NULL'},
+                    '${f.modelType}',
+                    '${f.modelVersion || '1.0'}',
+                    ${f.horizonMinutes},
+                    ${f.horizonDays || 'NULL'},
+                    '${f.resolution}',
+                    '${f.forecastType}',
+                    '${f.dataQuality}',
+                    ${f.temperature || 'NULL'},
+                    ${f.ghi || 'NULL'},
+                    ${f.dni || 'NULL'},
+                    ${f.cloudCover || 'NULL'},
+                    ${f.windSpeed || 'NULL'},
+                    ${f.qualityScore || 'NULL'},
+                    ${f.isValidated}
+                )`;
+            }).join(',\n');
+
+            // Execute raw SQL insert
+            const insertQuery = `
+                INSERT INTO forecasts (
+                    "timestamp", "locationId", "powerMW", "powerOutputMW",
+                    "energyMWh", "capacityFactor", "confidence", "confidenceLevel",
+                    "modelType", "modelVersion", "horizonMinutes", "horizonDays",
+                    "resolution", "forecastType", "dataQuality",
+                    "temperature", "ghi", "dni", "cloudCover", "windSpeed",
+                    "qualityScore", "isValidated"
+                ) VALUES ${values}
+                ON CONFLICT ("locationId", "timestamp", "modelType") DO NOTHING
+                RETURNING id
+            `;
+
+            const insertedRows = await db.$queryRawUnsafe(insertQuery) as any[];
+            const result = { count: insertedRows.length };
 
             console.log(`Successfully inserted ${result.count} forecasts`);
 
@@ -151,9 +200,10 @@ export class ForecastRepository {
         const typeMap: Record<string, string> = {
             'ML_ENSEMBLE': 'ENSEMBLE',
             'PHYSICS': 'PHYSICAL',
+            'PHYSICAL': 'PHYSICAL',
             'HYBRID': 'HYBRID',
-            'LSTM': 'ML_ADVANCED',
-            'XGBOOST': 'ML_ADVANCED'
+            'CATBOOST': 'ENSEMBLE',  // CatBoost is our ensemble model
+            'ENSEMBLE': 'ENSEMBLE'
         };
         return typeMap[modelType] || 'ENSEMBLE';
     }

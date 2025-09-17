@@ -360,11 +360,6 @@ enum ForecastType {
 }
 
 enum ModelType {
-  ML_LSTM
-  ML_GRU
-  ML_XGBOOST
-  ML_RANDOMFOREST
-  ML_PROPHET
   PHYSICAL
   HYBRID
   ENSEMBLE
