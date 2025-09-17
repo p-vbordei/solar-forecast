@@ -1,29 +1,51 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import MetricCard from '$lib/components/dashboard/MetricCard.svelte';
 	import DashboardSolarForecast from '$lib/components/dashboard/DashboardSolarForecast.svelte';
 	import DashboardProductionForecast from '$lib/components/dashboard/DashboardProductionForecast.svelte';
 	import WeatherSyncButton from '$lib/components/weather/WeatherSyncButton.svelte';
 	import DocumentTextIcon from '$lib/components/icons/DocumentTextIcon.svelte';
 	import ChartBarIcon from '$lib/components/icons/ChartBarIcon.svelte';
-	
+
 	let showExplanation = false;
-	
+
 	// Dashboard location selection
-	let selectedDashboardLocation = 1;
-	
+	let selectedDashboardLocation = '550e8400-e29b-41d4-a716-446655440004'; // Default UUID
+
+	// Get locations from API
+	let locations: any[] = [];
+	let isLoadingLocations = true;
+
+	async function loadLocations() {
+		try {
+			const response = await fetch('/api/locations');
+			if (response.ok) {
+				const result = await response.json();
+				locations = result.data || [];
+				if (locations.length > 0) {
+					selectedDashboardLocation = locations[0].id;
+				}
+			} else {
+				console.error('Failed to load locations');
+			}
+		} catch (error) {
+			console.error('Error loading locations:', error);
+		} finally {
+			isLoadingLocations = false;
+		}
+	}
+
+	// Load data on mount
+	onMount(() => {
+		loadLocations();
+	});
+
 	// Mock data for now
 	const metrics = {
 		currentProduction: 87.5,
 		dailyEnergy: 1245.8,
 		forecastAccuracy: 94.2
 	};
-	
-	const locations = [
-		{ id: 1, name: 'Solar Farm Alpha - Bucharest' },
-		{ id: 2, name: 'Solar Station Beta - Cluj' },
-		{ id: 3, name: 'Green Energy Park - Timisoara' },
-		{ id: 4, name: 'Coastal Solar Array - Constanta' }
-	];
 </script>
 
 <div class="space-y-6">
@@ -78,9 +100,13 @@
 			<div class="flex-1">
 				<label for="dashboard-location-select" class="label">Select Location for Weather Data</label>
 				<select id="dashboard-location-select" class="select" bind:value={selectedDashboardLocation}>
-					{#each locations as location}
-						<option value={location.id}>{location.name}</option>
-					{/each}
+					{#if isLoadingLocations}
+						<option>Loading locations...</option>
+					{:else}
+						{#each locations as location}
+							<option value={location.id}>{location.name}</option>
+						{/each}
+					{/if}
 				</select>
 			</div>
 			<div class="text-sm text-soft-blue/60 max-w-xs">
@@ -91,15 +117,31 @@
 
 	<!-- Main Content Grid -->
 	<div class="grid grid-cols-1 gap-6">
-		<!-- Solar Forecast -->
-		<div>
-			<DashboardSolarForecast locationId={selectedDashboardLocation} />
-		</div>
-		
-		<!-- Production Forecast -->
-		<div>
-			<DashboardProductionForecast locationId={selectedDashboardLocation} />
-		</div>
+		{#if isLoadingLocations}
+			<div class="card-glass">
+				<div class="flex items-center justify-center p-8">
+					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan"></div>
+					<span class="ml-3 text-soft-blue">Loading dashboard data...</span>
+				</div>
+			</div>
+		{:else}
+			<!-- Solar Forecast -->
+			<div>
+				<DashboardSolarForecast
+					locationId={selectedDashboardLocation}
+					locationName={locations.find(l => l.id === selectedDashboardLocation)?.name || 'Selected Location'}
+					isMockData={false}
+				/>
+			</div>
+
+			<!-- Production Forecast -->
+			<div>
+				<DashboardProductionForecast
+					locationId={selectedDashboardLocation}
+					locationName={locations.find(l => l.id === selectedDashboardLocation)?.name || 'Selected Location'}
+				/>
+			</div>
+		{/if}
 	</div>
 	
 	

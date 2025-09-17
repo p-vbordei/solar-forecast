@@ -2,18 +2,12 @@
 	import { onMount, onDestroy } from 'svelte';
 
 	export let locationId: string | number = 1;
-	export let isMockData: boolean = true; // Default to true since this component typically shows mock weather data
+	export let isMockData: boolean = false; // Default to false to try to fetch real data
 
-	// Convert locationId to number for compatibility with existing code
-	$: numericLocationId = typeof locationId === 'string' ? 1 : locationId;
+	// Keep locationId as-is for API calls (supports both string UUIDs and numeric IDs)
 
-	// Location names for display
-	const locations = {
-		1: 'Solar Farm Alpha - Bucharest',
-		2: 'Solar Station Beta - Cluj',
-		3: 'Green Energy Park - Timisoara',
-		4: 'Coastal Solar Array - Constanta'
-	};
+	// Accept location name as a prop
+	export let locationName: string = 'Selected Location';
 
 	// Available timezones for display (UTC-3 to UTC+4)
 	const availableTimezones = [
@@ -33,7 +27,7 @@
 	// Save timezone preference when changed
 	function handleTimezoneChange() {
 		if (typeof window !== 'undefined') {
-			localStorage.setItem(`timezone_location_${numericLocationId}`, selectedTimezone);
+			localStorage.setItem(`timezone_location_${locationId}`, selectedTimezone);
 		}
 		updateChart();
 	}
@@ -142,7 +136,7 @@
 
 	// Fetch real data from API
 	async function fetchWeatherData(timeRange: string = 'Today') {
-		console.log('Fetching weather data:', { locationId: numericLocationId, timeRange, params: selectedParameters });
+		console.log('Fetching weather data:', { locationId, timeRange, params: selectedParameters });
 		isLoading = true;
 		errorMessage = '';
 
@@ -151,7 +145,7 @@
 			const params = selectedParameters.join(',');
 
 			// Fetch real data from our API
-			const response = await fetch(`/api/weather/chart-data?location_id=${numericLocationId}&time_range=${timeRange}&parameters=${params}`);
+			const response = await fetch(`/api/weather/chart-data?location_id=${locationId}&time_range=${timeRange}&parameters=${params}`);
 			const result = await response.json();
 			console.log('API response:', result);
 
@@ -194,7 +188,9 @@
 			}
 		}
 
-		const locationProfile = locationWeatherProfiles[numericLocationId] || locationWeatherProfiles[1];
+		// For UUID locations, use default profile (1)
+		const profileId = typeof locationId === 'number' ? locationId : 1;
+		const locationProfile = locationWeatherProfiles[profileId] || locationWeatherProfiles[1];
 
 		// Generate datasets for selected parameters
 		selectedParameters.forEach(param => {
@@ -428,7 +424,7 @@
 		mounted = true;
 		// Load saved timezone preference
 		if (typeof window !== 'undefined') {
-			const savedTimezone = localStorage.getItem(`timezone_location_${numericLocationId}`);
+			const savedTimezone = localStorage.getItem(`timezone_location_${locationId}`);
 			if (savedTimezone && availableTimezones.find(tz => tz.value === savedTimezone)) {
 				selectedTimezone = savedTimezone;
 			}
@@ -443,7 +439,7 @@
 	}
 
 	// Update chart when location changes (only in browser after mount)
-	$: if (mounted && numericLocationId) {
+	$: if (mounted && locationId) {
 		updateChartData();
 	}
 
@@ -471,7 +467,7 @@
 				{/if}
 			</div>
 			<p class="text-sm text-soft-blue/60 mt-1">
-				{isMockData ? 'Simulated' : 'Real-time'} meteorological data for <span class="text-cyan font-medium">{locations[numericLocationId] || 'Selected Location'}</span>
+				{isMockData ? 'Simulated' : 'Real-time'} meteorological data for <span class="text-cyan font-medium">{locationName}</span>
 			</p>
 		</div>
 		
@@ -508,7 +504,7 @@
 			{/each}
 		</select>
 		<span class="text-xs text-soft-blue/60">
-			Location: {locations[numericLocationId] || 'Selected Location'}
+			Location: {locationName}
 		</span>
 	</div>
 

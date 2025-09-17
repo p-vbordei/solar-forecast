@@ -2,18 +2,10 @@
 	import { onMount } from 'svelte';
 
 	export let locationId: string | number = 1;
-	export let isMockData: boolean = true; // Default to true since this component generates mock data
+	export let locationName: string = 'Selected Location';
+	export let isMockData: boolean = false; // Default to false to try to fetch real data
 
-	// Convert locationId to number for compatibility with existing code
-	$: numericLocationId = typeof locationId === 'string' ? 1 : locationId;
-
-	// Location names for display
-	const locations = {
-		1: 'Solar Farm Alpha - Bucharest',
-		2: 'Solar Station Beta - Cluj', 
-		3: 'Green Energy Park - Timisoara',
-		4: 'Coastal Solar Array - Constanta'
-	};
+	// Keep locationId as-is for API calls (supports both string UUIDs and numeric IDs)
 
 	// Location-specific production characteristics
 	const locationProductionProfiles = {
@@ -71,7 +63,9 @@
 		}
 		
 		const data: any = {};
-		const locationProfile = locationProductionProfiles[numericLocationId] || locationProductionProfiles[1];
+		// For UUID locations, use default profile (1)
+		const profileId = typeof locationId === 'number' ? locationId : 1;
+		const locationProfile = locationProductionProfiles[profileId] || locationProductionProfiles[1];
 		
 		timePoints.forEach((point, index) => {
 			let productionFactor = 0;
@@ -279,7 +273,7 @@
 	}
 	
 	// Update chart when location changes
-	$: if (numericLocationId) {
+	$: if (locationId) {
 		updateChart();
 	}
 </script>
@@ -295,7 +289,7 @@
 					</span>
 				{/if}
 			</div>
-			<p class="text-sm text-soft-blue/60 mt-1">Energy production forecasts for <span class="text-cyan font-medium">{locations[numericLocationId] || 'Selected Location'}</span></p>
+			<p class="text-sm text-soft-blue/60 mt-1">Energy production forecasts for <span class="text-cyan font-medium">{locationName}</span></p>
 		</div>
 		
 		<!-- Time Range Buttons -->
@@ -324,7 +318,8 @@
 		{@const currentData = activeTimeRange === '7 Days' ? 
 			mockData.data[0] : 
 			mockData.data[new Date().getHours()] ? mockData.data[new Date().getHours()] : mockData.data[0]}
-		{@const locationProfile = locationProductionProfiles[numericLocationId] || locationProductionProfiles[1]}
+		{@const profileId = typeof locationId === 'number' ? locationId : 1}
+		{@const locationProfile = locationProductionProfiles[profileId] || locationProductionProfiles[1]}
 		
 		<div class="bg-glass-white rounded-lg p-3">
 			<div class="text-xs text-soft-blue/70 mb-1">Forecast</div>
