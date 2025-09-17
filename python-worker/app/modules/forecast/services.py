@@ -12,7 +12,7 @@ import logging
 from .repositories import ForecastRepository
 from .models_api import ForecastTaskResponse, ForecastAccuracyResponse
 from app.modules.ml_models.services import MLModelService
-from app.modules.weather.services import WeatherService
+# Weather service removed - now using SvelteKit API via repository
 
 # Import the real forecast engine (NO CLASSES - pure functions)
 try:
@@ -32,7 +32,7 @@ class ForecastService:
         self.db = db
         self.repo = ForecastRepository(db)
         self.ml_service = MLModelService(db)
-        self.weather_service = WeatherService(db)
+        # Weather service removed - now using SvelteKit API
         
         # In-memory task tracking (should use Redis in production)
         self.tasks: Dict[str, Dict] = {}

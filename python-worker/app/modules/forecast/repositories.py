@@ -266,64 +266,105 @@ class ForecastRepository:
         return None
 
     async def get_recent_weather(self, location_id: str, hours: int) -> pd.DataFrame:
-        """Get weather data from TimescaleDB as DataFrame for forecast models"""
-        query = text("""
-            SELECT
-                timestamp, temperature, humidity,
-                "windSpeed", "cloudCover", ghi, dni, dhi
-            FROM weather_data
-            WHERE "locationId" = :location_id
-                AND ghi IS NOT NULL
-                AND dni IS NOT NULL
-                AND timestamp >= NOW() - INTERVAL '7 days'
-            ORDER BY timestamp ASC
-            LIMIT :limit_hours
-        """)
+        """Get weather data from SvelteKit API as DataFrame for forecast models"""
+        import httpx
+        import os
 
-        # Set limit to ensure we get reasonable amount of data
-        limit_hours = min(hours, 168)  # Max 7 days
+        # Get SvelteKit URL from environment
+        sveltekit_url = os.getenv('SVELTEKIT_URL', 'http://localhost:5173')
 
-        result = await self.db.execute(query, {"location_id": location_id, "limit_hours": limit_hours})
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{sveltekit_url}/api/weather/dataframe",
+                    params={
+                        "location_id": location_id,
+                        "hours": hours
+                    }
+                )
 
-        # Convert to DataFrame for forecast models
-        data = []
-        for row in result:
-            data.append({
-                'timestamp': row[0],
-                'temp_air': row[1],
-                'humidity': row[2],
-                'pressure': 1013.25,  # Default - not in schema
-                'wind_speed': row[3],
-                'cloud_cover': row[4],
-                'ghi': row[5] if row[5] is not None else 0,
-                'dni': row[6] if row[6] is not None else 0,
-                'dhi': row[7] if row[7] is not None else 0,
-                'solar_zenith': 45,  # Default - not in schema
-                'solar_azimuth': 180,  # Default - not in schema
-                'precipitable_water': 14.0  # Required for PVLIB
-            })
+                if response.status_code != 200:
+                    raise Exception(f"SvelteKit API error: {response.status_code}")
 
-        df = pd.DataFrame(data)
-        if not df.empty:
-            df.set_index('timestamp', inplace=True)
+                api_data = response.json()
 
-            # Add missing PVLIB fields with reasonable defaults
-            if 'precipitable_water' not in df.columns:
-                # Default precipitable water: 14mm (typical mid-latitude value)
-                df['precipitable_water'] = 14.0
+                if not api_data.get('success'):
+                    raise Exception(f"API error: {api_data.get('error', 'Unknown error')}")
 
-            # Ensure all required PVLIB weather fields are present
-            pvlib_fields = {
-                'wind_speed': 2.0,      # Default wind speed m/s
-                'temp_air': 20.0,       # Default air temperature °C
-                'albedo': 0.2           # Default ground reflectance
-            }
+                # Convert API response to DataFrame
+                weather_records = api_data['data']
 
-            for field, default_value in pvlib_fields.items():
-                if field not in df.columns:
-                    df[field] = default_value
+                if not weather_records:
+                    # Return empty DataFrame with expected columns
+                    return pd.DataFrame(columns=[
+                        'timestamp', 'temp_air', 'humidity', 'wind_speed',
+                        'cloud_cover', 'ghi', 'dni', 'dhi'
+                    ])
 
-        return df
+                # Create DataFrame from API response
+                df = pd.DataFrame(weather_records)
+
+                # Convert timestamp to datetime and set as index
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df.set_index('timestamp', inplace=True)
+
+                # Map SvelteKit field names to PVLIB/forecast expected names
+                column_mapping = {
+                    'temperature': 'temp_air',
+                    'windSpeed': 'wind_speed',
+                    'cloudCover': 'cloud_cover'
+                }
+
+                df = df.rename(columns=column_mapping)
+
+                # Ensure numeric columns
+                numeric_cols = ['temp_air', 'humidity', 'wind_speed', 'cloud_cover', 'ghi', 'dni', 'dhi']
+                for col in numeric_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+                # Add missing PVLIB fields with reasonable defaults
+                if 'pressure' not in df.columns:
+                    df['pressure'] = 1013.25
+
+                if 'precipitable_water' not in df.columns:
+                    df['precipitable_water'] = 14.0
+
+                if 'solar_zenith' not in df.columns:
+                    df['solar_zenith'] = 45
+
+                if 'solar_azimuth' not in df.columns:
+                    df['solar_azimuth'] = 180
+
+                if 'albedo' not in df.columns:
+                    df['albedo'] = 0.2
+
+                # Fill any missing values with defaults
+                pvlib_defaults = {
+                    'wind_speed': 2.0,
+                    'temp_air': 20.0,
+                    'humidity': 60.0,
+                    'cloud_cover': 50.0,
+                    'ghi': 0,
+                    'dni': 0,
+                    'dhi': 0
+                }
+
+                for field, default_value in pvlib_defaults.items():
+                    if field in df.columns:
+                        df[field] = df[field].fillna(default_value)
+
+                logger.info(f"Retrieved {len(df)} weather records from SvelteKit for location {location_id}")
+                return df
+
+        except Exception as e:
+            logger.error(f"Failed to get weather data from SvelteKit for location {location_id}: {e}")
+
+            # Fallback: return empty DataFrame with expected structure
+            return pd.DataFrame(columns=[
+                'timestamp', 'temp_air', 'humidity', 'wind_speed',
+                'cloud_cover', 'ghi', 'dni', 'dhi'
+            ])
 
     async def bulk_save_forecasts(self, location_id: str, forecasts: pd.DataFrame) -> int:
         """Bulk insert forecasts using correct Prisma field mapping (UTC timestamps)"""

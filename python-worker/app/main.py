@@ -9,7 +9,7 @@ import structlog
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.modules.forecast import forecast_router
-from app.modules.weather import weather_router
+# Weather module removed - now using SvelteKit API
 from app.modules.analysis import analysis_router
 from app.modules.pipeline import pipeline_router
 
@@ -136,11 +136,7 @@ app.include_router(
     tags=["Solar Forecasting"]
 )
 
-app.include_router(
-    weather_router,
-    prefix="/api/v1/weather",
-    tags=["weather"]
-)
+# Weather router removed - now using SvelteKit API
 
 app.include_router(
     analysis_router,
