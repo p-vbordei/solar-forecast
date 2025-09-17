@@ -2,7 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 
 /**
- * GET /api/forecast/worker/status - Check Python worker status
+ * GET /api/forecasts/worker/status - Check Python worker status
  * Used by UI to verify Python worker connectivity
  */
 export const GET: RequestHandler = async ({ url }) => {

@@ -2,7 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 
 /**
- * POST /api/forecast/worker/bulk - Generate forecasts for multiple locations
+ * POST /api/forecasts/worker/bulk - Generate forecasts for multiple locations
  * Used by UI for batch processing and scheduled operations
  */
 export const POST: RequestHandler = async ({ request }) => {
@@ -59,7 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
- * GET /api/forecast/worker/bulk?task_id=xxx - Check bulk operation status
+ * GET /api/forecasts/worker/bulk?task_id=xxx - Check bulk operation status
  */
 export const GET: RequestHandler = async ({ url }) => {
     try {

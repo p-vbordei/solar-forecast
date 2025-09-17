@@ -64,7 +64,7 @@
       progress = 20;
       progressMessage = 'Initializing forecast generation...';
       // Start forecast generation
-      const response = await fetch('/api/forecast/generate', {
+      const response = await fetch('/api/forecasts/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +116,7 @@
     if (!locationId) return null;
 
     try {
-      const response = await fetch('/api/forecast/worker/validate', {
+      const response = await fetch('/api/forecasts/worker/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

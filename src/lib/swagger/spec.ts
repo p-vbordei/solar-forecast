@@ -926,7 +926,7 @@ export const swaggerSpec = {
         }
       }
     },
-    '/api/forecast/generate': {
+    '/api/forecasts/generate': {
       post: {
         tags: ['Forecasts'],
         summary: 'Generate solar power forecast',
@@ -953,7 +953,7 @@ export const swaggerSpec = {
         }
       }
     },
-    '/api/forecast/worker/status': {
+    '/api/forecasts/worker/status': {
       get: {
         tags: ['Forecasts'],
         summary: 'Check Python worker status',
@@ -978,7 +978,7 @@ export const swaggerSpec = {
         }
       }
     },
-    '/api/forecast/worker/bulk': {
+    '/api/forecasts/worker/bulk': {
       post: {
         tags: ['Forecasts'],
         summary: 'Generate bulk forecasts',
@@ -1031,7 +1031,7 @@ export const swaggerSpec = {
         }
       }
     },
-    '/api/forecast/worker/validate': {
+    '/api/forecasts/worker/validate': {
       post: {
         tags: ['Forecasts'],
         summary: 'Validate forecast parameters',
@@ -1073,7 +1073,7 @@ export const swaggerSpec = {
         }
       }
     },
-    '/api/forecast/worker/models': {
+    '/api/forecasts/worker/models': {
       get: {
         tags: ['Forecasts'],
         summary: 'Get available ML models',

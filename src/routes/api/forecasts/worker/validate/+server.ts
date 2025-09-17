@@ -3,7 +3,7 @@ import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/database';
 
 /**
- * POST /api/forecast/worker/validate - Validate forecast parameters and test connection
+ * POST /api/forecasts/worker/validate - Validate forecast parameters and test connection
  * Used by UI for pre-validation before generating actual forecasts
  */
 export const POST: RequestHandler = async ({ request }) => {

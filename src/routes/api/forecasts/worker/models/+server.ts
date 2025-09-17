@@ -2,7 +2,7 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 
 /**
- * GET /api/forecast/worker/models - Get available models from Python worker
+ * GET /api/forecasts/worker/models - Get available models from Python worker
  * Used by UI to populate model selection dropdown
  */
 export const GET: RequestHandler = async () => {
@@ -82,7 +82,7 @@ export const GET: RequestHandler = async () => {
 };
 
 /**
- * POST /api/forecast/worker/models/test - Test a specific model
+ * POST /api/forecasts/worker/models/test - Test a specific model
  * Used by UI to validate model performance before using
  */
 export const POST: RequestHandler = async ({ request }) => {
