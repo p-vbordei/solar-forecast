@@ -354,7 +354,7 @@ class ForecastRepository:
             values.append({
                 "id": str(uuid4()),
                 "timestamp": timestamp,  # Correct field name
-                "time": timestamp,  # Legacy field for Prisma compatibility
+                # REMOVED 'time' field - it doesn't exist in database!
                 "locationId": location_id,  # String UUID
                 "powerMW": row.get('power_mw', 0.0),  # Correct field name, MW units
                 "powerOutputMW": row.get('power_mw', 0.0),  # Required duplicate field
@@ -385,14 +385,14 @@ class ForecastRepository:
         # Use COPY or multi-row INSERT for TimescaleDB optimization
         query = text("""
             INSERT INTO forecasts (
-                id, timestamp, time, "locationId", "powerMW", "powerOutputMW", "energyMWh", "capacityFactor",
+                id, timestamp, "locationId", "powerMW", "powerOutputMW", "energyMWh", "capacityFactor",
                 "powerMWQ10", "powerMWQ25", "powerMWQ75", "powerMWQ90",
                 "modelType", "modelVersion", "horizonMinutes",
                 resolution, "forecastType", "dataQuality",
                 temperature, ghi, dni, "cloudCover", "windSpeed",
                 "qualityScore", "isValidated", "createdAt"
             ) VALUES (
-                :id, :timestamp, :time, :locationId, :powerMW, :powerOutputMW, :energyMWh, :capacityFactor,
+                :id, :timestamp, :locationId, :powerMW, :powerOutputMW, :energyMWh, :capacityFactor,
                 :powerMWQ10, :powerMWQ25, :powerMWQ75, :powerMWQ90,
                 :modelType, :modelVersion, :horizonMinutes,
                 :resolution, :forecastType, :dataQuality,

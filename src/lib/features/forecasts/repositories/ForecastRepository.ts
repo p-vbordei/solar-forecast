@@ -145,7 +145,10 @@ export class ForecastRepository {
             // Use raw SQL to bypass Prisma's mysterious 'time' field issue
             // Build VALUES clause for raw SQL insert
             const values = forecastData.map((f: any) => {
+                // Generate a UUID for each forecast
+                const id = crypto.randomUUID();
                 return `(
+                    '${id}',
                     '${f.timestamp.toISOString()}',
                     '${f.locationId}',
                     ${f.powerMW},
@@ -174,14 +177,13 @@ export class ForecastRepository {
             // Execute raw SQL insert
             const insertQuery = `
                 INSERT INTO forecasts (
-                    "timestamp", "locationId", "powerMW", "powerOutputMW",
+                    id, "timestamp", "locationId", "powerMW", "powerOutputMW",
                     "energyMWh", "capacityFactor", "confidence", "confidenceLevel",
                     "modelType", "modelVersion", "horizonMinutes", "horizonDays",
                     "resolution", "forecastType", "dataQuality",
                     "temperature", "ghi", "dni", "cloudCover", "windSpeed",
                     "qualityScore", "isValidated"
                 ) VALUES ${values}
-                ON CONFLICT ("locationId", "timestamp", "modelType") DO NOTHING
                 RETURNING id
             `;
 

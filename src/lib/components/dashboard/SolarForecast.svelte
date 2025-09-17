@@ -813,11 +813,34 @@
       return;
     }
 
+    // Debug logging
+    console.log("ForecastData:", forecastData);
+    console.log(
+      "Datasets:",
+      forecastData.datasets.map((d) => ({
+        label: d.label,
+        dataLength: d.data?.length,
+      })),
+    );
+
     const exportData = transformChartDataForExport(
       forecastData,
       createParameterMapping(),
     );
+
+    console.log("Export data sample:", exportData[0]);
+    console.log("Export data keys:", Object.keys(exportData[0] || {}));
+
     const exportOptions = createExportOptions();
+
+    // Ensure we're only including parameters that have actual data
+    const dataKeys = new Set(
+      Object.keys(exportData[0] || {}).filter((k) => k !== "timestamp"),
+    );
+    exportOptions.allParameters = Array.from(dataKeys);
+
+    console.log("Export options:", exportOptions);
+
     exportToCSV(exportData, exportOptions);
   }
 
@@ -831,7 +854,22 @@
       forecastData,
       createParameterMapping(),
     );
+
+    // Log the export data for debugging
+    console.log("Export data sample:", exportData.slice(0, 2));
+    console.log(
+      "Available parameters in data:",
+      Object.keys(exportData[0] || {}),
+    );
+
     const exportOptions = createExportOptions();
+
+    // Ensure we're only including parameters that have actual data
+    const dataKeys = new Set(
+      Object.keys(exportData[0] || {}).filter((k) => k !== "timestamp"),
+    );
+    exportOptions.allParameters = Array.from(dataKeys);
+
     exportToExcel(exportData, exportOptions);
   }
 
@@ -846,6 +884,14 @@
       createParameterMapping(),
     );
     const exportOptions = createExportOptions();
+
+    // Ensure we're only including parameters that have actual data
+    const dataKeys = new Set(
+      Object.keys(exportData[0] || {}).filter((k) => k !== "timestamp"),
+    );
+    exportOptions.allParameters = Array.from(dataKeys);
+    exportOptions.selectedParameters = Array.from(dataKeys); // PDF uses selectedParameters
+
     await exportToPDF(exportData, exportOptions, chartContainer);
   }
 

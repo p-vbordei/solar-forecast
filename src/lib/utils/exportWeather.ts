@@ -410,18 +410,64 @@ export function transformChartDataForExport(
 ): WeatherExportData[] {
   const result: WeatherExportData[] = [];
 
+  // Create reverse mapping from dataset labels to parameter keys
+  const labelToParamKey: Record<string, string> = {
+    // Solar radiation mappings
+    "Global Horizontal Irradiance (GHI)": "shortwave_radiation",
+    "Direct Normal Irradiance (DNI)": "direct_radiation",
+    "Diffuse Horizontal Irradiance (DHI)": "diffuse_radiation",
+    "Global Tilted Irradiance (GTI)": "global_tilted_irradiance",
+    "Sunshine Duration": "sunshine_duration",
+    "UV Index": "uv_index",
+    "Solar Radiation": "shortwave_radiation", // API returns this label
+
+    // Atmospheric conditions mappings
+    "Air Temperature": "temperature_2m",
+    Temperature: "temperature_2m", // API returns this label
+    "Relative Humidity": "relative_humidity_2m",
+    Humidity: "relative_humidity_2m", // API returns this label
+    "Surface Pressure": "surface_pressure",
+    "Dew Point": "dew_point_2m",
+    Visibility: "visibility",
+
+    // Wind conditions mappings
+    "Wind Speed (10m)": "wind_speed_10m",
+    "Wind Speed (100m)": "wind_speed_100m",
+    "Wind Speed": "wind_speed_10m", // API returns this label
+    "Wind Direction (10m)": "wind_direction_10m",
+    "Wind Gusts": "wind_gusts_10m",
+
+    // Cloud & precipitation mappings
+    "Total Cloud Cover": "cloud_cover",
+    "Cloud Coverage": "cloud_cover", // API returns this label
+    "Low Cloud Cover": "cloud_cover_low",
+    "Mid Cloud Cover": "cloud_cover_mid",
+    "High Cloud Cover": "cloud_cover_high",
+    Precipitation: "precipitation",
+    Rain: "rain",
+
+    // Direct API mappings for DNI/DHI
+    "Direct Normal Irradiance": "direct_radiation",
+    "Diffuse Horizontal Irradiance": "diffuse_radiation",
+  };
+
   // Create a row for each timestamp
   chartData.labels.forEach((timestamp, index) => {
     const row: WeatherExportData = { timestamp };
 
     // Add data from each dataset
     chartData.datasets.forEach((dataset) => {
-      // Find the parameter key for this dataset
-      const paramKey = Object.entries(parameterMapping).find(
-        ([key, value]) =>
-          dataset.label.toLowerCase().includes(value.toLowerCase()) ||
-          dataset.label.toLowerCase().includes(key.toLowerCase()),
-      )?.[0];
+      // Try to find parameter key by exact label match first
+      let paramKey = labelToParamKey[dataset.label];
+
+      // If no exact match, try to find by mapping
+      if (!paramKey) {
+        paramKey = Object.entries(parameterMapping).find(
+          ([key, value]) =>
+            dataset.label.toLowerCase().includes(value.toLowerCase()) ||
+            dataset.label.toLowerCase().includes(key.toLowerCase()),
+        )?.[0];
+      }
 
       if (paramKey && dataset.data[index] !== undefined) {
         row[paramKey] = dataset.data[index];

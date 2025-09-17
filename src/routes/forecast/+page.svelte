@@ -15,9 +15,9 @@
   let showWeatherOverlay = false;
   let selectedTimeView: "15min" | "hourly" | "daily" | "weekly" = "hourly";
 
-  // Selected location for forecast generation
-  let selectedLocation = "550e8400-e29b-41d4-a716-446655440004";
-  let selectedWeatherLocation = "550e8400-e29b-41d4-a716-446655440004"; // Use same type as locations
+  // Selected location for forecast generation - will be set after loading locations
+  let selectedLocation = "";
+  let selectedWeatherLocation = ""; // Use same type as locations
 
   // Get locations from API
   let locations: any[] = [];
@@ -30,8 +30,12 @@
         const result = await response.json();
         locations = result.data || [];
         if (locations.length > 0) {
+          // Set to first location
           selectedLocation = locations[0].id;
           selectedWeatherLocation = locations[0].id; // Set weather location to first in list
+
+          // Load any existing forecast data for this location
+          await loadForecastData();
         }
       } else {
         console.error("Failed to load locations");
@@ -113,17 +117,14 @@
     // Check if mock data was used
     isMockData = event.detail.metadata?.isMockData || false;
 
+    // Wait a moment for data to be saved to database
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // Refresh the forecast data
     await loadForecastData();
 
-    // Show success message
-    // Check both possible data structures
-    const dataPoints =
-      event.detail.data?.data?.length || event.detail.data?.length || 0;
-    const dataType = isMockData ? "Mock forecast" : "Forecast";
-    alert(
-      `${dataType} generated successfully! ${dataPoints} data points created.`,
-    );
+    // Show success message - removed alert as UI already shows completion
+    console.log("Forecast generated successfully!");
   }
 
   // Export forecast data
@@ -167,16 +168,22 @@
     }
   }
 
-  // Load data on mount and when selection changes
+  // Load data on mount
   onMount(() => {
     loadLocations();
   });
 
-  $: if (selectedLocation) {
+  // Reload forecast data when location changes (but avoid double loading)
+  let previousLocation = "";
+  $: if (selectedLocation && selectedLocation !== previousLocation) {
+    previousLocation = selectedLocation;
     loadForecastData();
   }
 
-  $: if (selectedTimeView && chartData.length > 0) {
+  // Reload when time view changes (only if we have data)
+  let previousTimeView = selectedTimeView;
+  $: if (selectedTimeView !== previousTimeView && chartData.length > 0) {
+    previousTimeView = selectedTimeView;
     loadForecastData();
   }
 </script>
@@ -245,6 +252,29 @@
 
   <!-- Forecast Visualization -->
   <div class="space-y-6">
+    <!-- Location Selector for Forecast Display -->
+    <div class="card-glass">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-soft-blue">Forecast Display</h2>
+        <div class="flex items-center gap-4">
+          <label class="text-sm text-soft-blue/60">Select Location:</label>
+          <select class="select w-64" bind:value={selectedLocation}>
+            {#if isLoadingLocations}
+              <option>Loading locations...</option>
+            {:else if locations.length === 0}
+              <option>No locations available</option>
+            {:else}
+              {#each locations as location}
+                <option value={location.id}>
+                  {location.name} - {location.capacityMW} MW
+                </option>
+              {/each}
+            {/if}
+          </select>
+        </div>
+      </div>
+    </div>
+
     <!-- Forecast Chart Controls -->
     <div class="card-glass">
       <div class="flex items-center justify-between mb-4">
