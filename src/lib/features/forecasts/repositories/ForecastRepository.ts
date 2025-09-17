@@ -96,32 +96,42 @@ export class ForecastRepository {
             console.log(`Inserting ${forecasts.length} forecasts for location ${forecasts[0]?.locationId}`);
 
             // Prepare data for Prisma bulk insert - map to correct field names
-            const forecastData = forecasts.map(f => ({
-                timestamp: f.timestamp,
-                locationId: f.locationId,
-                powerMW: f.powerForecastMw || 0,  // Primary power field
-                powerOutputMW: f.powerForecastMw || 0,  // Legacy compatibility
-                energyMWh: f.energyMwh || 0,
-                capacityFactor: f.capacityFactor || 0,
-                confidence: f.confidenceScore || 0.95,  // Legacy confidence field
-                confidenceLevel: (f.confidenceScore || 0.95) * 100,  // As percentage
-                modelType: this.normalizeModelType(f.modelType),
-                modelVersion: f.modelVersion || '1.0',
-                horizonMinutes: (f.horizonHours || 24) * 60,  // Convert to minutes
-                horizonDays: Math.ceil((f.horizonHours || 24) / 24),  // Convert to days
-                resolution: 'HOURLY',  // Default resolution
-                forecastType: 'OPERATIONAL',  // Default type
-                dataQuality: 'GOOD',  // Default quality
-                // Weather parameters
-                temperature: f.temperature,
-                ghi: f.ghi,
-                dni: f.dni,
-                cloudCover: f.cloudCover,
-                windSpeed: f.windSpeed,
-                // Add quality score
-                qualityScore: f.confidenceScore || 0.95,
-                isValidated: false
-            }));
+            const forecastData = forecasts.map(f => {
+                const cleanData = {
+                    timestamp: f.timestamp,
+                    locationId: f.locationId,
+                    powerMW: f.powerForecastMw || 0,  // Primary power field
+                    powerOutputMW: f.powerForecastMw || 0,  // Legacy compatibility
+                    energyMWh: f.energyMwh || 0,
+                    capacityFactor: f.capacityFactor || 0,
+                    confidence: f.confidenceScore || 0.95,  // Legacy confidence field
+                    confidenceLevel: (f.confidenceScore || 0.95) * 100,  // As percentage
+                    modelType: this.normalizeModelType(f.modelType),
+                    modelVersion: f.modelVersion || '1.0',
+                    horizonMinutes: (f.horizonHours || 24) * 60,  // Convert to minutes
+                    horizonDays: Math.ceil((f.horizonHours || 24) / 24),  // Convert to days
+                    resolution: 'HOURLY',  // Default resolution
+                    forecastType: 'OPERATIONAL',  // Default type
+                    dataQuality: 'GOOD',  // Default quality
+                    // Weather parameters
+                    temperature: f.temperature,
+                    ghi: f.ghi,
+                    dni: f.dni,
+                    cloudCover: f.cloudCover,
+                    windSpeed: f.windSpeed,
+                    // Add quality score
+                    qualityScore: f.confidenceScore || 0.95,
+                    isValidated: false
+                };
+
+                // EXPLICITLY remove any 'time' field that might have been added
+                if ('time' in cleanData) {
+                    console.warn('WARNING: Removing mysterious "time" field from forecast data');
+                    delete (cleanData as any).time;
+                }
+
+                return cleanData;
+            });
 
             // Debug: Check if any object has a 'time' field
             const hasTimeField = forecastData.some((f: any) => 'time' in f);

@@ -151,7 +151,7 @@ export class ForecastService {
             } catch (fetchError) {
                 // Connection error
                 console.warn('Python worker connection failed:', fetchError);
-                throw new Error('Python worker not available - using mock data fallback');
+                throw new Error('Python worker not available');
             }
 
             if (!pythonWorkerResponse.ok) {
@@ -286,7 +286,7 @@ export class ForecastService {
                                         modelType: params.modelType,
                                         horizonHours: params.horizonHours,
                                         dataPoints: transformedData.length,
-                                        isMockData: false
+                                        isRealData: true
                                     }
                                 };
                             }
@@ -323,43 +323,7 @@ export class ForecastService {
         } catch (error) {
             console.error('Forecast generation failed:', error);
 
-            // Check if we should fall back to mock data
-            const shouldUseMockData = error.message && (
-                error.message.includes('No historical data') ||
-                error.message.includes('timeout') ||
-                error.message.includes('not available') ||
-                error.message.includes('mock data fallback')
-            );
-
-            if (shouldUseMockData) {
-                console.warn('Falling back to mock forecast data:', error.message);
-
-                // Generate mock forecast data
-                const mockData = await this.generateEnhancedMockForecast(params);
-
-                // Store mock data in database
-                await this.repository.bulkInsertForecasts(mockData);
-
-                const warningMessage = error.message.includes('timeout')
-                    ? 'Python worker timeout. Using simulated data for demonstration.'
-                    : error.message.includes('not available')
-                    ? 'Python worker not available. Using simulated data for demonstration.'
-                    : 'No historical data available. Using simulated data for demonstration.';
-
-                return {
-                    success: true,
-                    forecastId: `mock_forecast_${Date.now()}`,
-                    data: mockData,
-                    metadata: {
-                        generatedAt: new Date().toISOString(),
-                        modelType: params.modelType,
-                        horizonHours: params.horizonHours,
-                        dataPoints: mockData.length,
-                        isMockData: true,
-                        message: warningMessage
-                    }
-                };
-            }
+            // No mock data - only real forecasts from Python worker
 
             // Re-throw the error with more context
             throw new Error(`Failed to generate forecast: ${error.message}`);
@@ -598,71 +562,7 @@ export class ForecastService {
         return 0.85; // Default confidence
     }
 
-    /**
-     * Generate enhanced mock forecast
-     */
-    private async generateEnhancedMockForecast(params: GenerateForecastRequest): Promise<BulkForecastInsert[]> {
-        const { locationId, horizonHours, modelType, resolution = 'hourly' } = params;
-        const forecasts: BulkForecastInsert[] = [];
-
-        const timeStepMs = resolution === '15min' ? 15 * 60 * 1000 : 60 * 60 * 1000;
-        const steps = resolution === '15min' ? horizonHours * 4 : horizonHours;
-        const startTime = new Date();
-
-        for (let i = 0; i < steps; i++) {
-            const timestamp = new Date(startTime.getTime() + i * timeStepMs);
-            const hour = timestamp.getHours();
-
-            let baseForecast = 0;
-            let confidence = 0.85;
-            let energyMwh = 0;
-            let capacityFactor = 0;
-
-            // Simulate solar production pattern
-            if (hour >= 6 && hour <= 18) {
-                const peakHour = 12;
-                const hourDiff = Math.abs(hour - peakHour);
-                const maxPower = modelType === 'ML_ENSEMBLE' ? 45 :
-                                modelType === 'PHYSICS' ? 42 : 43;
-
-                baseForecast = maxPower * Math.exp(-(hourDiff * hourDiff) / 20);
-
-                confidence = modelType === 'ML_ENSEMBLE' ? 0.90 + Math.random() * 0.08 :
-                            modelType === 'PHYSICS' ? 0.88 + Math.random() * 0.10 :
-                            0.85 + Math.random() * 0.12;
-
-                // Add realistic variation
-                baseForecast += (Math.random() - 0.5) * 8;
-                baseForecast = Math.max(0, baseForecast);
-
-                // Calculate energy and capacity factor
-                energyMwh = baseForecast * (timeStepMs / (60 * 60 * 1000)); // Convert to MWh
-                capacityFactor = baseForecast / 50; // Assuming 50MW nominal capacity
-            }
-
-            // Add weather parameters for realism
-            const temperature = 20 + Math.random() * 15 - (hour < 6 || hour > 18 ? 5 : 0);
-            const ghi = baseForecast > 0 ? 200 + baseForecast * 15 + Math.random() * 100 : 0;
-            const cloudCover = baseForecast > 0 ? Math.max(0, 30 - baseForecast * 0.5) + Math.random() * 20 : 80;
-
-            forecasts.push({
-                locationId: locationId,
-                timestamp,
-                powerForecastMw: parseFloat(baseForecast.toFixed(2)),
-                energyMwh: parseFloat(energyMwh.toFixed(3)),
-                capacityFactor: parseFloat(capacityFactor.toFixed(3)),
-                confidenceScore: parseFloat(confidence.toFixed(3)),
-                modelType,
-                horizonHours,
-                temperature: parseFloat(temperature.toFixed(1)),
-                ghi: parseFloat(ghi.toFixed(0)),
-                cloudCover: parseFloat(cloudCover.toFixed(0)),
-                windSpeed: parseFloat((3 + Math.random() * 5).toFixed(1))
-            });
-        }
-
-        return forecasts;
-    }
+    // Removed mock forecast generation - only real data from Python worker
 
     /**
      * Export to CSV format
