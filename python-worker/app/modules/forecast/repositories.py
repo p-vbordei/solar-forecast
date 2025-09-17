@@ -273,11 +273,17 @@ class ForecastRepository:
                 "windSpeed", "cloudCover", ghi, dni, dhi
             FROM weather_data
             WHERE "locationId" = :location_id
-                AND timestamp >= NOW() - INTERVAL '{} hours'
+                AND ghi IS NOT NULL
+                AND dni IS NOT NULL
+                AND timestamp >= NOW() - INTERVAL '7 days'
             ORDER BY timestamp ASC
-        """.format(hours))
+            LIMIT :limit_hours
+        """)
 
-        result = await self.db.execute(query, {"location_id": location_id})
+        # Set limit to ensure we get reasonable amount of data
+        limit_hours = min(hours, 168)  # Max 7 days
+
+        result = await self.db.execute(query, {"location_id": location_id, "limit_hours": limit_hours})
 
         # Convert to DataFrame for forecast models
         data = []

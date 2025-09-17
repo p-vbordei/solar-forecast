@@ -36,6 +36,9 @@ const generateMockForecast = (locationId: number, hours: number = 48) => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
+    // DEPRECATED: This endpoint is deprecated. Use /api/forecasts/ instead
+    console.warn('DEPRECATED: /api/forecast/ endpoint used. Migrate to /api/forecasts/');
+
     try {
         const { locationId, horizonHours = 48, modelType = 'ML' } = await request.json();
         
@@ -64,7 +67,13 @@ export const POST: RequestHandler = async ({ request }) => {
                 locationId,
                 estimatedTimeSeconds: 5
             }
-        }, { status: 201 });
+        }, {
+            status: 201,
+            headers: {
+                'X-Deprecated': 'Use /api/forecasts/ instead',
+                'X-Deprecation-Message': 'This endpoint returns mock data only. Use /api/forecasts/ for real data.'
+            }
+        });
     } catch (error) {
         console.error('Error generating forecast:', error);
         return json({
@@ -75,6 +84,9 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 export const GET: RequestHandler = async ({ url }) => {
+    // DEPRECATED: This endpoint is deprecated. Use /api/forecasts/ instead
+    console.warn('DEPRECATED: /api/forecast/ GET endpoint used. Migrate to /api/forecasts/');
+
     try {
         const locationId = url.searchParams.get('locationId');
         const taskId = url.searchParams.get('taskId');
@@ -111,6 +123,11 @@ export const GET: RequestHandler = async ({ url }) => {
                 generatedAt: new Date().toISOString(),
                 modelType: 'ML',
                 accuracy: 94.5
+            }
+        }, {
+            headers: {
+                'X-Deprecated': 'Use /api/forecasts/ instead',
+                'X-Deprecation-Message': 'This endpoint returns mock data only. Use /api/forecasts/ for real data.'
             }
         });
     } catch (error) {
