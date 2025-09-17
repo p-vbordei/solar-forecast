@@ -15,19 +15,16 @@
 		4: 'Coastal Solar Array - Constanta'
 	};
 
-	// Available timezones for display
+	// Available timezones for display (UTC-3 to UTC+4)
 	const availableTimezones = [
+		{ value: 'UTC-3', label: 'UTC-3', offset: -3 },
+		{ value: 'UTC-2', label: 'UTC-2', offset: -2 },
+		{ value: 'UTC-1', label: 'UTC-1', offset: -1 },
 		{ value: 'UTC', label: 'UTC', offset: 0 },
-		{ value: 'Europe/London', label: 'London (GMT)', offset: 0 },
-		{ value: 'Europe/Paris', label: 'Paris (CET)', offset: 1 },
-		{ value: 'Europe/Bucharest', label: 'Bucharest (EET)', offset: 2 },
-		{ value: 'America/New_York', label: 'New York (EST)', offset: -5 },
-		{ value: 'America/Chicago', label: 'Chicago (CST)', offset: -6 },
-		{ value: 'America/Denver', label: 'Denver (MST)', offset: -7 },
-		{ value: 'America/Los_Angeles', label: 'Los Angeles (PST)', offset: -8 },
-		{ value: 'Asia/Tokyo', label: 'Tokyo (JST)', offset: 9 },
-		{ value: 'Asia/Shanghai', label: 'Shanghai (CST)', offset: 8 },
-		{ value: 'Australia/Sydney', label: 'Sydney (AEDT)', offset: 11 }
+		{ value: 'UTC+1', label: 'UTC+1 (CET)', offset: 1 },
+		{ value: 'Europe/Bucharest', label: 'UTC+2 (EET/Bucharest)', offset: 2 },
+		{ value: 'UTC+3', label: 'UTC+3 (MSK)', offset: 3 },
+		{ value: 'UTC+4', label: 'UTC+4', offset: 4 }
 	];
 
 	// Selected timezone for display
@@ -42,51 +39,52 @@
 	}
 
 	// Format labels based on selected timezone
-	function formatLabelsForTimezone(labels: string[], fromOffset: number = 2): string[] {
+	function formatLabelsForTimezone(labels: string[], fromOffset: number = 0): string[] {
 		const selectedTz = availableTimezones.find(tz => tz.value === selectedTimezone);
 		if (!selectedTz) return labels;
 
 		const offsetDiff = selectedTz.offset - fromOffset;
 
+		if (offsetDiff === 0) return labels; // No change needed
+
 		return labels.map(label => {
+			let hour24 = 0;
+			let minutes = 0;
+
 			// Handle different label formats
 			if (label.includes(':')) {
-				// Time format (e.g., "14:00" or "02:00 PM")
-				let hour24: number;
-				let minutes = 0;
-
 				if (label.includes(' ')) {
-					// 12-hour format with AM/PM
+					// 12-hour format with AM/PM (e.g., "02:00 PM")
 					const [time, period] = label.split(' ');
-					const [hours, mins] = time.split(':').map(Number);
-					minutes = mins || 0;
-					hour24 = hours;
-					if (period === 'PM' && hours !== 12) hour24 += 12;
-					if (period === 'AM' && hours === 12) hour24 = 0;
+					const [h, m] = time.split(':').map(Number);
+					hour24 = h;
+					minutes = m || 0;
+					if (period === 'PM' && hour24 !== 12) hour24 += 12;
+					if (period === 'AM' && hour24 === 12) hour24 = 0;
 				} else {
-					// 24-hour format
-					const [hours, mins] = label.split(':').map(Number);
-					hour24 = hours;
-					minutes = mins || 0;
+					// 24-hour format (e.g., "14:00")
+					const [h, m] = label.split(':').map(Number);
+					hour24 = h;
+					minutes = m || 0;
 				}
-
-				// Apply timezone offset
-				let newHour = hour24 + offsetDiff;
-
-				// Handle day boundaries
-				if (newHour < 0) newHour += 24;
-				if (newHour >= 24) newHour -= 24;
-
-				// Format back to 12-hour format
-				const isPM = newHour >= 12;
-				let hour12 = newHour % 12;
-				if (hour12 === 0) hour12 = 12;
-
-				return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
 			} else {
-				// Date format, return as-is
+				// Not a time label, return as is
 				return label;
 			}
+
+			// Apply timezone offset
+			let newHour = hour24 + offsetDiff;
+
+			// Handle day boundaries
+			while (newHour < 0) newHour += 24;
+			while (newHour >= 24) newHour -= 24;
+
+			// Format back to 12-hour format
+			const isPM = newHour >= 12;
+			let hour12 = newHour % 12;
+			if (hour12 === 0) hour12 = 12;
+
+			return `${hour12.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${isPM ? 'PM' : 'AM'}`;
 		});
 	}
 
@@ -275,8 +273,8 @@
 			// Use the already fetched data
 			const { labels, datasets } = forecastData;
 
-			// Apply timezone conversion to labels
-			const adjustedLabels = formatLabelsForTimezone(labels, 2); // Romania is UTC+2
+			// Apply timezone conversion to labels (database stores in UTC)
+			const adjustedLabels = formatLabelsForTimezone(labels, 0); // Database is UTC
 
 			// Convert datasets to ECharts series format
 			const series = datasets.map((dataset, index) => {
@@ -510,7 +508,7 @@
 			{/each}
 		</select>
 		<span class="text-xs text-soft-blue/60">
-			Local time: {locations[numericLocationId] || 'Selected Location'} (EET/UTC+2)
+			Location: {locations[numericLocationId] || 'Selected Location'}
 		</span>
 	</div>
 
