@@ -27,10 +27,10 @@ export abstract class BaseForecastRepository {
             interval,
             table: 'forecasts',
             aggregations: {
-                avg: ['powerMW', 'confidence', 'qualityScore'],
-                max: ['powerMW'],
-                min: ['powerMW'],
-                count: ['*']
+                avg: ['"powerMW"', 'confidence', '"qualityScore"'],
+                max: ['"powerMW"'],
+                min: ['"powerMW"'],
+                count: ['id']
             },
             where: `"locationId" = '${locationId}' AND timestamp >= '${startDate.toISOString()}' AND timestamp <= '${endDate.toISOString()}'`,
             groupBy: ['locationId'],

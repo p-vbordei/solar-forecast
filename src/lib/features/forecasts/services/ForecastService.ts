@@ -321,7 +321,7 @@ export class ForecastService {
         } catch (error) {
             console.error('Forecast generation failed:', error);
 
-            // No mock data - only real forecasts from Python worker
+            // Only real forecasts from Python worker
 
             // Re-throw the error with more context
             throw new Error(`Failed to generate forecast: ${error.message}`);
@@ -494,7 +494,6 @@ export class ForecastService {
         return 0.85; // Default confidence
     }
 
-    // Removed mock forecast generation - only real data from Python worker
 
     /**
      * Export using shared export engine

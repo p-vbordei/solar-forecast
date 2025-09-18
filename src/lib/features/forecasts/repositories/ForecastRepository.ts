@@ -9,7 +9,6 @@ import type { BulkForecastInsert } from '../models/dto/forecast';
  * - Business logic for forecast operations
  * - Data transformation and validation
  * - Feature-specific queries and operations
- * - Mock data generation for testing
  *
  * This repository is used by the ForecastService for all forecast-related operations.
  */
@@ -35,17 +34,15 @@ export class ForecastRepository extends BaseForecastRepository {
             const tsInterval = this.convertToTimescaleInterval(interval);
 
             // Get raw data from base repository
-            const rawData = await this.getRawForecastData(locationId, tsInterval, start, end);
+            const rawData = await this.getRawForecastData(locationId, tsInterval, start, end) as any[];
 
-            // If no data exists and we're in development, optionally generate mock data
-            if (rawData.length === 0 && process.env.NODE_ENV === 'development') {
+            // Log if no data found
+            if (rawData.length === 0) {
                 console.log(`No forecast data found for location ${locationId}`);
-                // Could optionally generate mock data here for development
-                // return this.generateMockForecastData(locationId, interval, start, end);
             }
 
             // Transform raw data to feature format
-            return this.transformForecastData(rawData);
+            return this.transformForecastData(rawData as any[]);
         } catch (error) {
             console.warn('Database query failed for forecast data:', error);
             return [];
@@ -96,11 +93,11 @@ export class ForecastRepository extends BaseForecastRepository {
                     locationId: f.locationId,
                     powerMW: f.powerForecastMw || 0,  // Primary power field
                     powerOutputMW: f.powerForecastMw || 0,  // Legacy compatibility
-                    energyMWh: f.energyMwh || 0,
-                    capacityFactor: f.capacityFactor || 0,
+                    energyMWh: (f as any).energyMwh || 0,
+                    capacityFactor: (f as any).capacityFactor || 0,
                     confidence: f.confidenceScore || 0.95,  // Legacy confidence field
                     confidenceLevel: (f.confidenceScore || 0.95) * 100,  // As percentage
-                    modelType: this.normalizeModelType(f.modelType),
+                    modelType: this.normalizeModelType(f.modelType || 'ENSEMBLE'),
                     modelVersion: f.modelVersion || '1.0',
                     horizonMinutes: (f.horizonHours || 24) * 60,  // Convert to minutes
                     horizonDays: Math.ceil((f.horizonHours || 24) / 24),  // Convert to days
@@ -348,72 +345,4 @@ export class ForecastRepository extends BaseForecastRepository {
         return 'POOR';
     }
 
-    /**
-     * Generate mock forecast data for testing (development only)
-     */
-    private generateMockForecastData(
-        locationId: string,
-        interval: string,
-        start: Date,
-        end: Date
-    ): any[] {
-        // Only available in development mode
-        if (process.env.NODE_ENV !== 'development') {
-            return [];
-        }
-
-        const data = [];
-        const current = new Date(start);
-        const intervalMs = this.getIntervalMilliseconds(interval);
-
-        while (current <= end) {
-            const hour = current.getHours();
-            const dayOfYear = this.getDayOfYear(current);
-
-            // Simulate solar production pattern
-            let baseProduction = 0;
-            if (hour >= 6 && hour <= 18) {
-                const peakHour = 12;
-                const hourDiff = Math.abs(hour - peakHour);
-                const maxProduction = 45; // MW at peak
-                baseProduction = maxProduction * Math.exp(-(hourDiff * hourDiff) / 18);
-
-                // Add seasonal variation
-                const seasonalFactor = 0.7 + 0.3 * Math.sin(((dayOfYear - 80) / 365) * 2 * Math.PI);
-                baseProduction *= seasonalFactor;
-
-                // Add some randomness
-                baseProduction += (Math.random() - 0.5) * 5;
-                baseProduction = Math.max(0, baseProduction);
-            }
-
-            data.push({
-                timestamp: current.toISOString(),
-                power_forecast_mw: parseFloat(baseProduction.toFixed(2)),
-                confidence_score: 0.85 + Math.random() * 0.1,
-                model_type: 'MOCK'
-            });
-
-            current.setTime(current.getTime() + intervalMs);
-        }
-
-        return data;
-    }
-
-    private getIntervalMilliseconds(interval: string): number {
-        const intervals: Record<string, number> = {
-            '15min': 15 * 60 * 1000,
-            'hourly': 60 * 60 * 1000,
-            'daily': 24 * 60 * 60 * 1000,
-            'weekly': 7 * 24 * 60 * 60 * 1000
-        };
-        return intervals[interval] || 60 * 60 * 1000;
-    }
-
-    private getDayOfYear(date: Date): number {
-        const start = new Date(date.getFullYear(), 0, 0);
-        const diff = date.getTime() - start.getTime();
-        const oneDay = 1000 * 60 * 60 * 24;
-        return Math.floor(diff / oneDay);
-    }
 }
