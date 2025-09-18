@@ -12,6 +12,7 @@ import logging
 from .repositories import ForecastRepository
 from .models_api import ForecastTaskResponse, ForecastAccuracyResponse
 from app.modules.ml_models.services import MLModelService
+from app.core.task_manager import task_manager
 # Weather service removed - now using SvelteKit API via repository
 
 # Import the real forecast engine (NO CLASSES - pure functions)
@@ -27,21 +28,21 @@ logger = logging.getLogger(__name__)
 
 class ForecastService:
     """Service layer for forecast business logic"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = ForecastRepository(db)
         self.ml_service = MLModelService(db)
         # Weather service removed - now using SvelteKit API
-        
-        # In-memory task tracking (should use Redis in production)
-        self.tasks: Dict[str, Dict] = {}
-    
+
+        # Use global task manager instead of instance-level storage
+        # This ensures tasks persist across requests
+
     async def validate_location(self, location_id: str) -> bool:
         """Validate if location exists and is active (database-driven)"""
         location = await self.repo.get_location_full(location_id)
         return location is not None
-    
+
     async def queue_forecast_generation(
         self,
         location_id: str,
@@ -50,8 +51,8 @@ class ForecastService:
     ) -> str:
         """Queue a forecast generation task"""
         task_id = str(uuid.uuid4())
-        
-        self.tasks[task_id] = {
+
+        task_data = {
             "id": task_id,
             "status": "queued",
             "location_id": location_id,
@@ -62,20 +63,23 @@ class ForecastService:
             "result": None,
             "error": None
         }
-        
+
+        # Add to global task manager
+        task_manager.add_task(task_id, task_data)
+        logger.info(f"Queued task {task_id} for location {location_id}")
+
         return task_id
-    
+
     async def process_forecast_task(self, task_id: str) -> None:
         """Process forecast generation task using database-driven approach"""
-        if task_id not in self.tasks:
+        task = task_manager.get_task(task_id)
+        if not task:
+            logger.error(f"Task {task_id} not found in task manager")
             return
-
-        task = self.tasks[task_id]
 
         try:
             # Update status
-            task["status"] = "processing"
-            task["progress"] = 10
+            task_manager.update_task(task_id, {"status": "processing", "progress": 10})
             logger.info(f"Starting forecast task {task_id} for location {task['location_id']}")
 
             # 1. Get location from database (not YAML)
@@ -83,13 +87,13 @@ class ForecastService:
             if not location:
                 raise ValueError(f"Location {task['location_id']} not found in database")
 
-            task["progress"] = 20
+            task_manager.update_task(task_id, {"progress": 20})
             logger.info(f"Location loaded: {location['name']} ({location['capacityMW']} MW)")
 
             # 2. Build config from database fields
             config = self.repo.build_config_from_location(location)
 
-            task["progress"] = 30
+            task_manager.update_task(task_id, {"progress": 30})
 
             # 3. Get weather from database (not API)
             weather_df = await self.repo.get_recent_weather(
@@ -100,7 +104,7 @@ class ForecastService:
             if weather_df.empty:
                 raise ValueError(f"No weather data found for location {task['location_id']}")
 
-            task["progress"] = 40
+            task_manager.update_task(task_id, {"progress": 40})
             logger.info(f"Weather data loaded: {len(weather_df)} records")
 
             # 4. Load ML models for this location
@@ -113,19 +117,30 @@ class ForecastService:
                 else:
                     logger.warning(f"No models found for {location_code}, will use physics-only")
 
-            task["progress"] = 60
+            task_manager.update_task(task_id, {"progress": 60})
 
             # 5. Run unified forecast (REAL FORECAST ENGINE - NO MOCK DATA)
             if REAL_FORECAST_AVAILABLE:
                 forecast_type = "hybrid" if models else "physics"
 
+                # Import time resolution utilities
+                from .utils.time_resolution import resample_weather_to_15min, resample_forecast_to_15min
+
+                # Resample weather data to 15-minute intervals
+                logger.info(f"Resampling weather data to 15-minute intervals")
+                weather_15min = resample_weather_to_15min(weather_df)
+
                 logger.info(f"Running {forecast_type} forecast with unified engine")
                 forecast_df = run_unified_forecast(
-                    weather_data=weather_df,
+                    weather_data=weather_15min,
                     config=config,
                     forecast_type=forecast_type,
                     client_id=location_code
                 )
+
+                # Ensure forecast is at 15-minute intervals
+                if not forecast_df.empty:
+                    forecast_df = resample_forecast_to_15min(forecast_df)
 
                 # Add model metadata to forecast
                 if models:
@@ -150,7 +165,7 @@ class ForecastService:
                 # Fallback if core modules not available
                 raise ImportError("Real forecast engine not available")
 
-            task["progress"] = 80
+            task_manager.update_task(task_id, {"progress": 80})
             logger.info(f"Forecast generated: {len(forecast_df)} points")
 
             # 6. Save to database using TimescaleDB bulk operations
@@ -159,33 +174,37 @@ class ForecastService:
                 forecasts=forecast_df
             )
 
-            task["progress"] = 100
-            task["status"] = "completed"
-            task["result"] = {
+            task_manager.update_task(task_id, {
+                "progress": 100,
+                "status": "completed",
+                "result": {
                 "forecast_count": saved_count,
                 "start_time": forecast_df.index[0].isoformat() if len(forecast_df) > 0 else None,
                 "end_time": forecast_df.index[-1].isoformat() if len(forecast_df) > 0 else None,
                 "model_type": forecast_df.iloc[0]['model_type'] if len(forecast_df) > 0 else None,
                 "location_name": location['name'],
                 "capacity_mw": location['capacityMW']
-            }
+                }
+            })
 
             logger.info(f"Task {task_id} completed successfully: {saved_count} forecasts saved")
 
         except Exception as e:
-            task["status"] = "failed"
-            task["error"] = str(e)
+            task_manager.update_task(task_id, {
+                "status": "failed",
+                "error": str(e)
+            })
             logger.error(f"Task {task_id} failed: {e}", exc_info=True)
-    
+
     # REMOVED: _generate_forecasts() - now using real unified_forecast engine
-    
+
     async def get_task_status(self, task_id: str) -> Optional[ForecastTaskResponse]:
         """Get current status of a forecast task"""
-        if task_id not in self.tasks:
+        task = task_manager.get_task(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found when getting status")
             return None
-        
-        task = self.tasks[task_id]
-        
+
         return ForecastTaskResponse(
             task_id=task["id"],
             status=task["status"],
@@ -195,7 +214,7 @@ class ForecastService:
             error=task["error"],
             estimated_time_seconds=max(0, 30 - (task["progress"] / 100 * 30))
         )
-    
+
     async def get_forecasts(
         self,
         location_id: str,
@@ -210,10 +229,10 @@ class ForecastService:
             end_time=end_time,
             model_type=model_type
         )
-    
+
     # calculate_accuracy method removed - now handled by SvelteKit shared utilities
     # Use ForecastMetricsCalculator in SvelteKit instead
-    
+
     async def delete_old_forecasts(
         self,
         location_id: str,

@@ -1,30 +1,39 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { db } from '$lib/server/database';
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
+import { db } from "$lib/server/database";
 
 /**
- * Simple weather data endpoint for Python forecast service
- * Returns weather data in format that's easy to convert to pandas DataFrame
+ * Weather DataFrame API endpoint for Python worker
+ * Returns weather data in a format suitable for pandas DataFrame conversion
  */
 export const GET: RequestHandler = async ({ url }) => {
   try {
-    const locationId = url.searchParams.get('location_id');
-    const hours = parseInt(url.searchParams.get('hours') || '24');
+    const locationId = url.searchParams.get("location_id");
+    const hours = parseInt(url.searchParams.get("hours") ?? "24");
 
     if (!locationId) {
-      return json({ error: 'location_id is required' }, { status: 400 });
+      return json(
+        {
+          success: false,
+          error: "location_id parameter is required",
+        },
+        { status: 400 },
+      );
     }
 
-    // Simple query to get recent weather data
+    // Calculate the start date based on hours
+    const startDate = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+    // Fetch weather data from database
     const weatherData = await db.weatherData.findMany({
       where: {
-        locationId,
+        locationId: locationId,
         timestamp: {
-          gte: new Date(Date.now() - hours * 60 * 60 * 1000)
-        }
+          gte: startDate,
+        },
       },
       orderBy: {
-        timestamp: 'asc'
+        timestamp: "asc",
       },
       select: {
         timestamp: true,
@@ -35,36 +44,42 @@ export const GET: RequestHandler = async ({ url }) => {
         ghi: true,
         dni: true,
         dhi: true,
-        pressure: true
-      }
+        // pressure field doesn't exist in WeatherData model
+      },
     });
 
-    // Format for easy pandas DataFrame creation
-    const formattedData = weatherData.map(record => ({
+    // Transform to DataFrame-friendly format
+    const dataframeData = weatherData.map((record) => ({
       timestamp: record.timestamp.toISOString(),
-      temperature: record.temperature || 0,
-      humidity: record.humidity || 0,
-      windSpeed: record.windSpeed || 0,
-      cloudCover: record.cloudCover || 0,
-      ghi: record.ghi || 0,
-      dni: record.dni || 0,
-      dhi: record.dhi || 0,
-      pressure: record.pressure || 1013.25
+      temp_air: record.temperature,
+      humidity: record.humidity,
+      wind_speed: record.windSpeed,
+      cloud_cover: record.cloudCover,
+      ghi: record.ghi,
+      dni: record.dni,
+      dhi: record.dhi,
+      pressure: 1013.25, // Default pressure as field doesn't exist in model
     }));
 
     return json({
       success: true,
-      data: formattedData,
-      count: formattedData.length,
-      locationId,
-      hours
+      data: dataframeData,
+      metadata: {
+        locationId,
+        hours,
+        recordCount: dataframeData.length,
+        startDate: startDate.toISOString(),
+        endDate: new Date().toISOString(),
+      },
     });
-
   } catch (error) {
-    console.error('Weather dataframe API error:', error);
-    return json({
-      success: false,
-      error: 'Failed to fetch weather data'
-    }, { status: 500 });
+    console.error("Weather DataFrame API error:", error);
+    return json(
+      {
+        success: false,
+        error: "Failed to fetch weather data",
+      },
+      { status: 500 },
+    );
   }
 };

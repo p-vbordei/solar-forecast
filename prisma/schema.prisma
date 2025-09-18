@@ -1,50 +1,563 @@
-// This is your Prisma schema file for TimescaleDB
-// TimescaleDB is a PostgreSQL extension optimized for time-series data
-// Learn more: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
-  // Enable experimental features for better TimescaleDB support
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "linux-musl", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql" // TimescaleDB extends PostgreSQL
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-  // TimescaleDB extension is enabled via init.sql
 }
 
-// ========================================
-// USER & AUTHENTICATION MODELS
-// ========================================
-
-// User and Authentication (deferred but schema ready)
 model User {
-  id             Int       @id @default(autoincrement())
-  email          String    @unique
-  name           String?
-  role           UserRole  @default(USER)
-  passwordHash   String?
-  isActive       Boolean   @default(true)
-  lastLoginAt    DateTime?
-  preferences    Json?     // User preferences (theme, language, etc.)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  
-  // Relations
-  clientId       Int?
-  client         Client?   @relation(fields: [clientId], references: [id])
-  forecasts      Forecast[]
-  alerts         Alert[]
-  reports        Report[]
+  id               Int               @id @default(autoincrement())
+  email            String            @unique
+  name             String?
+  role             UserRole          @default(USER)
+  passwordHash     String?
+  isActive         Boolean           @default(true)
+  lastLoginAt      DateTime?
+  preferences      Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  clientId         Int?
+  alerts           Alert[]
+  auditLogs        AuditLog[]
+  forecasts        Forecast[]
+  reports          Report[]
   scheduledReports ScheduledReport[]
-  auditLogs      AuditLog[]
-  
+  client           Client?           @relation(fields: [clientId], references: [id])
+
   @@index([email])
   @@index([clientId])
   @@map("users")
+}
+
+model Client {
+  id                  Int                  @id @default(autoincrement())
+  name                String
+  code                String               @unique
+  contactEmail        String?
+  contactPhone        String?
+  address             String?
+  country             String?
+  timezone            String               @default("UTC")
+  currency            String               @default("EUR")
+  isActive            Boolean              @default(true)
+  contractStart       DateTime?
+  contractEnd         DateTime?
+  metadata            Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  apiKeys             ApiKey[]
+  emailConfigurations EmailConfiguration[]
+  locations           Location[]
+  users               User[]
+
+  @@index([code])
+  @@map("clients")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  clientId    Int
+  name        String
+  key         String    @unique
+  permissions Json
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  client      Client    @relation(fields: [clientId], references: [id])
+
+  @@index([key])
+  @@index([clientId])
+  @@map("api_keys")
+}
+
+model Location {
+  id                  String            @id @default(uuid())
+  clientId            Int
+  name                String
+  code                String            @unique
+  latitude            Float
+  longitude           Float
+  timezone            String            @default("UTC")
+  altitude            Float?
+  address             String?
+  city                String?
+  region              String?
+  country             String?
+  capacityMW          Float
+  actualCapacityMW    Float?
+  capacityKW          Float?
+  panelCount          Int?
+  panelType           String?
+  panelTechnology     String?
+  inverterCount       Int?
+  inverterType        String?
+  inverterModel       String?
+  trackingSystem      TrackingType      @default(FIXED)
+  tiltAngle           Float?
+  azimuthAngle        Float?
+  isBifacial          Boolean           @default(false)
+  nominalEfficiency   Float?
+  temperatureCoeff    Float?
+  bifacialityFactor   Float?
+  dcOverpowerRatio    Float?
+  performanceRatio    Float?
+  installationDate    DateTime?
+  commissioningDate   DateTime?
+  warrantyEndDate     DateTime?
+  status              LocationStatus    @default(ACTIVE)
+  lastMaintenance     DateTime?
+  nextMaintenance     DateTime?
+  expectedYield       Float?
+  degradationRate     Float?
+  locationData        Json?
+  plantData           Json?
+  performanceData     Json?
+  outputConfig        Json?
+  calibrationSettings Json?
+  monitoringConfig    Json?
+  clientConfig        Json?
+  notes               String?
+  tags                String?
+  certificationData   String?
+  lastMaintenanceDate DateTime?
+  version             Int               @default(1)
+  lastCalibrationDate DateTime?
+  calibrationStatus   CalibrationStatus @default(PENDING)
+  bulkOperationId     String?
+  displayCapacity     String?
+  displayLocation     String?
+  statusDisplay       String?
+  metadata            Json?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  deletedAt           DateTime?
+  alerts              Alert[]
+  forecasts           Forecast[]
+  client              Client            @relation(fields: [clientId], references: [id])
+  maintenanceLogs     MaintenanceLog[]
+  plants              Plant[]
+  production          Production[]
+  weatherData         WeatherData[]
+
+  @@index([clientId])
+  @@index([code])
+  @@index([status])
+  @@index([latitude, longitude])
+  @@index([calibrationStatus])
+  @@index([bulkOperationId])
+  @@map("locations")
+}
+
+model Plant {
+  id          String         @id @default(uuid())
+  locationId  String
+  name        String
+  code        String         @unique
+  capacityMW  Float
+  inverterIds String[]
+  status      LocationStatus @default(ACTIVE)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  location    Location       @relation(fields: [locationId], references: [id])
+
+  @@index([locationId])
+  @@index([code])
+  @@map("plants")
+}
+
+model Forecast {
+  id              String         @id @default(uuid())
+  timestamp       DateTime
+  locationId      String
+  powerMW         Float
+  powerOutputMW   Float
+  energyMWh       Float?
+  capacityFactor  Float?
+  powerMWQ10      Float?
+  powerMWQ25      Float?
+  powerMWQ75      Float?
+  powerMWQ90      Float?
+  powerMWLower    Float?
+  powerMWUpper    Float?
+  confidence      Float?
+  confidenceLevel Float?
+  modelType       ModelType
+  modelVersion    String?
+  modelId         String?
+  horizonMinutes  Int
+  horizonDays     Int?
+  resolution      ResolutionType
+  runId           String?
+  forecastType    ForecastType   @default(OPERATIONAL)
+  temperature     Float?
+  ghi             Float?
+  dni             Float?
+  dhi             Float?
+  gti             Float?
+  cloudCover      Float?
+  windSpeed       Float?
+  humidity        Float?
+  pressure        Float?
+  weatherData     Json?
+  qualityScore    Float?
+  isValidated     Boolean        @default(false)
+  validationNotes String?
+  dataQuality     DataQuality    @default(GOOD)
+  processingTime  Float?
+  inputFeatures   Json?
+  modelParameters Json?
+  createdAt       DateTime       @default(now())
+  createdBy       Int?
+  user            User?          @relation(fields: [createdBy], references: [id])
+  location        Location       @relation(fields: [locationId], references: [id])
+
+  @@index([timestamp, locationId], map: "forecasts_time_location_idx")
+  @@index([timestamp, modelType], map: "forecasts_time_model_idx")
+  @@index([locationId, timestamp(sort: Desc)], map: "forecasts_location_time_desc_idx")
+  @@index([modelType, timestamp(sort: Desc)], map: "forecasts_model_time_desc_idx")
+  @@index([horizonMinutes, timestamp], map: "forecasts_horizon_time_idx")
+  @@index([runId, timestamp], map: "forecasts_run_time_idx")
+  @@index([resolution, timestamp], map: "forecasts_resolution_time_idx")
+  @@index([forecastType, timestamp], map: "forecasts_type_time_idx")
+  @@map("forecasts")
+}
+
+model Production {
+  id             String   @id @default(uuid())
+  timestamp      DateTime
+  locationId     String
+  powerMW        Float
+  capacityFactor Float?
+  availability   Float?
+  location       Location @relation(fields: [locationId], references: [id])
+
+  @@index([timestamp, locationId], map: "production_time_location_idx")
+  @@index([locationId, timestamp(sort: Desc)], map: "production_location_time_desc_idx")
+  @@map("production")
+}
+
+model WeatherData {
+  id          String      @id @default(uuid())
+  timestamp   DateTime
+  locationId  String
+  temperature Float
+  humidity    Float
+  windSpeed   Float
+  cloudCover  Float
+  ghi         Float?
+  dni         Float?
+  dhi         Float?
+  source      String
+  dataQuality DataQuality @default(GOOD)
+  location    Location    @relation(fields: [locationId], references: [id])
+
+  @@index([timestamp, locationId], map: "weather_time_location_idx")
+  @@index([locationId, timestamp(sort: Desc)], map: "weather_location_time_desc_idx")
+  @@index([timestamp, source], map: "weather_time_source_idx")
+  @@index([source, timestamp], map: "weather_source_time_idx")
+  @@map("weather_data")
+}
+
+model ForecastAccuracy {
+  id                String    @id @default(uuid())
+  locationId        String
+  date              DateTime
+  modelType         ModelType
+  modelVersion      String?
+  mape              Float
+  rmse              Float
+  mae               Float
+  mbe               Float?
+  r2                Float?
+  skillScore        Float?
+  accuracyByHorizon Json?
+  sampleCount       Int
+  validSamples      Int
+  createdAt         DateTime  @default(now())
+
+  @@unique([locationId, date, modelType, modelVersion])
+  @@index([locationId])
+  @@index([date])
+  @@index([modelType])
+  @@map("forecast_accuracy")
+}
+
+model Alert {
+  id                String        @id @default(uuid())
+  locationId        String?
+  userId            Int?
+  type              AlertType
+  severity          AlertSeverity
+  title             String
+  message           String
+  details           Json?
+  thresholdValue    Float?
+  actualValue       Float?
+  status            AlertStatus   @default(ACTIVE)
+  acknowledgedAt    DateTime?
+  acknowledgedBy    Int?
+  resolvedAt        DateTime?
+  resolvedBy        Int?
+  resolution        String?
+  triggeredAt       DateTime      @default(now())
+  expiresAt         DateTime?
+  notificationsSent Json?
+  location          Location?     @relation(fields: [locationId], references: [id])
+  user              User?         @relation(fields: [userId], references: [id])
+
+  @@index([locationId])
+  @@index([status])
+  @@index([severity])
+  @@index([triggeredAt])
+  @@index([type])
+  @@map("alerts")
+}
+
+model MaintenanceLog {
+  id                String            @id @default(uuid())
+  locationId        String
+  type              MaintenanceType
+  category          String?
+  description       String
+  scheduledAt       DateTime
+  startedAt         DateTime?
+  completedAt       DateTime?
+  duration          Int?
+  productionLossMWh Float?
+  downtime          Int?
+  laborCost         Float?
+  partsCost         Float?
+  totalCost         Float?
+  currency          String            @default("EUR")
+  performedBy       String?
+  contractor        String?
+  notes             String?
+  attachments       String[]
+  status            MaintenanceStatus @default(SCHEDULED)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  location          Location          @relation(fields: [locationId], references: [id])
+
+  @@index([locationId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("maintenance_logs")
+}
+
+model Report {
+  id          String            @id @default(uuid())
+  userId      Int
+  type        ReportType
+  name        String
+  description String?
+  parameters  Json
+  filters     Json?
+  schedule    String?
+  isScheduled Boolean           @default(false)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  format      ReportFormat      @default(PDF)
+  outputUrl   String?
+  fileSize    Int?
+  recipients  String[]
+  status      ReportStatus      @default(DRAFT)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  executions  ReportExecution[]
+  user        User              @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@map("reports")
+}
+
+model ReportExecution {
+  id          String          @id @default(uuid())
+  reportId    String
+  startedAt   DateTime        @default(now())
+  completedAt DateTime?
+  duration    Int?
+  status      ExecutionStatus
+  outputUrl   String?
+  fileSize    Int?
+  recordCount Int?
+  error       String?
+  report      Report          @relation(fields: [reportId], references: [id])
+
+  @@index([reportId])
+  @@index([startedAt])
+  @@map("report_executions")
+}
+
+model ScheduledReport {
+  id                  String                     @id @default(uuid())
+  userId              Int
+  reportType          ReportType
+  name                String
+  description         String?
+  parameters          Json
+  filters             Json?
+  frequency           ScheduleFrequency
+  scheduleTime        String
+  startDate           DateTime
+  timezone            String                     @default("UTC")
+  scheduleDescription String?
+  format              ReportFormat               @default(PDF)
+  aggregationLevel    String?
+  selectedTimezone    String?
+  emailRecipients     String[]
+  emailEnabled        Boolean                    @default(true)
+  locationIds         String[]
+  locationDisplay     LocationDisplay            @default(INDIVIDUAL)
+  plantIds            String[]
+  isActive            Boolean                    @default(true)
+  lastRunAt           DateTime?
+  nextRunAt           DateTime?
+  lastStatus          ExecutionStatus?
+  errorCount          Int                        @default(0)
+  lastError           String?
+  totalRuns           Int                        @default(0)
+  successfulRuns      Int                        @default(0)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  executions          ScheduledReportExecution[]
+  user                User                       @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([reportType])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@map("scheduled_reports")
+}
+
+model ScheduledReportExecution {
+  id                String          @id @default(uuid())
+  scheduledReportId String
+  startedAt         DateTime        @default(now())
+  completedAt       DateTime?
+  duration          Int?
+  configSnapshot    Json
+  status            ExecutionStatus
+  outputUrl         String?
+  fileSize          Int?
+  recordCount       Int?
+  emailsSent        Int             @default(0)
+  emailRecipients   String[]
+  emailStatus       String?
+  error             String?
+  scheduledReport   ScheduledReport @relation(fields: [scheduledReportId], references: [id])
+
+  @@index([scheduledReportId])
+  @@index([startedAt])
+  @@index([status])
+  @@map("scheduled_report_executions")
+}
+
+model MLModel {
+  id               String      @id @default(uuid())
+  name             String
+  version          String
+  type             ModelType
+  description      String?
+  algorithm        String?
+  framework        String?
+  hyperparameters  Json?
+  features         String[]
+  targetVariable   String?
+  trainMetrics     Json?
+  validMetrics     Json?
+  testMetrics      Json?
+  modelPath        String
+  artifactPath     String?
+  checksum         String?
+  fileSize         Int?
+  trainDataStart   DateTime?
+  trainDataEnd     DateTime?
+  trainSampleCount Int?
+  validSampleCount Int?
+  testSampleCount  Int?
+  status           ModelStatus @default(TRAINING)
+  isDefault        Boolean     @default(false)
+  isDeployed       Boolean     @default(false)
+  deployedAt       DateTime?
+  deploymentUrl    String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  trainedBy        String?
+
+  @@unique([name, version])
+  @@index([type])
+  @@index([status])
+  @@index([isDefault])
+  @@map("ml_models")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    Int?
+  action    String
+  entity    String
+  entityId  String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  sessionId String?
+  timestamp DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity])
+  @@index([timestamp])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  category    String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([key])
+  @@map("system_configs")
+}
+
+model EmailConfiguration {
+  id               String          @id @default(uuid())
+  clientId         Int?
+  name             String
+  type             EmailConfigType @default(RECIPIENTS)
+  recipients       String[]
+  smtpSettings     Json?
+  templateSettings Json?
+  isActive         Boolean         @default(true)
+  isValidated      Boolean         @default(false)
+  lastUsedAt       DateTime?
+  usageCount       Int             @default(0)
+  description      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  client           Client?         @relation(fields: [clientId], references: [id])
+
+  @@index([clientId])
+  @@index([type])
+  @@index([isActive])
+  @@map("email_configurations")
 }
 
 enum UserRole {
@@ -54,168 +567,6 @@ enum UserRole {
   USER
   VIEWER
   API_SERVICE
-}
-
-// ========================================
-// ORGANIZATION MODELS
-// ========================================
-
-// Client/Company
-model Client {
-  id             Int       @id @default(autoincrement())
-  name           String
-  code           String    @unique
-  contactEmail   String?
-  contactPhone   String?
-  address        String?
-  country        String?
-  timezone       String    @default("UTC")
-  currency       String    @default("EUR")
-  isActive       Boolean   @default(true)
-  contractStart  DateTime?
-  contractEnd    DateTime?
-  metadata       Json?     // Additional client-specific configuration
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  
-  // Relations
-  users          User[]
-  locations      Location[]
-  apiKeys        ApiKey[]
-  emailConfigurations EmailConfiguration[]
-  
-  @@index([code])
-  @@map("clients")
-}
-
-// API Key Management for Python Worker & External Services
-model ApiKey {
-  id             String    @id @default(uuid())
-  clientId       Int
-  name           String
-  key            String    @unique
-  permissions    Json      // Array of allowed endpoints/operations
-  isActive       Boolean   @default(true)
-  lastUsedAt     DateTime?
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  
-  // Relations
-  client         Client    @relation(fields: [clientId], references: [id])
-  
-  @@index([key])
-  @@index([clientId])
-  @@map("api_keys")
-}
-
-// ========================================
-// SOLAR INSTALLATION MODELS
-// ========================================
-
-// Solar Installation Locations
-model Location {
-  id                String    @id @default(uuid())
-  clientId          Int
-  name              String
-  code              String    @unique
-  latitude          Float
-  longitude         Float
-  timezone          String    @default("UTC")
-  altitude          Float?
-  
-  // Location details
-  address           String?
-  city              String?
-  region            String?
-  country           String?
-  
-  // Technical specifications
-  capacityMW        Float     // Nominal capacity in Megawatts
-  actualCapacityMW  Float?    // Actual/derated capacity
-  capacityKW        Float?    // Capacity in Kilowatts
-  panelCount        Int?
-  panelType         String?
-  panelTechnology   String?   // heterojunction, monocrystalline, etc.
-  inverterCount     Int?
-  inverterType      String?
-  inverterModel     String?
-  trackingSystem    TrackingType @default(FIXED)
-  tiltAngle         Float?    // Degrees
-  azimuthAngle      Float?    // Degrees
-  isBifacial        Boolean   @default(false)
-  
-  // Performance specifications
-  nominalEfficiency Float?    // Panel efficiency percentage
-  temperatureCoeff  Float?    // Temperature coefficient
-  bifacialityFactor Float?    // Bifaciality factor for bifacial panels
-  dcOverpowerRatio  Float?    // DC overpower ratio
-  performanceRatio  Float?    // Expected PR
-  
-  // Dates
-  installationDate  DateTime?
-  commissioningDate DateTime?
-  warrantyEndDate   DateTime?
-  
-  // Status
-  status            LocationStatus @default(ACTIVE)
-  lastMaintenance   DateTime?
-  nextMaintenance   DateTime?
-  
-  // Performance benchmarks
-  expectedYield     Float?    // kWh/kWp/year
-  degradationRate   Float?    // Percentage per year
-  
-  // Comprehensive Technical Data (JSON fields matching linear forecast YAML)
-  locationData      Json?     // Extended location details, weather station config
-  plantData         Json?     // Complete plant configuration (physics parameters, losses)
-  performanceData   Json?     // Performance parameters, weather adjustments, corrections
-  outputConfig      Json?     // Output formats and delivery configuration  
-  calibrationSettings Json?   // Calibration settings, hourly corrections, seasonal adjustments
-  monitoringConfig  Json?     // Alert thresholds, tracking parameters
-  
-  // Client-specific configuration storage
-  clientConfig      Json?     // Complete client YAML configuration
-  
-  // Additional metadata
-  notes             String?   // Serialized JSON array of notes
-  tags              String?   // Serialized JSON array of tags
-  certificationData String?   // Serialized JSON for certification info
-  lastMaintenanceDate DateTime?
-  version           Int       @default(1)  // For version control
-  
-  // Bulk operations support
-  lastCalibrationDate DateTime?
-  calibrationStatus CalibrationStatus @default(PENDING)
-  bulkOperationId   String?   // For tracking bulk operations
-  
-  // Computed fields for dashboard display
-  displayCapacity   String?   // Formatted capacity for display
-  displayLocation   String?   // "City, Country" format
-  statusDisplay     String?   // Human-readable status
-  
-  // Metadata
-  metadata          Json?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
-  
-  // Relations
-  client            Client    @relation(fields: [clientId], references: [id])
-  plants            Plant[]
-  forecasts         Forecast[]
-  production        Production[]
-  alerts            Alert[]
-  weatherData       WeatherData[]
-  maintenanceLogs   MaintenanceLog[]
-  
-  @@index([clientId])
-  @@index([code])
-  @@index([status])
-  @@index([latitude, longitude])
-  @@index([calibrationStatus])
-  @@index([bulkOperationId])
-  @@map("locations")
 }
 
 enum CalibrationStatus {
@@ -240,123 +591,21 @@ enum TrackingType {
   DUAL_AXIS
 }
 
-// Plant/Array within a Location (for large installations)
-model Plant {
-  id                String    @id @default(uuid())
-  locationId        String
-  name              String
-  code              String    @unique
-  capacityMW        Float
-  inverterIds       String[]  // Array of inverter serial numbers
-  status            LocationStatus @default(ACTIVE)
-  metadata          Json?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  location          Location  @relation(fields: [locationId], references: [id])
-  
-  @@index([locationId])
-  @@index([code])
-  @@map("plants")
-}
-
-// ========================================
-// TIME SERIES DATA MODELS
-// ========================================
-
-// Forecast Data - Primary TimescaleDB Hypertable
-// This table will be converted to a TimescaleDB hypertable partitioned by timestamp
-// Optimized for time-series queries with 15-minute to daily aggregations
-model Forecast {
-  id                String    @id @default(uuid())
-  timestamp         DateTime
-  locationId        String
-  
-  // Primary forecast values (matching linear forecast CSV structure)
-  powerMW           Float     // Forecasted power in MW (production_mw)
-  powerOutputMW     Float     // Legacy field name compatibility
-  energyMWh         Float?    // Forecasted energy in MWh
-  capacityFactor    Float?    // Capacity factor (production_mw / nominal_capacity)
-  
-  // Confidence intervals (matching CSV: production_mw_q10, q25, q75, q90)
-  powerMWQ10        Float?    // 10th percentile (lower bound)
-  powerMWQ25        Float?    // 25th percentile
-  powerMWQ75        Float?    // 75th percentile  
-  powerMWQ90        Float?    // 90th percentile (upper bound)
-  powerMWLower      Float?    // Legacy lower confidence bound
-  powerMWUpper      Float?    // Legacy upper confidence bound
-  confidence        Float?    // Legacy confidence field
-  confidenceLevel   Float?    // Confidence percentage (0-100)
-  
-  // Forecast metadata
-  modelType         ModelType
-  modelVersion      String?
-  modelId           String?   // Reference to MLModel
-  horizonMinutes    Int       // Forecast horizon in minutes
-  horizonDays       Int?      // Forecast horizon in days (D+1, D+5)
-  resolution        ResolutionType // Time resolution
-  runId             String?   // Forecast run identifier
-  forecastType      ForecastType @default(OPERATIONAL)
-  
-  // Weather inputs used
-  temperature       Float?
-  ghi               Float?    // Global Horizontal Irradiance W/m²
-  dni               Float?    // Direct Normal Irradiance W/m²
-  dhi               Float?    // Diffuse Horizontal Irradiance W/m²
-  gti               Float?    // Global Tilted Irradiance W/m²
-  cloudCover        Float?    // Percentage
-  windSpeed         Float?    // m/s
-  humidity          Float?    // Percentage
-  pressure          Float?    // hPa
-  weatherData       Json?     // Full weather context
-  
-  // Quality and validation
-  qualityScore      Float?    // 0-1 quality indicator
-  isValidated       Boolean   @default(false)
-  validationNotes   String?
-  dataQuality       DataQuality @default(GOOD)
-  
-  // Processing metadata
-  processingTime    Float?    // Processing time in seconds
-  inputFeatures     Json?     // Features used in forecast
-  modelParameters   Json?     // Model parameters used
-  
-  // Tracking
-  createdAt         DateTime  @default(now())
-  createdBy         Int?
-  
-  // Relations
-  location          Location  @relation(fields: [locationId], references: [id])
-  user              User?     @relation(fields: [createdBy], references: [id])
-  
-  // TimescaleDB optimized indexes - time dimension first for hypertables
-  @@index([timestamp, locationId], name: "forecasts_time_location_idx")
-  @@index([timestamp, modelType], name: "forecasts_time_model_idx") 
-  @@index([locationId, timestamp(sort: Desc)], name: "forecasts_location_time_desc_idx")
-  @@index([modelType, timestamp(sort: Desc)], name: "forecasts_model_time_desc_idx")
-  @@index([horizonMinutes, timestamp], name: "forecasts_horizon_time_idx")
-  @@index([runId, timestamp], name: "forecasts_run_time_idx")
-  @@index([resolution, timestamp], name: "forecasts_resolution_time_idx")
-  @@index([forecastType, timestamp], name: "forecasts_type_time_idx")
-  @@map("forecasts")
-}
-
 enum ResolutionType {
-  FIFTEEN_MINUTES   // 15min
-  THIRTY_MINUTES    // 30min
-  HOURLY           // 1h
-  DAILY            // 1d
-  WEEKLY           // 1w
-  MONTHLY          // 1m
+  FIFTEEN_MINUTES
+  THIRTY_MINUTES
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 enum ForecastType {
-  OPERATIONAL      // Regular operational forecasts
-  D_PLUS_1_5       // D+1 to D+5 forecasts
-  MONTHLY_CONTINUED // Monthly continued forecasts
-  HISTORICAL       // Historical forecast recreation
-  VALIDATION       // Validation/backtesting forecasts
+  OPERATIONAL
+  D_PLUS_1_5
+  MONTHLY_CONTINUED
+  HISTORICAL
+  VALIDATION
 }
 
 enum ModelType {
@@ -367,28 +616,6 @@ enum ModelType {
   STATISTICAL
 }
 
-// Production Data - TimescaleDB Hypertable
-// Optimized for historical analysis and ML training
-// Supports compression and retention policies for efficient storage
-model Production {
-  id                String    @id @default(uuid())
-  timestamp         DateTime
-  locationId        String
-
-  // Core production metrics (essential for ML training & historical analysis)
-  powerMW           Float     // Actual AC power in MW - PRIMARY TARGET
-  capacityFactor    Float?    // Actual/Nominal capacity ratio
-  availability      Float?    // System availability percentage
-  
-  // Relations
-  location          Location  @relation(fields: [locationId], references: [id])
-
-  // TimescaleDB optimized indexes - time dimension first for hypertables
-  @@index([timestamp, locationId], name: "production_time_location_idx")
-  @@index([locationId, timestamp(sort: Desc)], name: "production_location_time_desc_idx")
-  @@map("production")
-}
-
 enum DataQuality {
   GOOD
   ESTIMATED
@@ -396,125 +623,6 @@ enum DataQuality {
   POOR
   MISSING
   INVALID
-}
-
-// Weather Data - TimescaleDB Hypertable
-// Meteorological data converted to hypertable for efficient time-series storage
-// Includes solar irradiance components optimized for solar forecasting
-model WeatherData {
-  id           String    @id @default(uuid())
-  timestamp    DateTime
-  locationId   String
-
-  // Essential weather metrics for solar forecasting
-  temperature  Float     // Celsius - affects panel efficiency
-  humidity     Float     // Percentage - affects atmospheric transparency
-  windSpeed    Float     // m/s - affects panel cooling
-  cloudCover   Float     // Percentage (0-100) - primary solar impact factor
-
-  // Solar radiation components (essential for forecasting)
-  ghi          Float?    // Global Horizontal Irradiance W/m²
-  dni          Float?    // Direct Normal Irradiance W/m²
-  dhi          Float?    // Diffuse Horizontal Irradiance W/m²
-
-  // Source and quality
-  source       String    // OpenWeather, Open-Meteo, etc.
-  dataQuality  DataQuality @default(GOOD)
-  
-  // Relations
-  location          Location  @relation(fields: [locationId], references: [id])
-  
-  // TimescaleDB optimized indexes - time dimension first for hypertables
-  @@index([timestamp, locationId], name: "weather_time_location_idx")
-  @@index([locationId, timestamp(sort: Desc)], name: "weather_location_time_desc_idx")
-  @@index([timestamp, source], name: "weather_time_source_idx")
-  @@index([source, timestamp], name: "weather_source_time_idx")
-  @@map("weather_data")
-}
-
-// ========================================
-// FORECAST ACCURACY TRACKING
-// ========================================
-
-model ForecastAccuracy {
-  id                String    @id @default(uuid())
-  locationId        String
-  date              DateTime
-  modelType         ModelType
-  modelVersion      String?
-  
-  // Accuracy metrics (industry standard)
-  mape              Float     // Mean Absolute Percentage Error
-  rmse              Float     // Root Mean Square Error
-  mae               Float     // Mean Absolute Error
-  mbe               Float?    // Mean Bias Error
-  r2                Float?    // R-squared
-  
-  // Skill scores
-  skillScore        Float?    // Forecast skill vs persistence
-  
-  // By horizon (store as JSON array)
-  accuracyByHorizon Json?     // Array of {horizon, mape, rmse, mae}
-  
-  // Sample counts
-  sampleCount       Int
-  validSamples      Int
-  
-  createdAt         DateTime  @default(now())
-  
-  @@unique([locationId, date, modelType, modelVersion])
-  @@index([locationId])
-  @@index([date])
-  @@index([modelType])
-  @@map("forecast_accuracy")
-}
-
-// ========================================
-// ALERT & MONITORING MODELS
-// ========================================
-
-// Alert System
-model Alert {
-  id                String    @id @default(uuid())
-  locationId        String?
-  userId            Int?
-  
-  // Alert details
-  type              AlertType
-  severity          AlertSeverity
-  title             String
-  message           String
-  details           Json?
-  
-  // Thresholds that triggered alert
-  thresholdValue    Float?
-  actualValue       Float?
-  
-  // Status
-  status            AlertStatus @default(ACTIVE)
-  acknowledgedAt    DateTime?
-  acknowledgedBy    Int?
-  resolvedAt        DateTime?
-  resolvedBy        Int?
-  resolution        String?
-  
-  // Timestamps
-  triggeredAt       DateTime  @default(now())
-  expiresAt         DateTime?
-  
-  // Notification tracking
-  notificationsSent Json?     // Array of notification methods used
-  
-  // Relations
-  location          Location? @relation(fields: [locationId], references: [id])
-  user              User?     @relation(fields: [userId], references: [id])
-  
-  @@index([locationId])
-  @@index([status])
-  @@index([severity])
-  @@index([triggeredAt])
-  @@index([type])
-  @@map("alerts")
 }
 
 enum AlertType {
@@ -546,58 +654,6 @@ enum AlertStatus {
   SUPPRESSED
 }
 
-// ========================================
-// MAINTENANCE & OPERATIONS
-// ========================================
-
-model MaintenanceLog {
-  id                String    @id @default(uuid())
-  locationId        String
-  
-  // Maintenance details
-  type              MaintenanceType
-  category          String?   // Cleaning, Repair, Inspection, etc.
-  description       String
-  
-  // Timing
-  scheduledAt       DateTime
-  startedAt         DateTime?
-  completedAt       DateTime?
-  duration          Int?      // Minutes
-  
-  // Impact
-  productionLossMWh Float?
-  downtime          Int?      // Minutes
-  
-  // Cost
-  laborCost         Float?
-  partsCost         Float?
-  totalCost         Float?
-  currency          String    @default("EUR")
-  
-  // Personnel
-  performedBy       String?
-  contractor        String?
-  
-  // Documentation
-  notes             String?
-  attachments       String[]  // URLs to documents/images
-  
-  // Status
-  status            MaintenanceStatus @default(SCHEDULED)
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  location          Location  @relation(fields: [locationId], references: [id])
-  
-  @@index([locationId])
-  @@index([scheduledAt])
-  @@index([status])
-  @@map("maintenance_logs")
-}
-
 enum MaintenanceType {
   PREVENTIVE
   CORRECTIVE
@@ -614,81 +670,6 @@ enum MaintenanceStatus {
   POSTPONED
 }
 
-// ========================================
-// REPORTING & ANALYTICS
-// ========================================
-
-// Reports
-model Report {
-  id                String    @id @default(uuid())
-  userId            Int
-  
-  // Report details
-  type              ReportType
-  name              String
-  description       String?
-  
-  // Configuration
-  parameters        Json      // Report configuration
-  filters           Json?     // Location IDs, date ranges, etc.
-  
-  // Schedule
-  schedule          String?   // Cron expression
-  isScheduled       Boolean   @default(false)
-  lastRunAt         DateTime?
-  nextRunAt         DateTime?
-  
-  // Output
-  format            ReportFormat @default(PDF)
-  outputUrl         String?
-  fileSize          Int?      // Bytes
-  
-  // Distribution
-  recipients        String[]  // Email addresses
-  
-  // Status
-  status            ReportStatus @default(DRAFT)
-  
-  // Metadata
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  user              User      @relation(fields: [userId], references: [id])
-  executions        ReportExecution[]
-  
-  @@index([userId])
-  @@index([type])
-  @@index([status])
-  @@map("reports")
-}
-
-model ReportExecution {
-  id                String    @id @default(uuid())
-  reportId          String
-  
-  // Execution details
-  startedAt         DateTime  @default(now())
-  completedAt       DateTime?
-  duration          Int?      // Seconds
-  
-  // Result
-  status            ExecutionStatus
-  outputUrl         String?
-  fileSize          Int?      // Bytes
-  recordCount       Int?
-  
-  // Error handling
-  error             String?
-  
-  // Relations
-  report            Report    @relation(fields: [reportId], references: [id])
-  
-  @@index([reportId])
-  @@index([startedAt])
-  @@map("report_executions")
-}
-
 enum ReportType {
   PRODUCTION_SUMMARY
   EFFICIENCY_ANALYSIS
@@ -698,8 +679,8 @@ enum ReportType {
   COMPLIANCE_REPORT
   WEATHER_IMPACT
   LOCATION_COMPARISON
-  FORECAST_D1_D5        // D+1/+5 Forecast Report
-  FORECAST_MONTHLY_CONTINUED // Monthly Continued Forecast Report  
+  FORECAST_D1_D5
+  FORECAST_MONTHLY_CONTINUED
   CUSTOM
 }
 
@@ -726,104 +707,6 @@ enum ExecutionStatus {
   CANCELLED
 }
 
-// Scheduled Reports (for automatic report generation and distribution)
-model ScheduledReport {
-  id                String    @id @default(uuid())
-  userId            Int
-  reportType        ReportType
-  
-  // Report configuration
-  name              String
-  description       String?
-  parameters        Json      // Report configuration matching UI
-  filters           Json?     // Location IDs, date ranges, etc.
-  
-  // Schedule configuration (cron-like)
-  frequency         ScheduleFrequency
-  scheduleTime      String    // "06:00", "14:30", etc.
-  startDate         DateTime
-  timezone          String    @default("UTC")
-  
-  // Schedule description for display
-  scheduleDescription String?
-  
-  // Output configuration
-  format            ReportFormat @default(PDF)
-  aggregationLevel  String?   // "15min", "1h", "1day", etc.
-  selectedTimezone  String?   // Timezone for data
-  
-  // Distribution
-  emailRecipients   String[]  // Email addresses
-  emailEnabled      Boolean   @default(true)
-  
-  // Location filtering
-  locationIds       String[]  // Selected location IDs
-  locationDisplay   LocationDisplay @default(INDIVIDUAL)
-  plantIds          String[]  // Selected plant IDs
-  
-  // Status and execution
-  isActive          Boolean   @default(true)
-  lastRunAt         DateTime?
-  nextRunAt         DateTime?
-  lastStatus        ExecutionStatus?
-  errorCount        Int       @default(0)
-  lastError         String?
-  
-  // Statistics
-  totalRuns         Int       @default(0)
-  successfulRuns    Int       @default(0)
-  
-  // Metadata
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  user              User      @relation(fields: [userId], references: [id])
-  executions        ScheduledReportExecution[]
-  
-  @@index([userId])
-  @@index([reportType])
-  @@index([isActive])
-  @@index([nextRunAt])
-  @@map("scheduled_reports")
-}
-
-// Execution history for scheduled reports
-model ScheduledReportExecution {
-  id                String    @id @default(uuid())
-  scheduledReportId String
-  
-  // Execution details
-  startedAt         DateTime  @default(now())
-  completedAt       DateTime?
-  duration          Int?      // Seconds
-  
-  // Configuration snapshot (in case schedule changes)
-  configSnapshot    Json
-  
-  // Result
-  status            ExecutionStatus
-  outputUrl         String?
-  fileSize          Int?      // Bytes
-  recordCount       Int?
-  
-  // Email delivery
-  emailsSent        Int       @default(0)
-  emailRecipients   String[]
-  emailStatus       String?   // "sent", "failed", "partial"
-  
-  // Error handling
-  error             String?
-  
-  // Relations
-  scheduledReport   ScheduledReport @relation(fields: [scheduledReportId], references: [id])
-  
-  @@index([scheduledReportId])
-  @@index([startedAt])
-  @@index([status])
-  @@map("scheduled_report_executions")
-}
-
 enum ScheduleFrequency {
   DAILY
   WEEKLY
@@ -833,66 +716,8 @@ enum ScheduleFrequency {
 }
 
 enum LocationDisplay {
-  INDIVIDUAL  // Show separate data for each location
-  AGGREGATED  // Combine all locations into summary
-}
-
-// ========================================
-// ML MODEL MANAGEMENT
-// ========================================
-
-// ML Model Registry
-model MLModel {
-  id                String    @id @default(uuid())
-  name              String
-  version           String
-  type              ModelType
-  
-  // Model details
-  description       String?
-  algorithm         String?
-  framework         String?   // TensorFlow, PyTorch, Scikit-learn, etc.
-  hyperparameters   Json?
-  features          String[]  // Input features used
-  targetVariable    String?   // What it predicts
-  
-  // Performance metrics
-  trainMetrics      Json?     // Training metrics
-  validMetrics      Json?     // Validation metrics
-  testMetrics       Json?     // Test metrics
-  
-  // Storage
-  modelPath         String    // Path to model file
-  artifactPath      String?   // Path to additional artifacts
-  checksum          String?   // Model file checksum
-  fileSize          Int?      // Bytes
-  
-  // Training data
-  trainDataStart    DateTime?
-  trainDataEnd      DateTime?
-  trainSampleCount  Int?
-  validSampleCount  Int?
-  testSampleCount   Int?
-  
-  // Status
-  status            ModelStatus @default(TRAINING)
-  isDefault         Boolean   @default(false)
-  isDeployed        Boolean   @default(false)
-  
-  // Deployment
-  deployedAt        DateTime?
-  deploymentUrl     String?   // Model serving endpoint
-  
-  // Metadata
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  trainedBy         String?   // User or service that trained it
-  
-  @@unique([name, version])
-  @@index([type])
-  @@index([status])
-  @@index([isDefault])
-  @@map("ml_models")
+  INDIVIDUAL
+  AGGREGATED
 }
 
 enum ModelStatus {
@@ -905,103 +730,9 @@ enum ModelStatus {
   ARCHIVED
 }
 
-// ========================================
-// AUDIT & COMPLIANCE
-// ========================================
-
-model AuditLog {
-  id                String    @id @default(uuid())
-  userId            Int?
-  
-  // Action details
-  action            String    // CREATE, UPDATE, DELETE, VIEW, EXPORT, etc.
-  entity            String    // Table/Model name
-  entityId          String?   // Record ID
-  
-  // Changes
-  oldValues         Json?
-  newValues         Json?
-  
-  // Context
-  ipAddress         String?
-  userAgent         String?
-  sessionId         String?
-  
-  // Metadata
-  timestamp         DateTime  @default(now())
-  
-  // Relations
-  user              User?     @relation(fields: [userId], references: [id])
-  
-  @@index([userId])
-  @@index([entity])
-  @@index([timestamp])
-  @@index([action])
-  @@map("audit_logs")
-}
-
-// ========================================
-// CONFIGURATION & SETTINGS
-// ========================================
-
-model SystemConfig {
-  id                String    @id @default(uuid())
-  key               String    @unique
-  value             Json
-  description       String?
-  category          String?
-  isPublic          Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  @@index([category])
-  @@index([key])
-  @@map("system_configs")
-}
-
-// Email Configuration and Distribution Lists
-model EmailConfiguration {
-  id                String    @id @default(uuid())
-  clientId          Int?      // Null for global configuration
-  
-  // Configuration name and type
-  name              String    // "Default Recipients", "Emergency Contacts", etc.
-  type              EmailConfigType @default(RECIPIENTS)
-  
-  // Email addresses
-  recipients        String[]  // Array of email addresses
-  
-  // Email service settings (for SMTP configuration)
-  smtpSettings      Json?     // SMTP server configuration
-  
-  // Template settings
-  templateSettings  Json?     // Email template configuration
-  
-  // Status
-  isActive          Boolean   @default(true)
-  isValidated       Boolean   @default(false)
-  
-  // Usage tracking
-  lastUsedAt        DateTime?
-  usageCount        Int       @default(0)
-  
-  // Metadata
-  description       String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  
-  // Relations
-  client            Client?   @relation(fields: [clientId], references: [id])
-  
-  @@index([clientId])
-  @@index([type])
-  @@index([isActive])
-  @@map("email_configurations")
-}
-
 enum EmailConfigType {
-  RECIPIENTS        // Recipient lists
-  SMTP              // SMTP configuration
-  TEMPLATES         // Email templates
-  GLOBAL            // Global settings
+  RECIPIENTS
+  SMTP
+  TEMPLATES
+  GLOBAL
 }

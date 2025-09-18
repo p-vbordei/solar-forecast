@@ -140,7 +140,7 @@ export class ForecastService {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         location_id: params.locationId,  // Python worker expects GUID string
-                        forecast_hours: params.horizonHours,
+                        horizon_hours: params.horizonHours,  // Fixed: was forecast_hours
                         model_type: params.modelType,  // Pass model type directly as received
                         use_weather: params.useWeather !== false,  // Default to true
                         confidence_level: params.confidenceLevel || 0.95
@@ -180,7 +180,7 @@ export class ForecastService {
                 console.log('Python worker returned task ID:', forecastResult.task_id);
 
                 // Poll for task completion
-                const maxAttempts = 30; // 30 seconds timeout
+                const maxAttempts = 120; // 120 seconds timeout (2 minutes)
                 let attempts = 0;
 
                 while (attempts < maxAttempts) {

@@ -13,6 +13,7 @@ from .models_api import (
     ForecastTaskResponse
     # ForecastAccuracyResponse removed - business logic moved to SvelteKit
 )
+from app.core.task_manager import task_manager
 
 router = APIRouter(
     tags=["Solar Forecasting"],
@@ -372,3 +373,26 @@ async def delete_location_forecasts(
 
 # Training data endpoint removed - business logic moved to SvelteKit
 # Use SvelteKit API for data extraction and formatting
+
+
+@router.get(
+    "/debug/tasks",
+    summary="Debug: List All Tasks",
+    description="Debug endpoint to list all active tasks in memory",
+    include_in_schema=False  # Hide from production docs
+)
+async def debug_list_tasks():
+    """Debug endpoint to check all active tasks"""
+    tasks = task_manager.get_all_tasks()
+    return {
+        "task_count": task_manager.task_count(),
+        "tasks": {
+            task_id: {
+                "status": task_data.get("status"),
+                "location_id": task_data.get("location_id"),
+                "created_at": task_data.get("created_at").isoformat() if task_data.get("created_at") else None,
+                "progress": task_data.get("progress")
+            }
+            for task_id, task_data in tasks.items()
+        }
+    }

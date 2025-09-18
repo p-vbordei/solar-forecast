@@ -68,6 +68,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide-svelte": "^0.454.0",
     "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.6",
     "pdfkit": "^0.17.2",
     "swagger-ui-dist": "^5.28.1",

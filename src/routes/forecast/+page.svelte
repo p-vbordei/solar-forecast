@@ -6,6 +6,7 @@
   import DocumentTextIcon from "$lib/components/icons/DocumentTextIcon.svelte";
   import ChartBarIcon from "$lib/components/icons/ChartBarIcon.svelte";
   import DownloadIcon from "$lib/components/icons/DownloadIcon.svelte";
+  import { StorageManager } from "$lib/utils/storage-manager";
 
   let showExplanation = false;
   let isLoadingChart = false;
@@ -23,25 +24,50 @@
   let locations: any[] = [];
   let isLoadingLocations = true;
 
+  // Update stored preference when location changes
+  $: if (selectedLocation && locations.length > 0) {
+    StorageManager.setStoredLocation('SELECTED_LOCATION', selectedLocation);
+  }
+
+  $: if (selectedWeatherLocation && locations.length > 0) {
+    StorageManager.setStoredLocation('SELECTED_WEATHER_LOCATION', selectedWeatherLocation);
+  }
+
   async function loadLocations() {
     try {
       const response = await fetch("/api/locations");
       if (response.ok) {
         const result = await response.json();
         locations = result.data || [];
+
         if (locations.length > 0) {
-          // Set to first location
-          selectedLocation = locations[0].id;
-          selectedWeatherLocation = locations[0].id; // Set weather location to first in list
+          // Get valid location IDs
+          const validLocationIds = locations.map(l => l.id);
+
+          // Try to get stored location preference with validation
+          const storedLocation = StorageManager.getStoredLocation('SELECTED_LOCATION', validLocationIds);
+          const storedWeatherLocation = StorageManager.getStoredLocation('SELECTED_WEATHER_LOCATION', validLocationIds);
+
+          // Use stored location if valid, otherwise use first location
+          selectedLocation = storedLocation || locations[0].id;
+          selectedWeatherLocation = storedWeatherLocation || locations[0].id;
+
+          // Store the selection
+          StorageManager.setStoredLocation('SELECTED_LOCATION', selectedLocation);
+          StorageManager.setStoredLocation('SELECTED_WEATHER_LOCATION', selectedWeatherLocation);
 
           // Load any existing forecast data for this location
           await loadForecastData();
         }
       } else {
         console.error("Failed to load locations");
+        // Clear any invalid stored locations
+        StorageManager.clearLocationPreferences();
       }
     } catch (error) {
       console.error("Error loading locations:", error);
+      // Clear any invalid stored locations on error
+      StorageManager.clearLocationPreferences();
     } finally {
       isLoadingLocations = false;
     }

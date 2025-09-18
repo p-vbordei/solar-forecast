@@ -9,36 +9,52 @@ import json
 import pandas as pd
 from uuid import uuid4
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ForecastRepository:
     """Repository for forecast data access"""
-    
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
     async def get_location(self, location_id: int) -> Optional[Dict]:
         """Get location by ID"""
         query = text("""
-            SELECT id, name, latitude, longitude, capacity_mw, status
-            FROM "Location"
+            SELECT id, name, latitude, longitude, "capacityMW", status,
+                   timezone, altitude, "tiltAngle", "azimuthAngle",
+                   "panelType", "isBifacial", "inverterCount",
+                   "plantData", "performanceData"
+            FROM locations
             WHERE id = :location_id
         """)
-        
+
         result = await self.db.execute(query, {"location_id": location_id})
         row = result.fetchone()
-        
+
         if row:
             return {
                 "id": row[0],
                 "name": row[1],
                 "latitude": row[2],
                 "longitude": row[3],
-                "capacity_mw": row[4],
-                "status": row[5]
+                "capacityMW": row[4],  # Use camelCase to match config builder
+                "capacity_mw": row[4],  # Also provide lowercase for compatibility
+                "status": row[5],
+                "timezone": row[6] or "Europe/Bucharest",
+                "altitude": row[7],
+                "tiltAngle": row[8],
+                "azimuthAngle": row[9],
+                "panelType": row[10],
+                "isBifacial": row[11],
+                "inverterCount": row[12],
+                "plantData": row[13],
+                "performanceData": row[14]
             }
         return None
-    
+
     async def save_forecasts(self, forecasts: List[Dict]) -> int:
         """Save multiple forecast records (LEGACY METHOD - USE bulk_save_forecasts for new code)"""
         if not forecasts:
@@ -91,7 +107,7 @@ class ForecastRepository:
 
         await self.db.commit()
         return len(values)
-    
+
     async def get_forecasts_range(
         self,
         location_id: str,  # String UUID
@@ -150,7 +166,7 @@ class ForecastRepository:
             }
             for row in rows
         ]
-    
+
     async def get_production_range(
         self,
         location_id: str,  # String UUID
@@ -184,7 +200,7 @@ class ForecastRepository:
             }
             for row in rows
         ]
-    
+
     async def delete_forecasts_before(
         self,
         location_id: str,  # String UUID
@@ -204,7 +220,7 @@ class ForecastRepository:
 
         await self.db.commit()
         return result.rowcount
-    
+
     async def get_latest_forecast(self, location_id: str) -> Optional[Dict]:
         """Get the most recent forecast for a location (corrected field names)"""
         query = text("""
@@ -259,14 +275,15 @@ class ForecastRepository:
                 "trackingSystem": row[11],
                 "tiltAngle": row[12],
                 "azimuthAngle": row[13],
-                "plantData": json.loads(row[14]) if row[14] else {},
-                "performanceData": json.loads(row[15]) if row[15] else {},
-                "calibrationSettings": json.loads(row[16]) if row[16] else {}
+                # Handle JSON fields - they might already be dictionaries or JSON strings
+                "plantData": row[14] if isinstance(row[14], dict) else (json.loads(row[14]) if row[14] and isinstance(row[14], str) else {}),
+                "performanceData": row[15] if isinstance(row[15], dict) else (json.loads(row[15]) if row[15] and isinstance(row[15], str) else {}),
+                "calibrationSettings": row[16] if isinstance(row[16], dict) else (json.loads(row[16]) if row[16] and isinstance(row[16], str) else {})
             }
         return None
 
     async def get_recent_weather(self, location_id: str, hours: int) -> pd.DataFrame:
-        """Get weather data from SvelteKit API as DataFrame for forecast models"""
+        """Get weather data from SvelteKit API as DataFrame for forecast models, with database fallback"""
         import httpx
         import os
 
@@ -284,12 +301,14 @@ class ForecastRepository:
                 )
 
                 if response.status_code != 200:
-                    raise Exception(f"SvelteKit API error: {response.status_code}")
+                    logger.warning(f"SvelteKit API returned {response.status_code}, using database fallback")
+                    return await self._get_weather_from_database(location_id, hours)
 
                 api_data = response.json()
 
                 if not api_data.get('success'):
-                    raise Exception(f"API error: {api_data.get('error', 'Unknown error')}")
+                    logger.warning(f"API error: {api_data.get('error')}, using database fallback")
+                    return await self._get_weather_from_database(location_id, hours)
 
                 # Convert API response to DataFrame
                 weather_records = api_data['data']
@@ -359,8 +378,82 @@ class ForecastRepository:
 
         except Exception as e:
             logger.error(f"Failed to get weather data from SvelteKit for location {location_id}: {e}")
+            # Try database fallback
+            return await self._get_weather_from_database(location_id, hours)
 
-            # Fallback: return empty DataFrame with expected structure
+    async def _get_weather_from_database(self, location_id: str, hours: int) -> pd.DataFrame:
+        """Direct database query for weather data (fallback method)"""
+        from datetime import timedelta
+
+        try:
+            # Calculate time range
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(hours=hours)
+
+            # Query weather data directly from database (using correct camelCase column names)
+            query = text("""
+                SELECT
+                    timestamp,
+                    temperature as temp_air,
+                    humidity,
+                    "windSpeed" as wind_speed,
+                    "cloudCover" as cloud_cover,
+                    ghi,
+                    dni,
+                    dhi
+                FROM weather_data
+                WHERE "locationId" = :location_id
+                  AND timestamp >= :start_time
+                  AND timestamp <= :end_time
+                ORDER BY timestamp ASC
+            """)
+
+            result = await self.db.execute(query, {
+                "location_id": location_id,
+                "start_time": start_time,
+                "end_time": end_time
+            })
+
+            rows = result.fetchall()
+
+            if not rows:
+                logger.warning(f"No weather data found in database for location {location_id}")
+                # Return empty DataFrame with expected structure
+                return pd.DataFrame(columns=[
+                    'timestamp', 'temp_air', 'humidity', 'wind_speed',
+                    'cloud_cover', 'ghi', 'dni', 'dhi'
+                ])
+
+            # Convert to DataFrame
+            weather_data = []
+            for row in rows:
+                weather_data.append({
+                    'timestamp': row[0],
+                    'temp_air': row[1] or 20.0,
+                    'humidity': row[2] or 60.0,
+                    'wind_speed': row[3] or 2.0,
+                    'cloud_cover': row[4] or 50.0,
+                    'ghi': row[5] or 0,
+                    'dni': row[6] or 0,
+                    'dhi': row[7] or 0
+                })
+
+            df = pd.DataFrame(weather_data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+
+            # Add PVLIB required fields
+            df['albedo'] = 0.2
+            df['solar_zenith'] = 45
+            df['solar_azimuth'] = 180
+            df['precipitable_water'] = 14.0
+
+            logger.info(f"Retrieved {len(df)} weather records from database for location {location_id}")
+            return df
+
+        except Exception as e:
+            logger.error(f"Failed to get weather data from database: {e}")
+            # Return empty DataFrame as last resort
             return pd.DataFrame(columns=[
                 'timestamp', 'temp_air', 'humidity', 'wind_speed',
                 'cloud_cover', 'ghi', 'dni', 'dhi'
@@ -470,20 +563,26 @@ class ForecastRepository:
         return model_type_map.get(model_type, 'ENSEMBLE')
 
     def build_config_from_location(self, location: Dict) -> Dict[str, Any]:
-        """Build forecast configuration from database location data"""
+        """Build forecast configuration from database location data with Romanian defaults"""
         # Handle None or missing JSON fields
         plant_data = location.get('plantData') or {}
         performance_data = location.get('performanceData') or {}
 
-        # Get tilt and azimuth with defaults
+        # Calculate optimal tilt based on latitude for Romania
+        latitude = location['latitude']
+
+        # Romanian optimal tilt: latitude - 10° for year-round production
+        default_tilt = round(latitude - 10) if 44 <= latitude <= 47 else 35
+
+        # Get tilt and azimuth with Romanian defaults
         tilt_angle = location.get('tiltAngle')
         azimuth_angle = location.get('azimuthAngle')
 
-        # Ensure we have valid values for PVLIB
+        # Apply Romanian defaults if not specified
         if tilt_angle is None:
-            tilt_angle = 30  # Default tilt angle
+            tilt_angle = default_tilt  # Optimal for Romania
         if azimuth_angle is None:
-            azimuth_angle = 180  # Default south-facing
+            azimuth_angle = 180  # South-facing for Northern hemisphere
 
         config = {
             'location': {
@@ -500,30 +599,34 @@ class ForecastRepository:
                     'tilt': plant_data.get('panels', {}).get('tilt', tilt_angle),
                     'azimuth': plant_data.get('panels', {}).get('azimuth', azimuth_angle),
                     'technology': location.get('panelType', 'monocrystalline'),
-                    'temperature_coefficient': -0.004,
-                    'bifacial': False
+                    'temperature_coefficient': -0.0035,  # Romanian standard for mono-Si
+                    'bifacial': location.get('isBifacial', False),
+                    'nominal_efficiency': 0.21  # Modern panel efficiency
                 },
-                'inverter': plant_data.get('inverter', {
-                    'efficiency': 0.95
-                }),
+                'inverter': {
+                    'efficiency': plant_data.get('inverter', {}).get('efficiency', 0.98),
+                    # Size inverters to match plant capacity (not divide by quantity)
+                    'ac_power_rating_kw': location.get('capacityMW', 1) * 1000,  # Total AC capacity
+                    'quantity': location.get('inverterCount', 1)  # Handled in solar_physics.py
+                },
                 'physics_parameters': performance_data.get('physics_parameters', {
-                    'performance_ratio': 0.90,
-                    'albedo': 0.2,
-                    'dc_overpower_ratio': 1.1
+                    'performance_ratio': 0.84,  # Romanian typical PR
+                    'albedo': 0.2,  # Grass/soil
+                    'dc_overpower_ratio': 1.15  # 15% DC oversizing
                 }),
-                # PVLIB system losses configuration
-                'losses': performance_data.get('losses', {
+                # PVLIB system losses configuration - get from performanceData or use defaults
+                'losses': performance_data.get('losses') or {
                     'soiling': 2,       # Soiling losses (%)
-                    'shading': 3,       # Shading losses (%)
-                    'snow': 0,          # Snow losses (%)
+                    'shading': 1,       # Shading losses (%) - Romanian default
+                    'snow': 1.5,        # Snow losses (%) - Romanian winters
                     'mismatch': 2,      # Module mismatch (%)
-                    'wiring': 2,        # DC wiring losses (%)
+                    'wiring': 1.5,      # DC wiring losses (%)
                     'connections': 0.5, # Connection losses (%)
                     'lid': 1.5,         # Light-induced degradation (%)
                     'nameplate': 1,     # Nameplate rating losses (%)
                     'age': 0,           # Age-related losses (%)
                     'availability': 3   # System availability (%)
-                })
+                }
             }
         }
 
