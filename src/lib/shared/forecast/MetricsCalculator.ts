@@ -29,8 +29,13 @@ export class ForecastMetricsCalculator {
             return this.getDefaultMetrics(data.length);
         }
 
-        const forecasts = validPoints.map(p => p.forecast);
-        const actuals = validPoints.map(p => p.actual!);
+        // Performance: Extract values in single pass
+        const forecasts: number[] = [];
+        const actuals: number[] = [];
+        for (const point of validPoints) {
+            forecasts.push(point.forecast);
+            actuals.push(point.actual!);
+        }
 
         // Core accuracy calculations
         const mape = this.calculateMAPE(actuals, forecasts);
@@ -69,9 +74,11 @@ export class ForecastMetricsCalculator {
         let sumAPE = 0;
         let validPoints = 0;
 
+        // Performance: Use single loop with minimal operations
         for (let i = 0; i < actual.length; i++) {
-            if (actual[i] !== 0) { // Avoid division by zero
-                sumAPE += Math.abs((actual[i] - forecast[i]) / actual[i]);
+            const actualVal = actual[i];
+            if (actualVal !== 0) { // Avoid division by zero
+                sumAPE += Math.abs((actualVal - forecast[i]) / actualVal);
                 validPoints++;
             }
         }
@@ -86,8 +93,12 @@ export class ForecastMetricsCalculator {
     static calculateRMSE(actual: number[], forecast: number[]): number {
         if (actual.length !== forecast.length || actual.length === 0) return 0;
 
-        const sumSquaredError = actual.reduce((sum, a, i) =>
-            sum + Math.pow(a - forecast[i], 2), 0);
+        // Performance: Use loop instead of reduce for better performance
+        let sumSquaredError = 0;
+        for (let i = 0; i < actual.length; i++) {
+            const diff = actual[i] - forecast[i];
+            sumSquaredError += diff * diff; // Faster than Math.pow
+        }
 
         return Math.sqrt(sumSquaredError / actual.length);
     }
@@ -99,8 +110,11 @@ export class ForecastMetricsCalculator {
     static calculateMAE(actual: number[], forecast: number[]): number {
         if (actual.length !== forecast.length || actual.length === 0) return 0;
 
-        const sumAbsoluteError = actual.reduce((sum, a, i) =>
-            sum + Math.abs(a - forecast[i]), 0);
+        // Performance: Use loop for better performance
+        let sumAbsoluteError = 0;
+        for (let i = 0; i < actual.length; i++) {
+            sumAbsoluteError += Math.abs(actual[i] - forecast[i]);
+        }
 
         return sumAbsoluteError / actual.length;
     }
@@ -112,13 +126,24 @@ export class ForecastMetricsCalculator {
     static calculateR2(actual: number[], forecast: number[]): number {
         if (actual.length !== forecast.length || actual.length === 0) return 0;
 
-        const actualMean = actual.reduce((sum, val) => sum + val, 0) / actual.length;
+        // Performance: Calculate mean in single pass
+        let actualSum = 0;
+        for (let i = 0; i < actual.length; i++) {
+            actualSum += actual[i];
+        }
+        const actualMean = actualSum / actual.length;
 
-        const totalSumSquares = actual.reduce((sum, val) =>
-            sum + Math.pow(val - actualMean, 2), 0);
+        // Performance: Calculate both sum of squares in single pass
+        let totalSumSquares = 0;
+        let residualSumSquares = 0;
+        for (let i = 0; i < actual.length; i++) {
+            const actualVal = actual[i];
+            const meanDiff = actualVal - actualMean;
+            const residualDiff = actualVal - forecast[i];
 
-        const residualSumSquares = actual.reduce((sum, val, i) =>
-            sum + Math.pow(val - forecast[i], 2), 0);
+            totalSumSquares += meanDiff * meanDiff;
+            residualSumSquares += residualDiff * residualDiff;
+        }
 
         if (totalSumSquares === 0) return 0;
 
@@ -160,8 +185,12 @@ export class ForecastMetricsCalculator {
     private static calculateMSE(actual: number[], forecast: number[]): number {
         if (actual.length !== forecast.length || actual.length === 0) return 0;
 
-        const sumSquaredError = actual.reduce((sum, a, i) =>
-            sum + Math.pow(a - forecast[i], 2), 0);
+        // Performance: Use loop for better performance
+        let sumSquaredError = 0;
+        for (let i = 0; i < actual.length; i++) {
+            const diff = actual[i] - forecast[i];
+            sumSquaredError += diff * diff;
+        }
 
         return sumSquaredError / actual.length;
     }

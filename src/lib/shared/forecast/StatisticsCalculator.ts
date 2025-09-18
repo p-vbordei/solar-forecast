@@ -29,9 +29,16 @@ export class ForecastStatisticsCalculator {
         }
 
         // Calculate time range
-        const timestamps = validForecasts.map(f => new Date(f.timestamp));
-        const startDate = new Date(Math.min(...timestamps.map(d => d.getTime())));
-        const endDate = new Date(Math.max(...timestamps.map(d => d.getTime())));
+        // Performance: Find min/max timestamps in single pass
+        let minTimestamp = Number.MAX_SAFE_INTEGER;
+        let maxTimestamp = Number.MIN_SAFE_INTEGER;
+        for (const forecast of validForecasts) {
+            const timestamp = new Date(forecast.timestamp).getTime();
+            if (timestamp < minTimestamp) minTimestamp = timestamp;
+            if (timestamp > maxTimestamp) maxTimestamp = timestamp;
+        }
+        const startDate = new Date(minTimestamp);
+        const endDate = new Date(maxTimestamp);
         const daysSpanned = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
         // Calculate average accuracy from actual vs forecast comparison
@@ -83,10 +90,14 @@ export class ForecastStatisticsCalculator {
      * Calculate average confidence from forecast data
      */
     private static calculateAverageConfidence(data: ForecastData[]): number {
-        const confidenceValues = data
-            .map(point => point.confidence)
-            .filter(conf => conf != null && !isNaN(conf!))
-            .map(conf => conf! * 100); // Convert to percentage
+        // Performance: Single pass for confidence extraction
+        const confidenceValues: number[] = [];
+        for (const point of data) {
+            const conf = point.confidence;
+            if (conf != null && !isNaN(conf)) {
+                confidenceValues.push(conf * 100); // Convert to percentage
+            }
+        }
 
         if (confidenceValues.length === 0) return 85; // Default confidence
 
@@ -190,9 +201,17 @@ export class ForecastStatisticsCalculator {
         variance: number;
         seasonality: 'detected' | 'not_detected';
     } {
-        const validForecasts = data
-            .filter(point => point.forecast != null && !isNaN(point.forecast))
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        // Performance: Filter and sort in optimized way
+        const validForecasts: ForecastData[] = [];
+        for (const point of data) {
+            if (point.forecast != null && !isNaN(point.forecast)) {
+                validForecasts.push(point);
+            }
+        }
+        // Sort if needed
+        if (validForecasts.length > 0) {
+            validForecasts.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        }
 
         if (validForecasts.length < 3) {
             return {
@@ -205,8 +224,13 @@ export class ForecastStatisticsCalculator {
 
         // Simple linear regression for trend
         const n = validForecasts.length;
-        const x = Array.from({ length: n }, (_, i) => i);
-        const y = validForecasts.map(f => f.forecast);
+        // Performance: Create arrays efficiently
+        const x: number[] = [];
+        const y: number[] = [];
+        for (let i = 0; i < n; i++) {
+            x.push(i);
+            y.push(validForecasts[i].forecast);
+        }
 
         const sumX = x.reduce((sum, val) => sum + val, 0);
         const sumY = y.reduce((sum, val) => sum + val, 0);

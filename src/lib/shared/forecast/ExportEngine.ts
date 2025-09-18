@@ -167,8 +167,13 @@ export class ForecastExportEngine {
         lines.push(`Total Forecast Points: ${data.forecast.length}`);
 
         if (data.forecast.length > 0) {
-            const forecasts = data.forecast.map(f => f.forecast).filter(f => f != null);
-            const actuals = data.forecast.map(f => f.actual).filter(f => f != null);
+            // Performance: Extract values in single pass
+            const forecasts: number[] = [];
+            const actuals: number[] = [];
+            for (const f of data.forecast) {
+                if (f.forecast != null) forecasts.push(f.forecast);
+                if (f.actual != null) actuals.push(f.actual);
+            }
 
             if (forecasts.length > 0) {
                 lines.push(`Forecast Range: ${Math.min(...forecasts).toFixed(2)} - ${Math.max(...forecasts).toFixed(2)} MW`);

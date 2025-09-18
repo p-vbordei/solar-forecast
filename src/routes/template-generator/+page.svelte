@@ -179,6 +179,6 @@
 	:global(.text-soft-blue) { color: #AFDDE5; }
 	:global(.text-cyan) { color: #0FA4AF; }
 	:global(.bg-cyan) { background-color: #0FA4AF; }
-	:global(.border-soft-blue\\/20) { border-color: rgba(175, 221, 229, 0.2); }
-	:global(.border-soft-blue\\/30) { border-color: rgba(175, 221, 229, 0.3); }
+	:global(.border-soft-blue-20) { border-color: rgba(175, 221, 229, 0.2); }
+	:global(.border-soft-blue-30) { border-color: rgba(175, 221, 229, 0.3); }
 </style>

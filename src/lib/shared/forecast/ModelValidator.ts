@@ -7,6 +7,11 @@ import type { ModelType, ModelValidationResult } from './types';
 
 export class ModelValidator {
     /**
+     * Cache for normalized model types (performance optimization)
+     */
+    private static normalizationCache = new Map<string, ModelType>();
+
+    /**
      * Valid model types mapping
      * Single source of truth for all model type validation
      */
@@ -156,9 +161,21 @@ export class ModelValidator {
         }
 
         const trimmed = modelType.trim();
-        const normalized = this.MODEL_TYPE_MAPPING[trimmed];
 
-        return normalized || 'ML_ENSEMBLE'; // Fallback to default
+        // Performance: Check cache first
+        const cached = this.normalizationCache.get(trimmed);
+        if (cached) {
+            return cached;
+        }
+
+        const normalized = this.MODEL_TYPE_MAPPING[trimmed] || 'ML_ENSEMBLE';
+
+        // Cache the result (limit cache size for memory efficiency)
+        if (this.normalizationCache.size < 1000) {
+            this.normalizationCache.set(trimmed, normalized);
+        }
+
+        return normalized;
     }
 
     /**

@@ -24,46 +24,45 @@ export { ModelValidator } from './ModelValidator';
 export { ForecastExportEngine } from './ExportEngine';
 export { ForecastStatisticsCalculator } from './StatisticsCalculator';
 
+// Import classes for re-exporting static methods
+import { ForecastMetricsCalculator } from './MetricsCalculator';
+import { ModelValidator } from './ModelValidator';
+import { ForecastExportEngine } from './ExportEngine';
+import { ForecastStatisticsCalculator } from './StatisticsCalculator';
+import type { ForecastData, ExportData, ForecastInterval } from './types';
+
 // Re-export commonly used functions for convenience
-export const {
-    calculateAccuracyMetrics,
-    calculateMAPE,
-    calculateRMSE,
-    calculateMAE,
-    calculateR2,
-    calculateNRMSE,
-    calculateSkillScore,
-    calculateConfidenceBounds,
-    validateMetrics
-} = ForecastMetricsCalculator;
+export const calculateAccuracyMetrics = ForecastMetricsCalculator.calculateAccuracyMetrics.bind(ForecastMetricsCalculator);
+export const calculateMAPE = ForecastMetricsCalculator.calculateMAPE.bind(ForecastMetricsCalculator);
+export const calculateRMSE = ForecastMetricsCalculator.calculateRMSE.bind(ForecastMetricsCalculator);
+export const calculateMAE = ForecastMetricsCalculator.calculateMAE.bind(ForecastMetricsCalculator);
+export const calculateR2 = ForecastMetricsCalculator.calculateR2.bind(ForecastMetricsCalculator);
+export const calculateNRMSE = ForecastMetricsCalculator.calculateNRMSE.bind(ForecastMetricsCalculator);
+export const calculateSkillScore = ForecastMetricsCalculator.calculateSkillScore.bind(ForecastMetricsCalculator);
+export const calculateConfidenceBounds = ForecastMetricsCalculator.calculateConfidenceBounds.bind(ForecastMetricsCalculator);
+export const validateMetrics = ForecastMetricsCalculator.validateMetrics.bind(ForecastMetricsCalculator);
 
-export const {
-    normalizeModelType,
-    validateModelType,
-    isValidModelType,
-    getSupportedModelTypes,
-    getCanonicalModelTypes,
-    getModelCapabilities,
-    requiresWeatherData,
-    requiresHistoricalData,
-    supportsConfidenceBounds,
-    supportsRealTime,
-    getRecommendedModels,
-    getValidationErrorMessage,
-    safeNormalizeModelType
-} = ModelValidator;
+export const normalizeModelType = ModelValidator.normalizeModelType.bind(ModelValidator);
+export const validateModelType = ModelValidator.validateModelType.bind(ModelValidator);
+export const isValidModelType = ModelValidator.isValidModelType.bind(ModelValidator);
+export const getSupportedModelTypes = ModelValidator.getSupportedModelTypes.bind(ModelValidator);
+export const getCanonicalModelTypes = ModelValidator.getCanonicalModelTypes.bind(ModelValidator);
+export const getModelCapabilities = ModelValidator.getModelCapabilities.bind(ModelValidator);
+export const requiresWeatherData = ModelValidator.requiresWeatherData.bind(ModelValidator);
+export const requiresHistoricalData = ModelValidator.requiresHistoricalData.bind(ModelValidator);
+export const supportsConfidenceBounds = ModelValidator.supportsConfidenceBounds.bind(ModelValidator);
+export const supportsRealTime = ModelValidator.supportsRealTime.bind(ModelValidator);
+export const getRecommendedModels = ModelValidator.getRecommendedModels.bind(ModelValidator);
+export const getValidationErrorMessage = ModelValidator.getValidationErrorMessage.bind(ModelValidator);
+export const safeNormalizeModelType = ModelValidator.safeNormalizeModelType.bind(ModelValidator);
 
-export const {
-    exportData: exportForecastData,
-    generateFilename: generateExportFilename,
-    getMimeType: getExportMimeType
-} = ForecastExportEngine;
+export const exportForecastData = ForecastExportEngine.exportData.bind(ForecastExportEngine);
+export const generateExportFilename = ForecastExportEngine.generateFilename.bind(ForecastExportEngine);
+export const getExportMimeType = ForecastExportEngine.getMimeType.bind(ForecastExportEngine);
 
-export const {
-    calculateForecastStatistics,
-    calculateQualityDistribution,
-    calculateTrendAnalysis
-} = ForecastStatisticsCalculator;
+export const calculateForecastStatistics = ForecastStatisticsCalculator.calculateForecastStatistics.bind(ForecastStatisticsCalculator);
+export const calculateQualityDistribution = ForecastStatisticsCalculator.calculateQualityDistribution.bind(ForecastStatisticsCalculator);
+export const calculateTrendAnalysis = ForecastStatisticsCalculator.calculateTrendAnalysis.bind(ForecastStatisticsCalculator);
 
 /**
  * Convenience function to create a complete forecast analysis
