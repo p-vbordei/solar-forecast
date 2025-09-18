@@ -211,53 +211,8 @@ class ForecastService:
             model_type=model_type
         )
     
-    async def calculate_accuracy(
-        self,
-        location_id: str,
-        days: int = 7
-    ) -> Optional[ForecastAccuracyResponse]:
-        """Calculate forecast accuracy metrics"""
-        end_time = datetime.utcnow()
-        start_time = end_time - timedelta(days=days)
-        
-        # Get forecasts and actual production
-        forecasts = await self.repo.get_forecasts_range(
-            location_id=location_id,
-            start_time=start_time,
-            end_time=end_time
-        )
-        
-        actuals = await self.repo.get_production_range(
-            location_id=location_id,
-            start_time=start_time,
-            end_time=end_time
-        )
-        
-        if not forecasts or not actuals:
-            return None
-        
-        # Calculate metrics
-        forecast_values = np.array([f["power_output_mw"] for f in forecasts])
-        actual_values = np.array([a["power_output_mw"] for a in actuals[:len(forecasts)]])
-        
-        # Mean Absolute Percentage Error
-        mape = np.mean(np.abs((actual_values - forecast_values) / (actual_values + 0.001))) * 100
-        
-        # Root Mean Square Error
-        rmse = np.sqrt(np.mean((actual_values - forecast_values) ** 2))
-        
-        # Accuracy percentage
-        accuracy = max(0, 100 - mape)
-        
-        return ForecastAccuracyResponse(
-            location_id=location_id,
-            accuracy_percentage=round(accuracy, 1),
-            mape=round(mape, 2),
-            rmse=round(rmse, 2),
-            sample_size=len(forecasts),
-            period_days=days,
-            model_type=forecasts[0].get("model_type", "Unknown") if forecasts else "Unknown"
-        )
+    # calculate_accuracy method removed - now handled by SvelteKit shared utilities
+    # Use ForecastMetricsCalculator in SvelteKit instead
     
     async def delete_old_forecasts(
         self,

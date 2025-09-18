@@ -1,6 +1,12 @@
 import { ForecastRepository } from '../repositories/ForecastRepository';
-import { forecastRepository as legacyRepository } from '$lib/server/repositories/forecast.repository';
-import ExcelJS from 'exceljs';
+import {
+    ForecastMetricsCalculator,
+    ModelValidator,
+    ForecastExportEngine,
+    prepareExportData,
+    type ForecastData,
+    type AccuracyMetrics as SharedAccuracyMetrics
+} from '$lib/shared/forecast';
 import type {
     ForecastParameters,
     AccuracyParameters,
@@ -27,7 +33,7 @@ export class ForecastService {
         // Validate GUID format
         this.validateGuidFormat(locationId);
 
-        // Try to get real data from repository first
+        // Get data from repository
         let rawData = await this.repository.getForecastData(
             locationId,
             interval,
@@ -35,15 +41,10 @@ export class ForecastService {
             endDate
         );
 
-        // Fall back to legacy repository if no data
+        // If no data available, return empty dataset with proper structure
         if (!rawData || rawData.length === 0) {
-            console.log(`No TimescaleDB data found, using legacy repository for location ${locationId}`);
-            rawData = await legacyRepository.getForecastData(
-                locationId,
-                interval,
-                startDate,
-                endDate
-            );
+            console.log(`No forecast data found for location ${locationId}`);
+            rawData = [];
         }
 
         // Process and format data based on interval
@@ -84,13 +85,10 @@ export class ForecastService {
             endDate
         );
 
-        // Fall back to legacy if needed
+        // If no data available, use empty dataset
         if (!accuracyData || accuracyData.length === 0) {
-            accuracyData = await legacyRepository.getAccuracyData(
-                locationId,
-                startDate,
-                endDate
-            );
+            console.log(`No accuracy data found for location ${locationId}`);
+            accuracyData = [];
         }
 
         // Calculate metrics
@@ -367,9 +365,9 @@ export class ForecastService {
             throw new Error('Model type is required');
         }
 
-        const validModelTypes = ['ML_ENSEMBLE', 'PHYSICS', 'HYBRID'];
-        if (!validModelTypes.includes(params.modelType)) {
-            throw new Error(`Invalid model type. Valid types: ${validModelTypes.join(', ')}`);
+        // Use shared model validator
+        if (!ModelValidator.isValidModelType(params.modelType)) {
+            throw new Error(ModelValidator.getValidationErrorMessage(params.modelType));
         }
     }
 
@@ -398,95 +396,29 @@ export class ForecastService {
     }
 
     /**
-     * Calculate enhanced accuracy metrics
+     * Calculate enhanced accuracy metrics using shared calculator
      */
     private calculateAccuracyMetrics(data: any): AccuracyMetrics {
-        if (!data || data.length === 0) {
-            return {
-                accuracy: 0,
-                mape: 0,
-                rmse: 0,
-                mae: 0,
-                r2: 0,
-                nrmse: 0,
-                validPoints: 0
-            };
-        }
+        // Transform data to shared format
+        const forecastData: ForecastData[] = data.map((point: any) => ({
+            timestamp: point.timestamp || new Date().toISOString(),
+            forecast: point.forecast || 0,
+            actual: point.actual || null,
+            measured: point.measured || null
+        }));
 
-        let sumAPE = 0;
-        let sumSquaredError = 0;
-        let sumAbsoluteError = 0;
-        let sumActual = 0;
-        let sumForecast = 0;
-        let sumActualSquared = 0;
-        let sumForecastSquared = 0;
-        let sumActualForecast = 0;
-        let validPoints = 0;
+        // Use shared metrics calculator
+        const sharedMetrics = ForecastMetricsCalculator.calculateAccuracyMetrics(forecastData);
 
-        data.forEach((point: any) => {
-            if (point.actual !== null && point.actual !== undefined &&
-                point.forecast !== null && point.forecast !== undefined &&
-                point.actual > 0) {
-
-                const actual = parseFloat(point.actual);
-                const forecast = parseFloat(point.forecast);
-                const error = actual - forecast;
-                const ape = Math.abs(error / actual) * 100;
-
-                sumAPE += ape;
-                sumSquaredError += error * error;
-                sumAbsoluteError += Math.abs(error);
-                sumActual += actual;
-                sumForecast += forecast;
-                sumActualSquared += actual * actual;
-                sumForecastSquared += forecast * forecast;
-                sumActualForecast += actual * forecast;
-                validPoints++;
-            }
-        });
-
-        if (validPoints === 0) {
-            return {
-                accuracy: 100,
-                mape: 0,
-                rmse: 0,
-                mae: 0,
-                r2: 0,
-                nrmse: 0,
-                validPoints: 0
-            };
-        }
-
-        const mape = sumAPE / validPoints;
-        const rmse = Math.sqrt(sumSquaredError / validPoints);
-        const mae = sumAbsoluteError / validPoints;
-        const meanActual = sumActual / validPoints;
-
-        // Calculate R²
-        const numerator = validPoints * sumActualForecast - sumActual * sumForecast;
-        const denominator = Math.sqrt(
-            (validPoints * sumActualSquared - sumActual * sumActual) *
-            (validPoints * sumForecastSquared - sumForecast * sumForecast)
-        );
-        const r2 = denominator !== 0 ? Math.pow(numerator / denominator, 2) : 0;
-
-        // Calculate NRMSE
-        const nrmse = meanActual !== 0 ? (rmse / meanActual) * 100 : 0;
-
-        // Enhanced accuracy calculation
-        const accuracyFromMAPE = Math.max(0, 100 - mape);
-        const accuracyFromR2 = r2 * 100;
-        const accuracyFromNRMSE = Math.max(0, 100 - nrmse);
-        const accuracy = (accuracyFromMAPE * 0.4 + accuracyFromR2 * 0.3 + accuracyFromNRMSE * 0.3);
-
+        // Convert to local format (add validPoints for backwards compatibility)
         return {
-            accuracy: Math.max(0, Math.min(100, accuracy)),
-            mape: parseFloat(mape.toFixed(2)),
-            rmse: parseFloat(rmse.toFixed(2)),
-            mae: parseFloat(mae.toFixed(2)),
-            r2: parseFloat(r2.toFixed(4)),
-            nrmse: parseFloat(nrmse.toFixed(2)),
-            validPoints
+            accuracy: sharedMetrics.accuracy,
+            mape: sharedMetrics.mape,
+            rmse: sharedMetrics.rmse,
+            mae: sharedMetrics.mae,
+            r2: sharedMetrics.r2,
+            nrmse: sharedMetrics.nrmse || 0,
+            validPoints: sharedMetrics.sample_count
         };
     }
 
@@ -565,127 +497,50 @@ export class ForecastService {
     // Removed mock forecast generation - only real data from Python worker
 
     /**
-     * Export to CSV format
+     * Export using shared export engine
      */
-    private exportToCSV(data: ForecastResponse): Buffer {
-        const rows: string[] = [];
-
-        // Header
-        rows.push('Timestamp,Forecast,Upper Bound,Lower Bound,Actual,Measured');
-
-        // Data rows
-        data.data.forEach((point: any) => {
-            rows.push([
-                point.timestamp,
-                point.forecast,
-                point.confidence_upper,
-                point.confidence_lower,
-                point.actual || '',
-                point.measured || ''
-            ].join(','));
-        });
-
-        return Buffer.from(rows.join('\n'));
+    private async exportToCSV(data: ForecastResponse): Promise<Buffer> {
+        const exportData = this.prepareSharedExportData(data);
+        return await ForecastExportEngine.exportData(exportData, 'csv');
     }
 
     /**
-     * Export to Excel format using ExcelJS
+     * Export using shared export engine
      */
     private async exportToExcel(data: ForecastResponse): Promise<Buffer> {
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Forecast Data');
-
-        // Set up columns
-        worksheet.columns = [
-            { header: 'Timestamp', key: 'timestamp', width: 20 },
-            { header: 'Forecast (MW)', key: 'forecast', width: 15 },
-            { header: 'Upper Bound (MW)', key: 'confidence_upper', width: 18 },
-            { header: 'Lower Bound (MW)', key: 'confidence_lower', width: 18 },
-            { header: 'Actual (MW)', key: 'actual', width: 15 },
-            { header: 'Measured (MW)', key: 'measured', width: 15 }
-        ];
-
-        // Style the header row
-        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        worksheet.getRow(1).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FF0FA4AF' }
-        };
-        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-
-        // Add data rows
-        data.data.forEach((point, index) => {
-            const row = worksheet.addRow({
-                timestamp: point.timestamp,
-                forecast: point.forecast,
-                confidence_upper: point.confidence_upper,
-                confidence_lower: point.confidence_lower,
-                actual: point.actual || null,
-                measured: point.measured || null
-            });
-
-            // Alternate row colors
-            if (index % 2 === 0) {
-                row.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFF5F5F5' }
-                };
-            }
-        });
-
-        // Add metadata sheet
-        const metaSheet = workbook.addWorksheet('Metadata');
-        metaSheet.columns = [
-            { header: 'Property', key: 'property', width: 25 },
-            { header: 'Value', key: 'value', width: 40 }
-        ];
-
-        metaSheet.getRow(1).font = { bold: true };
-        metaSheet.getRow(1).fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FF0FA4AF' }
-        };
-
-        // Add metadata
-        metaSheet.addRow({ property: 'Location ID', value: data.metadata.locationId });
-        metaSheet.addRow({ property: 'Interval', value: data.metadata.interval });
-        metaSheet.addRow({ property: 'Start Date', value: data.metadata.startDate || 'N/A' });
-        metaSheet.addRow({ property: 'End Date', value: data.metadata.endDate || 'N/A' });
-        metaSheet.addRow({ property: 'Data Points', value: data.metadata.dataPoints });
-        metaSheet.addRow({ property: 'Generated At', value: data.metadata.generatedAt });
-        metaSheet.addRow({ property: 'Has Actual Data', value: data.hasActual ? 'Yes' : 'No' });
-        metaSheet.addRow({ property: 'Has Measured Data', value: data.hasMeasured ? 'Yes' : 'No' });
-
-        // Auto-fit columns
-        worksheet.columns.forEach(column => {
-            column.alignment = { vertical: 'middle', horizontal: 'center' };
-        });
-
-        // Generate buffer
-        const buffer = await workbook.xlsx.writeBuffer();
-        return Buffer.from(buffer);
+        const exportData = this.prepareSharedExportData(data);
+        return await ForecastExportEngine.exportData(exportData, 'excel');
     }
 
     /**
-     * Export to PDF format - returns formatted JSON
+     * Export using shared export engine
      */
     private exportToPDF(data: ForecastResponse): Buffer {
-        // PDF export not implemented, return formatted JSON
-        const pdfContent = {
-            title: 'Solar Forecast Report',
-            generated: new Date().toISOString(),
-            metadata: data.metadata,
-            summary: {
-                totalDataPoints: data.metadata.dataPoints,
-                hasActualData: data.hasActual,
-                hasMeasuredData: data.hasMeasured
-            },
-            data: data.data.slice(0, 100) // Limit to first 100 records for PDF
-        };
+        const exportData = this.prepareSharedExportData(data);
+        return ForecastExportEngine.exportData(exportData, 'pdf');
+    }
 
-        return Buffer.from(JSON.stringify(pdfContent, null, 2));
+    /**
+     * Prepare data for shared export engine
+     */
+    private prepareSharedExportData(data: ForecastResponse) {
+        // Transform forecast response to shared export format
+        const forecastData: ForecastData[] = data.data.map((point: any) => ({
+            timestamp: point.timestamp,
+            forecast: point.forecast,
+            actual: point.actual || null,
+            measured: point.measured || null,
+            confidence_upper: point.confidence_upper || null,
+            confidence_lower: point.confidence_lower || null
+        }));
+
+        return prepareExportData(
+            forecastData,
+            data.metadata.locationId,
+            `Location ${data.metadata.locationId}`,
+            data.metadata.interval as any,
+            data.metadata.startDate,
+            data.metadata.endDate
+        );
     }
 }

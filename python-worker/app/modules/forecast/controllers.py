@@ -10,8 +10,8 @@ from .services import ForecastService
 from .models_api import (
     ForecastRequest,
     ForecastResponse,
-    ForecastTaskResponse,
-    ForecastAccuracyResponse
+    ForecastTaskResponse
+    # ForecastAccuracyResponse removed - business logic moved to SvelteKit
 )
 
 router = APIRouter(
@@ -243,60 +243,8 @@ async def get_location_forecasts(
         raise HTTPException(status_code=500, detail="Error retrieving forecasts")
 
 
-@router.get(
-    "/accuracy/{location_id}",
-    response_model=ForecastAccuracyResponse,
-    summary="Get Forecast Accuracy Metrics",
-    description="""Calculate forecast accuracy by comparing predictions with actual production.
-
-    Metrics calculated:
-    - **Accuracy Percentage**: Overall accuracy score (100 - MAPE)
-    - **MAPE**: Mean Absolute Percentage Error
-    - **RMSE**: Root Mean Square Error (MW)
-    - **Sample Size**: Number of data points analyzed
-
-    Default analysis period is 7 days. Requires both forecast and production data.
-    """,
-    responses={
-        200: {
-            "description": "Accuracy metrics calculated successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "location_id": "1",
-                        "accuracy_percentage": 94.5,
-                        "mape": 5.5,
-                        "rmse": 2.3,
-                        "sample_size": 168,
-                        "period_days": 7,
-                        "model_type": "ENSEMBLE"
-                    }
-                }
-            }
-        },
-        404: {"description": "No forecast data available for accuracy calculation"}
-    }
-)
-async def get_forecast_accuracy(
-    location_id: str,
-    days: int = 7,
-    db: AsyncSession = Depends(get_db)
-) -> ForecastAccuracyResponse:
-    """Get forecast accuracy metrics for a location"""
-    service = ForecastService(db)
-    
-    accuracy = await service.calculate_accuracy(
-        location_id=location_id,
-        days=days
-    )
-    
-    if not accuracy:
-        raise HTTPException(
-            status_code=404,
-            detail="No forecast data available for accuracy calculation"
-        )
-    
-    return accuracy
+# Accuracy endpoint removed - now handled by SvelteKit shared utilities
+# Use /api/forecasts/accuracy in SvelteKit instead
 
 
 @router.post(
@@ -422,101 +370,5 @@ async def delete_location_forecasts(
     }
 
 
-@router.get(
-    "/training-data/{location_id}",
-    summary="Get Historical Production Data for ML Training",
-    description="""Extract historical production data for ML model training.
-
-    Returns historical production data optimized for ML training:
-    - Power production values (MW) - primary training target
-    - Capacity factor for performance normalization
-    - System availability metrics
-    - Timestamp-indexed data ready for pandas DataFrame
-
-    This endpoint is specifically designed for ML model training workflows
-    and returns data in the format expected by the CatBoost training pipeline.
-    """,
-    responses={
-        200: {
-            "description": "Historical production data retrieved successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "location_id": "1",
-                        "data_points": 8760,
-                        "date_range": {
-                            "start": "2023-01-01T00:00:00",
-                            "end": "2023-12-31T23:00:00"
-                        },
-                        "records": [
-                            {
-                                "timestamp": "2023-01-01T00:00:00",
-                                "power_mw": 0.0,
-                                "capacity_factor": 0.0,
-                                "availability": 100.0,
-                                "data_quality": "GOOD"
-                            }
-                        ]
-                    }
-                }
-            }
-        },
-        404: {"description": "Location not found"},
-        400: {"description": "Invalid date range"}
-    }
-)
-async def get_training_data(
-    location_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-) -> dict:
-    """Extract historical production data for ML model training"""
-    service = ForecastService(db)
-
-    # Default to last year of data if no dates specified
-    if not end_date:
-        end_time = datetime.utcnow()
-    else:
-        end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-
-    if not start_date:
-        start_time = end_time - timedelta(days=365)  # Last year
-    else:
-        start_time = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-
-    # Validate location exists
-    if not await service.validate_location(location_id):
-        raise HTTPException(status_code=404, detail="Location not found")
-
-    # Get historical production data using optimized schema
-    production_data = await service.repo.get_production_range(
-        location_id=location_id,
-        start_time=start_time,
-        end_time=end_time
-    )
-
-    if not production_data:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No production data found for location {location_id} in specified date range"
-        )
-
-    return {
-        "location_id": location_id,
-        "data_points": len(production_data),
-        "date_range": {
-            "start": start_time.isoformat(),
-            "end": end_time.isoformat()
-        },
-        "records": [
-            {
-                "timestamp": record["time"].isoformat(),
-                "power_mw": record["power_output_mw"],
-                "capacity_factor": record.get("capacity_factor"),
-                "availability": record.get("availability"),
-                "data_quality": "GOOD"  # From optimized schema
-            }
-            for record in production_data
-        ]
-    }
+# Training data endpoint removed - business logic moved to SvelteKit
+# Use SvelteKit API for data extraction and formatting
