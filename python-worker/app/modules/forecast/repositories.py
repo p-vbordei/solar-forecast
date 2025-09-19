@@ -651,6 +651,7 @@ class ForecastRepository:
             return 0
 
         # Use COPY or multi-row INSERT for TimescaleDB optimization
+        # ON CONFLICT: Update existing forecasts for same timestamp and location
         query = text("""
             INSERT INTO forecasts (
                 id, timestamp, "locationId", "powerMW", "powerOutputMW", "energyMWh", "capacityFactor",
@@ -667,6 +668,25 @@ class ForecastRepository:
                 :temperature, :ghi, :dni, :cloudCover, :windSpeed,
                 :qualityScore, :isValidated, :createdAt
             )
+            ON CONFLICT (timestamp, "locationId") DO UPDATE SET
+                "powerMW" = EXCLUDED."powerMW",
+                "powerOutputMW" = EXCLUDED."powerOutputMW",
+                "energyMWh" = EXCLUDED."energyMWh",
+                "capacityFactor" = EXCLUDED."capacityFactor",
+                "powerMWQ10" = EXCLUDED."powerMWQ10",
+                "powerMWQ25" = EXCLUDED."powerMWQ25",
+                "powerMWQ75" = EXCLUDED."powerMWQ75",
+                "powerMWQ90" = EXCLUDED."powerMWQ90",
+                "modelType" = EXCLUDED."modelType",
+                "modelVersion" = EXCLUDED."modelVersion",
+                "horizonMinutes" = EXCLUDED."horizonMinutes",
+                temperature = EXCLUDED.temperature,
+                ghi = EXCLUDED.ghi,
+                dni = EXCLUDED.dni,
+                "cloudCover" = EXCLUDED."cloudCover",
+                "windSpeed" = EXCLUDED."windSpeed",
+                "qualityScore" = EXCLUDED."qualityScore",
+                "updatedAt" = NOW()
         """)
 
         for value in values:

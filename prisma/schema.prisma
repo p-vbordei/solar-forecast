@@ -219,6 +219,7 @@ model Forecast {
   user            User?          @relation(fields: [createdBy], references: [id])
   location        Location       @relation(fields: [locationId], references: [id])
 
+  @@unique([timestamp, locationId])
   @@index([timestamp, locationId], map: "forecasts_time_location_idx")
   @@index([timestamp, modelType], map: "forecasts_time_model_idx")
   @@index([locationId, timestamp(sort: Desc)], map: "forecasts_location_time_desc_idx")
