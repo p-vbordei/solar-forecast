@@ -189,6 +189,40 @@ class ForecastService:
             task_manager.update_task(task_id, {"progress": 80})
             logger.info(f"Forecast generated: {len(forecast_df)} points")
 
+            # 5a. VALIDATE FORECAST HAS MEANINGFUL VALUES
+            if forecast_df.empty:
+                raise ValueError("Forecast generation produced no data points")
+
+            # Check if we have any non-zero power values during expected daylight hours
+            if 'power_mw' in forecast_df.columns:
+                # Get daytime hours (6 AM to 8 PM)
+                daytime_mask = (forecast_df.index.hour >= 6) & (forecast_df.index.hour <= 20)
+                daytime_forecast = forecast_df[daytime_mask]
+
+                if len(daytime_forecast) > 0:
+                    max_power = daytime_forecast['power_mw'].max()
+                    non_zero_count = (daytime_forecast['power_mw'] > 0).sum()
+
+                    if max_power == 0 or non_zero_count == 0:
+                        logger.error(f"Forecast validation failed: All daytime power values are zero")
+                        raise ValueError(
+                            "Forecast validation failed: Generated forecast has no power production during daylight hours. "
+                            "Check weather data quality (GHI, DNI values) and location configuration."
+                        )
+
+                    # Validate that max power doesn't exceed capacity
+                    if max_power > max_capacity_mw * 1.1:  # Allow 10% tolerance
+                        logger.warning(f"Forecast exceeds capacity: {max_power:.2f} MW > {max_capacity_mw} MW")
+
+                    # Log validation summary
+                    avg_daytime_power = daytime_forecast['power_mw'].mean()
+                    logger.info(
+                        f"Forecast validation passed: "
+                        f"Max: {max_power:.2f} MW, "
+                        f"Avg daytime: {avg_daytime_power:.2f} MW, "
+                        f"Non-zero points: {non_zero_count}/{len(daytime_forecast)}"
+                    )
+
             # 6. Save to database using TimescaleDB bulk operations
             saved_count = await self.repo.bulk_save_forecasts(
                 location_id=task["location_id"],
