@@ -121,7 +121,22 @@ class ForecastService:
 
             # 5. Run unified forecast (REAL FORECAST ENGINE - NO MOCK DATA)
             if REAL_FORECAST_AVAILABLE:
-                forecast_type = "hybrid" if models else "physics"
+                # Use the model_type from the request
+                requested_model_type = task.get("model_type", "PHYSICS")
+
+                # Map request model types to forecast engine types
+                if requested_model_type == "PHYSICS":
+                    forecast_type = "physics"
+                elif requested_model_type == "ML_ENSEMBLE":
+                    if not models:
+                        raise ValueError(f"ML_ENSEMBLE requested but no ML models available for location {location_code}")
+                    forecast_type = "ml"
+                elif requested_model_type == "HYBRID":
+                    if not models:
+                        raise ValueError(f"HYBRID requested but no ML models available for location {location_code}")
+                    forecast_type = "hybrid"
+                else:
+                    forecast_type = "physics"  # Default to physics
 
                 # Import time resolution utilities
                 from .utils.time_resolution import resample_weather_to_15min, resample_forecast_to_15min
@@ -142,13 +157,9 @@ class ForecastService:
                 if not forecast_df.empty:
                     forecast_df = resample_forecast_to_15min(forecast_df)
 
-                # Add model metadata to forecast
-                if models:
-                    forecast_df['model_type'] = models['model_type']
-                    forecast_df['model_version'] = models['version']
-                else:
-                    forecast_df['model_type'] = 'PHYSICS_ONLY'
-                    forecast_df['model_version'] = '1.0'
+                # Add model metadata to forecast - use the ACTUAL model type requested
+                forecast_df['model_type'] = requested_model_type
+                forecast_df['model_version'] = models['version'] if models and requested_model_type != 'PHYSICS' else '1.0'
 
                 # Convert kW to MW for database storage
                 if 'prediction' in forecast_df.columns:
