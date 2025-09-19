@@ -685,8 +685,7 @@ class ForecastRepository:
                 dni = EXCLUDED.dni,
                 "cloudCover" = EXCLUDED."cloudCover",
                 "windSpeed" = EXCLUDED."windSpeed",
-                "qualityScore" = EXCLUDED."qualityScore",
-                "updatedAt" = NOW()
+                "qualityScore" = EXCLUDED."qualityScore"
         """)
 
         for value in values:
