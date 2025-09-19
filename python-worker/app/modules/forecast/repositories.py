@@ -401,19 +401,6 @@ class ForecastRepository:
                         df[field] = df[field].fillna(default_value)
 
                 logger.info(f"Retrieved {len(df)} weather records from SvelteKit for location {location_id}")
-
-                # Enhance with GHI if missing
-                from .utils.solar_irradiance import enhance_weather_data_with_irradiance
-                location = await self.get_location_full(location_id)
-                if location and ('ghi' not in df.columns or df['ghi'].isna().all() or (df['ghi'] == 0).all()):
-                    logger.info("Enhancing weather data with estimated solar irradiance")
-                    df = enhance_weather_data_with_irradiance(
-                        weather_df=df,
-                        location_lat=location['latitude'],
-                        location_lon=location['longitude'],
-                        altitude=location.get('altitude', 0)
-                    )
-
                 return df
 
         except Exception as e:
@@ -424,7 +411,6 @@ class ForecastRepository:
     async def _get_weather_from_database(self, location_id: str, hours: int) -> pd.DataFrame:
         """Direct database query for weather data (fallback method)"""
         from datetime import timedelta
-        from .utils.solar_irradiance import enhance_weather_data_with_irradiance
 
         try:
             # Calculate time range
@@ -490,18 +476,6 @@ class ForecastRepository:
             df['precipitable_water'] = 14.0
 
             logger.info(f"Retrieved {len(df)} weather records from database for location {location_id}")
-
-            # Get location details for GHI estimation
-            location = await self.get_location_full(location_id)
-            if location and (df['ghi'].isna().all() or (df['ghi'] == 0).all()):
-                logger.info("Enhancing weather data with estimated solar irradiance")
-                df = enhance_weather_data_with_irradiance(
-                    weather_df=df,
-                    location_lat=location['latitude'],
-                    location_lon=location['longitude'],
-                    altitude=location.get('altitude', 0)
-                )
-
             return df
 
         except Exception as e:
