@@ -60,22 +60,40 @@ class ForecastRepository:
         if not forecasts:
             return 0
 
+        import math
+
+        # Helper function to clean numeric values
+        def clean_numeric(val):
+            """Replace NaN and Inf values with None for database compatibility"""
+            if val is not None and isinstance(val, (float, int)):
+                if math.isnan(val) or math.isinf(val):
+                    return None
+            return val
+
         # Convert to proper field names
         values = []
+        skipped = 0  # Initialize skipped counter
         for f in forecasts:
+            # Validate critical power value
+            power_mw = f.get("power_output_mw", 0)
+            if power_mw is None or (isinstance(power_mw, float) and (math.isnan(power_mw) or math.isinf(power_mw))):
+                logger.warning(f"Skipping forecast with invalid power: {power_mw} at {f.get('time')}")
+                skipped += 1
+                continue
+
             values.append({
                 "timestamp": f["time"],  # Use primary field name
                 "locationId": f["location_id"],
-                "powerMW": f["power_output_mw"],  # Use primary field name
-                "energyMWh": f.get("energy_mwh"),
-                "confidence": f.get("confidence"),
+                "powerMW": clean_numeric(power_mw),  # Already validated above
+                "energyMWh": clean_numeric(f.get("energy_mwh")),
+                "confidence": clean_numeric(f.get("confidence")),
                 "modelType": f.get("model_type", "ML_ENSEMBLE"),
                 "modelVersion": f.get("model_version"),
                 "horizonMinutes": f.get("horizon_hours", 1) * 60,  # Convert to minutes
-                "temperature": f.get("temperature"),
-                "ghi": f.get("irradiance"),  # Correct field name
-                "cloudCover": f.get("cloud_cover"),
-                "windSpeed": f.get("wind_speed"),
+                "temperature": clean_numeric(f.get("temperature")),
+                "ghi": clean_numeric(f.get("irradiance")),  # Correct field name
+                "cloudCover": clean_numeric(f.get("cloud_cover")),
+                "windSpeed": clean_numeric(f.get("wind_speed")),
                 "createdAt": datetime.utcnow()
             })
 
@@ -106,6 +124,10 @@ class ForecastRepository:
             await self.db.execute(query, value)
 
         await self.db.commit()
+
+        if skipped > 0:
+            logger.info(f"Saved {len(values)} forecasts, skipped {skipped} invalid records")
+
         return len(values)
 
     async def get_forecasts_range(
@@ -464,7 +486,24 @@ class ForecastRepository:
         if forecasts.empty:
             return 0
 
+        import math
+        import numpy as np
+
+        # Helper function to clean numeric values
+        def clean_numeric(val):
+            """Replace NaN and Inf values with None for database compatibility"""
+            if val is None:
+                return None
+            if isinstance(val, (float, int)):
+                if math.isnan(val) or math.isinf(val):
+                    return None
+            elif isinstance(val, (np.floating, np.integer)):
+                if np.isnan(val) or np.isinf(val):
+                    return None
+            return val
+
         values = []
+        skipped = 0  # Initialize skipped counter
         for idx, row in forecasts.iterrows():
             # Ensure timestamp is in UTC and timezone-naive for PostgreSQL
             timestamp = row.get('timestamp', idx)
@@ -491,19 +530,26 @@ class ForecastRepository:
                 if timestamp.tzinfo is not None:
                     timestamp = timestamp.replace(tzinfo=None)
 
+            # Validate critical power value
+            power_mw = clean_numeric(row.get('power_mw', 0.0))
+            if power_mw is None or power_mw < 0:
+                logger.warning(f"Skipping forecast with invalid power: {row.get('power_mw')} at {timestamp}")
+                skipped += 1
+                continue
+
             values.append({
                 "id": str(uuid4()),
                 "timestamp": timestamp,  # Correct field name
                 # REMOVED 'time' field - it doesn't exist in database!
                 "locationId": location_id,  # String UUID
-                "powerMW": row.get('power_mw', 0.0),  # Correct field name, MW units
-                "powerOutputMW": row.get('power_mw', 0.0),  # Required duplicate field
-                "energyMWh": row.get('energy_mwh', 0.0),
-                "capacityFactor": row.get('capacity_factor', 0.0),
-                "powerMWQ10": row.get('p10_mw', None),  # Confidence bands
-                "powerMWQ25": row.get('p25_mw', None),
-                "powerMWQ75": row.get('p75_mw', None),
-                "powerMWQ90": row.get('p90_mw', None),
+                "powerMW": power_mw,  # Cleaned and validated
+                "powerOutputMW": power_mw,  # Required duplicate field
+                "energyMWh": clean_numeric(row.get('energy_mwh', 0.0)),
+                "capacityFactor": clean_numeric(row.get('capacity_factor', 0.0)),
+                "powerMWQ10": clean_numeric(row.get('p10_mw', None)),  # Confidence bands
+                "powerMWQ25": clean_numeric(row.get('p25_mw', None)),
+                "powerMWQ75": clean_numeric(row.get('p75_mw', None)),
+                "powerMWQ90": clean_numeric(row.get('p90_mw', None)),
                 "modelType": self._normalize_model_type(row.get('model_type', 'ENSEMBLE')),
                 "modelVersion": row.get('model_version', '2.0'),
                 "horizonMinutes": int(row.get('horizon_hours', 1) * 60),  # Convert to minutes
@@ -512,12 +558,12 @@ class ForecastRepository:
                 "forecastType": "OPERATIONAL",  # Valid ForecastType enum value
                 "dataQuality": "GOOD",  # Valid DataQuality enum value
                 # Weather parameters
-                "temperature": row.get('temp_air', None),
-                "ghi": row.get('ghi', None),
-                "dni": row.get('dni', None),
-                "cloudCover": row.get('cloud_cover', None),
-                "windSpeed": row.get('wind_speed', None),
-                "qualityScore": row.get('quality_score', 0.95),
+                "temperature": clean_numeric(row.get('temp_air', None)),
+                "ghi": clean_numeric(row.get('ghi', None)),
+                "dni": clean_numeric(row.get('dni', None)),
+                "cloudCover": clean_numeric(row.get('cloud_cover', None)),
+                "windSpeed": clean_numeric(row.get('wind_speed', None)),
+                "qualityScore": clean_numeric(row.get('quality_score', 0.95)),
                 "isValidated": False,  # Default validation status
                 "createdAt": datetime.utcnow()
             })
@@ -545,6 +591,10 @@ class ForecastRepository:
             await self.db.execute(query, value)
 
         await self.db.commit()
+
+        if skipped > 0:
+            logger.info(f"Saved {len(values)} forecasts, skipped {skipped} invalid records")
+
         return len(values)
 
     def _normalize_model_type(self, model_type: str) -> str:

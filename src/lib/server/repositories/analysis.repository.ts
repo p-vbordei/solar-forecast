@@ -1,4 +1,5 @@
 import { db, TimescaleQueries } from '../database';
+import { cleanNumericValue, isValidNumber } from '$lib/utils/data-validation';
 
 export class AnalysisRepository {
 
@@ -20,31 +21,38 @@ export class AnalysisRepository {
       }
     });
 
-    // Transform data to match expected analysis format
-    const result = forecasts.map((forecast: any) => ({
-      bucket: forecast.timestamp,
-      avg_powerMW: forecast.powerMW || forecast.powerOutputMW || 0, // Try both field names for compatibility
-      avg_energyMWh: forecast.energyMWh || forecast.powerMW || 0, // Use energy if available, fallback to power
-      avg_capacityFactor: forecast.capacityFactor || Math.min(1.0, (forecast.powerMW || 0) / 50), // Use actual or calculated
-      avg_powerMWQ10: (forecast.powerMWQ10 || (forecast.powerMW || 0) * 0.8),
-      avg_powerMWQ25: (forecast.powerMWQ25 || (forecast.powerMW || 0) * 0.9),
-      avg_powerMWQ75: (forecast.powerMWQ75 || (forecast.powerMW || 0) * 1.1),
-      avg_powerMWQ90: (forecast.powerMWQ90 || (forecast.powerMW || 0) * 1.2),
-      avg_confidence: forecast.qualityScore || 0.85, // Updated field name
-      count: 1
-    }));
+    // Transform data to match expected analysis format with validation
+    const result = forecasts.map((forecast: any) => {
+      // Clean and validate numeric values
+      const powerMW = cleanNumericValue(forecast.powerMW || forecast.powerOutputMW) || 0;
+      const energyMWh = cleanNumericValue(forecast.energyMWh) || powerMW;
+      const capacityFactor = cleanNumericValue(forecast.capacityFactor) || Math.min(1.0, powerMW / 50);
 
-    // Transform to final format expected by UI
+      return {
+        bucket: forecast.timestamp,
+        avg_powerMW: powerMW,
+        avg_energyMWh: energyMWh,
+        avg_capacityFactor: capacityFactor,
+        avg_powerMWQ10: cleanNumericValue(forecast.powerMWQ10) || powerMW * 0.8,
+        avg_powerMWQ25: cleanNumericValue(forecast.powerMWQ25) || powerMW * 0.9,
+        avg_powerMWQ75: cleanNumericValue(forecast.powerMWQ75) || powerMW * 1.1,
+        avg_powerMWQ90: cleanNumericValue(forecast.powerMWQ90) || powerMW * 1.2,
+        avg_confidence: cleanNumericValue(forecast.qualityScore) || 0.85,
+        count: 1
+      };
+    });
+
+    // Transform to final format expected by UI with final validation
     return result.map(row => ({
       timestamp: row.bucket.toISOString(),
-      forecast: Math.round(row.avg_powerMW * 100) / 100,
-      energy: row.avg_energyMWh ? Math.round(row.avg_energyMWh * 100) / 100 : null,
-      capacity_factor: row.avg_capacityFactor ? Math.round(row.avg_capacityFactor * 100) / 100 : null,
-      confidence_lower: row.avg_powerMWQ10 ? Math.round(row.avg_powerMWQ10 * 100) / 100 : null,
-      confidence_q25: row.avg_powerMWQ25 ? Math.round(row.avg_powerMWQ25 * 100) / 100 : null,
-      confidence_q75: row.avg_powerMWQ75 ? Math.round(row.avg_powerMWQ75 * 100) / 100 : null,
-      confidence_upper: row.avg_powerMWQ90 ? Math.round(row.avg_powerMWQ90 * 100) / 100 : null,
-      confidence: row.avg_confidence ? Math.round(row.avg_confidence * 100) / 100 : null,
+      forecast: isValidNumber(row.avg_powerMW) ? Math.round(row.avg_powerMW * 100) / 100 : 0,
+      energy: isValidNumber(row.avg_energyMWh) ? Math.round(row.avg_energyMWh * 100) / 100 : null,
+      capacity_factor: isValidNumber(row.avg_capacityFactor) ? Math.round(row.avg_capacityFactor * 100) / 100 : null,
+      confidence_lower: isValidNumber(row.avg_powerMWQ10) ? Math.round(row.avg_powerMWQ10 * 100) / 100 : null,
+      confidence_q25: isValidNumber(row.avg_powerMWQ25) ? Math.round(row.avg_powerMWQ25 * 100) / 100 : null,
+      confidence_q75: isValidNumber(row.avg_powerMWQ75) ? Math.round(row.avg_powerMWQ75 * 100) / 100 : null,
+      confidence_upper: isValidNumber(row.avg_powerMWQ90) ? Math.round(row.avg_powerMWQ90 * 100) / 100 : null,
+      confidence: isValidNumber(row.avg_confidence) ? Math.round(row.avg_confidence * 100) / 100 : null,
       count: Number(row.count)
     }));
   }

@@ -158,8 +158,18 @@ class ForecastService:
                 max_capacity_mw = location['capacityMW']
                 forecast_df['power_mw'] = forecast_df['power_mw'].clip(upper=max_capacity_mw)
 
+                # Clean NaN and Inf values before database storage
+                import numpy as np
+                forecast_df['power_mw'] = forecast_df['power_mw'].replace([np.inf, -np.inf], np.nan)
+                forecast_df['power_mw'] = forecast_df['power_mw'].fillna(0)  # Replace NaN with 0 for power
+
+                # Ensure power is non-negative
+                forecast_df['power_mw'] = forecast_df['power_mw'].clip(lower=0)
+
                 # Calculate capacity factor
                 forecast_df['capacity_factor'] = forecast_df['power_mw'] / max_capacity_mw
+                forecast_df['capacity_factor'] = forecast_df['capacity_factor'].replace([np.inf, -np.inf], np.nan)
+                forecast_df['capacity_factor'] = forecast_df['capacity_factor'].fillna(0)
 
             else:
                 # Fallback if core modules not available
