@@ -308,14 +308,12 @@ def _create_ml_forecast(
     ROLE: Ensures ML models are available before processing
     """
     if not client_id:
-        logger.warning("No client_id provided for ML forecast, falling back to physics")
-        return _create_physics_forecast(enhanced_forecast)
+        raise ValueError("ML forecast requested but no client_id provided. ML models require training data.")
 
     # Check for trained models
     model_path = resolve_models_path(f"{client_id}/catboost_ensemble")
     if not model_path.exists():
-        logger.warning(f"No ML models found at {model_path}, falling back to physics")
-        return _create_physics_forecast(enhanced_forecast)
+        raise FileNotFoundError(f"ML models not found at {model_path}. Train models first using historical data.")
     #%% ML_PREREQUISITES_CHECK END
 
     #%% ML_FEATURE_PREPARATION
@@ -370,8 +368,7 @@ def _create_ml_forecast(
                 quantile_models[quantile] = model
 
         if not quantile_models:
-            logger.warning("No valid ML models loaded, falling back to physics")
-            return _create_physics_forecast(enhanced_forecast)
+            raise ValueError("Failed to load ML models. Models may be corrupted or incompatible.")
         #%% ML_MODEL_LOADING END
 
         #%% FEATURE_ALIGNMENT
@@ -386,8 +383,7 @@ def _create_ml_forecast(
             # Reorder features to match training order
             available_features = [f for f in feature_names if f in ml_features.columns]
             if len(available_features) < len(feature_names) * 0.8:  # At least 80% of features should be available
-                logger.warning(f"Only {len(available_features)}/{len(feature_names)} training features available, falling back to physics")
-                return _create_physics_forecast(enhanced_forecast)
+                raise ValueError(f"Insufficient features for ML model: only {len(available_features)}/{len(feature_names)} available")
 
             # Create feature DataFrame with correct order, filling missing features with 0
             ml_features_ordered = pd.DataFrame(index=ml_features.index)
@@ -425,8 +421,8 @@ def _create_ml_forecast(
         #%% ML_PREDICTION_GENERATION END
 
     except Exception as e:
-        logger.warning(f"ML forecast failed: {e}, falling back to physics")
-        return _create_physics_forecast(enhanced_forecast)
+        logger.error(f"ML forecast failed: {e}")
+        raise ValueError(f"ML forecast generation failed: {e}")
 #%% ML_FORECAST_CREATION END
 
 
