@@ -14,7 +14,7 @@ class ForecastRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "location_id": "1",
+                "location_id": "363019d2-5c56-402c-8c32-202786d252ca",
                 "horizon_hours": 48,
                 "model_type": "ML_ENSEMBLE"
             }
@@ -66,7 +66,7 @@ class ForecastTaskResponse(BaseModel):
             "example": {
                 "task_id": "550e8400-e29b-41d4-a716-446655440000",
                 "status": "processing",
-                "location_id": 1,
+                "location_id": "363019d2-5c56-402c-8c32-202786d252ca",
                 "progress": 45,
                 "estimated_time_seconds": 15
             }
