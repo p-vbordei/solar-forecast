@@ -36,23 +36,33 @@
         : data.map(d => d.actual_energy || 0))
       : [];
 
-    // For confidence bands, scale them appropriately for energy if needed
+    // For confidence bands, use the proper energy confidence if available
+    // Otherwise calculate from power confidence bands
     const upperBound = showConfidenceBands
       ? (displayMode === 'power'
-        ? data.map(d => d.confidence_upper)
+        ? data.map(d => d.confidence_upper || d.forecast)
         : data.map(d => {
-            // Scale confidence bands for energy based on interval
+            // For energy display, calculate energy confidence from power confidence
+            if (d.energy_confidence_upper !== undefined) {
+              return d.energy_confidence_upper;
+            }
+            // If not available, calculate from power confidence
+            const upperPower = d.confidence_upper || d.forecast;
             const scaleFactor = getEnergyScaleFactor(interval);
-            return (d.confidence_upper || d.forecast) * scaleFactor;
+            return upperPower * scaleFactor;
           }))
       : [];
 
     const lowerBound = showConfidenceBands
       ? (displayMode === 'power'
-        ? data.map(d => d.confidence_lower)
+        ? data.map(d => d.confidence_lower || d.forecast)
         : data.map(d => {
+            if (d.energy_confidence_lower !== undefined) {
+              return d.energy_confidence_lower;
+            }
+            const lowerPower = d.confidence_lower || d.forecast;
             const scaleFactor = getEnergyScaleFactor(interval);
-            return (d.confidence_lower || d.forecast) * scaleFactor;
+            return lowerPower * scaleFactor;
           }))
       : [];
 
@@ -61,8 +71,8 @@
       switch (interval) {
         case '15min': return 0.25;  // 15 minutes = 0.25 hours
         case 'hourly': return 1;     // 1 hour
-        case 'daily': return 24;     // 24 hours
-        case 'weekly': return 168;   // 7 * 24 = 168 hours
+        case 'daily': return 24;     // 24 hours for single day reading
+        case 'weekly': return 168;   // 168 hours for single week reading
         default: return 1;
       }
     }

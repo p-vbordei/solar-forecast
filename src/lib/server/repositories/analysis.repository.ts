@@ -109,25 +109,35 @@ export class AnalysisRepository {
 
       // For energy, calculate based on power * time
       // Energy (MWh) = Power (MW) × Time (hours)
+      // When aggregating from 15-min data, we need to sum the energy contributions
       let totalEnergyMWh: number;
+
       if (interval === '15min') {
-        // 15 minutes = 0.25 hours
+        // For 15-minute interval: Energy = Average Power × 0.25 hours
         totalEnergyMWh = avgPowerMW * 0.25;
       } else if (interval === 'hourly') {
-        // 1 hour
+        // For hourly: Average power × 1 hour
+        // The aggregation already averaged the power values, so just multiply by time
         totalEnergyMWh = avgPowerMW * 1;
       } else if (interval === 'daily') {
-        // 24 hours - sum all power values and convert to energy
-        const sumPowerMW = group.powerMW.reduce((a, b) => a + b, 0);
-        // Each 15-min interval contributes 0.25 hours of energy
-        totalEnergyMWh = sumPowerMW * 0.25;
+        // For daily: Sum all power readings × their time contribution
+        if (group.powerMW.length > 0) {
+          // Assume each reading is 15-minute data (most granular)
+          const hoursPerReading = 0.25;
+          totalEnergyMWh = group.powerMW.reduce((sum, power) => sum + (power * hoursPerReading), 0);
+        } else {
+          totalEnergyMWh = 0;
+        }
       } else if (interval === 'weekly') {
-        // 168 hours (7 days) - sum all power values
-        const sumPowerMW = group.powerMW.reduce((a, b) => a + b, 0);
-        // Each 15-min interval contributes 0.25 hours of energy
-        totalEnergyMWh = sumPowerMW * 0.25;
+        // For weekly: Sum all power readings × their time contribution
+        if (group.powerMW.length > 0) {
+          const hoursPerReading = 0.25;
+          totalEnergyMWh = group.powerMW.reduce((sum, power) => sum + (power * hoursPerReading), 0);
+        } else {
+          totalEnergyMWh = 0;
+        }
       } else {
-        // Default to hourly
+        // Default to hourly calculation
         totalEnergyMWh = avgPowerMW * 1;
       }
 
