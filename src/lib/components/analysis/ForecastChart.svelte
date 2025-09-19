@@ -79,8 +79,8 @@
     
     const series: any[] = [];
     
-    // Add confidence bands
-    if (showConfidenceBands) {
+    // Add confidence bands (only show for line charts, not bar charts)
+    if (showConfidenceBands && displayMode === 'power') {
       series.push({
         name: 'Confidence Range',
         type: 'line',
@@ -93,7 +93,7 @@
         },
         silent: true
       });
-      
+
       series.push({
         name: 'Lower Bound',
         type: 'line',
@@ -109,23 +109,29 @@
       });
     }
     
-    // Add forecast line
+    // Add forecast - bar chart for energy, line chart for power
     series.push({
       name: 'Forecast',
-      type: 'line',
+      type: displayMode === 'energy' ? 'bar' : 'line',
       data: forecast,
-      smooth: true,
-      symbol: 'circle',
+      smooth: displayMode === 'power' ? true : false,
+      symbol: displayMode === 'power' ? 'circle' : 'none',
       symbolSize: 6,
       itemStyle: {
-        color: '#0FA4AF'
+        color: displayMode === 'energy'
+          ? 'rgba(15, 164, 175, 0.8)'  // Semi-transparent cyan for bars
+          : '#0FA4AF'  // Solid cyan for line
       },
-      lineStyle: {
+      lineStyle: displayMode === 'power' ? {
         width: 3,
         type: showActual ? 'dashed' : 'solid'
-      },
+      } : undefined,
+      barWidth: '60%',
       emphasis: {
-        focus: 'series'
+        focus: 'series',
+        itemStyle: displayMode === 'energy' ? {
+          color: 'rgba(15, 164, 175, 1)'  // Full opacity on hover
+        } : undefined
       }
     });
     
