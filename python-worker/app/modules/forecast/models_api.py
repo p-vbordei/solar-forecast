@@ -7,16 +7,16 @@ from datetime import datetime
 
 class ForecastRequest(BaseModel):
     """Request model for forecast generation (database-driven)"""
-    location_id: str = Field(..., description="Location UUID")
-    horizon_hours: int = Field(48, description="Forecast horizon in hours", ge=1, le=168)
-    model_type: str = Field("ML_ENSEMBLE", description="Model type: ML_ENSEMBLE, PHYSICS, HYBRID")
+    location_id: str = Field(..., description="Location UUID from the locations table")
+    horizon_hours: int = Field(48, description="Forecast horizon in hours (1-168, default: 48)", ge=1, le=168)
+    model_type: str = Field("PHYSICS", description="Model type - Options: PHYSICS (physics-based PVLIB calculations), ML_ENSEMBLE (machine learning ensemble), HYBRID (combines ML and physics)", enum=["PHYSICS", "ML_ENSEMBLE", "HYBRID"])
 
     class Config:
         json_schema_extra = {
             "example": {
                 "location_id": "363019d2-5c56-402c-8c32-202786d252ca",
-                "horizon_hours": 48,
-                "model_type": "ML_ENSEMBLE"
+                "horizon_hours": 24,
+                "model_type": "PHYSICS"
             }
         }
 

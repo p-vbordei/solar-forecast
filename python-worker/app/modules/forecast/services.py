@@ -47,7 +47,7 @@ class ForecastService:
         self,
         location_id: str,
         horizon_hours: int = 48,
-        model_type: str = "ML_ENSEMBLE"
+        model_type: str = "PHYSICS"
     ) -> str:
         """Queue a forecast generation task"""
         task_id = str(uuid.uuid4())

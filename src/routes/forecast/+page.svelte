@@ -57,7 +57,10 @@
           StorageManager.setStoredLocation('SELECTED_WEATHER_LOCATION', selectedWeatherLocation);
 
           // Load any existing forecast data for this location
-          await loadForecastData();
+          await Promise.all([
+            loadForecastData(),
+            loadForecastSummary()
+          ]);
         }
       } else {
         console.error("Failed to load locations");
@@ -70,6 +73,29 @@
       StorageManager.clearLocationPreferences();
     } finally {
       isLoadingLocations = false;
+    }
+  }
+
+  // Load forecast summary data for cards
+  async function loadForecastSummary() {
+    if (!selectedLocation) return;
+
+    isLoadingSummary = true;
+    try {
+      const response = await fetch(`/api/forecast/summary?location=${selectedLocation}`);
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          summaryData = result.summary;
+        }
+      } else {
+        console.error('Failed to load forecast summary');
+      }
+    } catch (error) {
+      console.error('Error loading forecast summary:', error);
+    } finally {
+      isLoadingSummary = false;
     }
   }
 
@@ -135,6 +161,8 @@
 
   // Track if current data is mock or real
   let isMockData = false;
+  let summaryData: any = null;
+  let isLoadingSummary = false;
 
   // Handle forecast generation completion
   async function handleForecastGenerated(event: any) {
@@ -147,7 +175,10 @@
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Refresh the forecast data
-    await loadForecastData();
+    await Promise.all([
+      loadForecastData(),
+      loadForecastSummary()
+    ]);
 
     // Show success message - removed alert as UI already shows completion
     console.log("Forecast generated successfully!");
@@ -203,7 +234,10 @@
   let previousLocation = "";
   $: if (selectedLocation && selectedLocation !== previousLocation) {
     previousLocation = selectedLocation;
-    loadForecastData();
+    Promise.all([
+      loadForecastData(),
+      loadForecastSummary()
+    ]);
   }
 
   // Reload when time view changes (only if we have data)
@@ -429,7 +463,7 @@
     </div>
 
     <!-- Forecast Insights Grid -->
-    {#if forecastData && chartData.length > 0}
+    {#if summaryData || (forecastData && chartData.length > 0)}
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <!-- Peak Production -->
         <div class="card-glass">
@@ -452,7 +486,33 @@
             Peak Production
           </h3>
           <div class="space-y-2">
-            {#if chartData.length > 0}
+            {#if isLoadingSummary}
+              <div class="animate-pulse space-y-2">
+                <div class="h-4 bg-cyan/20 rounded w-3/4"></div>
+                <div class="h-4 bg-cyan/20 rounded w-2/3"></div>
+                <div class="h-4 bg-cyan/20 rounded w-1/2"></div>
+              </div>
+            {:else if summaryData?.peakProduction}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Time</span>
+                <span class="text-cyan font-mono">
+                  {summaryData.peakProduction.time
+                    ? new Date(summaryData.peakProduction.time).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit"
+                      })
+                    : "--:--"}
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Output</span>
+                <span class="text-cyan font-mono">{summaryData.peakProduction.output || 0} MW</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Confidence</span>
+                <span class="text-cyan font-mono">±{summaryData.peakProduction.confidence || 0} MW</span>
+              </div>
+            {:else if chartData.length > 0}
               {@const peakData = chartData.reduce(
                 (max, current) =>
                   current.forecast > max.forecast ? current : max,
@@ -504,22 +564,43 @@
             Summary
           </h3>
           <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Avg Output</span>
-              <span class="text-cyan font-mono"
-                >{forecastData.avgPower?.toFixed(1) || "0.0"} MW</span
-              >
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Total Energy</span>
-              <span class="text-cyan font-mono"
-                >{forecastData.totalEnergy?.toFixed(1) || "0.0"} MWh</span
-              >
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Data Points</span>
-              <span class="text-cyan font-mono">{chartData.length}</span>
-            </div>
+            {#if isLoadingSummary}
+              <div class="animate-pulse space-y-2">
+                <div class="h-4 bg-cyan/20 rounded w-3/4"></div>
+                <div class="h-4 bg-cyan/20 rounded w-2/3"></div>
+                <div class="h-4 bg-cyan/20 rounded w-1/2"></div>
+              </div>
+            {:else if summaryData?.summary}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Avg Output</span>
+                <span class="text-cyan font-mono">{summaryData.summary.avgOutput || 0} MW</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Total Energy</span>
+                <span class="text-cyan font-mono">{summaryData.summary.totalEnergy || 0} MWh</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Data Points</span>
+                <span class="text-cyan font-mono">{summaryData.summary.dataPoints || 0}</span>
+              </div>
+            {:else}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Avg Output</span>
+                <span class="text-cyan font-mono"
+                  >{forecastData?.avgPower?.toFixed(1) || "0.0"} MW</span
+                >
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Total Energy</span>
+                <span class="text-cyan font-mono"
+                  >{forecastData?.totalEnergy?.toFixed(1) || "0.0"} MWh</span
+                >
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Data Points</span>
+                <span class="text-cyan font-mono">{chartData.length || 0}</span>
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -544,19 +625,40 @@
             Model Info
           </h3>
           <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Type</span>
-              <span class="text-cyan font-mono">Physics-based v2.1</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Accuracy</span>
-              <span class="text-cyan font-mono">{forecastData.accuracy}%</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-soft-blue">Confidence</span>
-              <span class="text-cyan font-mono">{forecastData.confidence}%</span
+            {#if isLoadingSummary}
+              <div class="animate-pulse space-y-2">
+                <div class="h-4 bg-cyan/20 rounded w-3/4"></div>
+                <div class="h-4 bg-cyan/20 rounded w-2/3"></div>
+                <div class="h-4 bg-cyan/20 rounded w-1/2"></div>
+              </div>
+            {:else if summaryData?.modelInfo}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Type</span>
+                <span class="text-cyan font-mono text-xs">{summaryData.modelInfo.type || "Physics-based v2.1"}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Accuracy</span>
+                <span class="text-cyan font-mono">{summaryData.modelInfo.accuracy || 0}%</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Confidence</span>
+                <span class="text-cyan font-mono">{summaryData.modelInfo.confidence || 0}%</span>
+              </div>
+            {:else}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Type</span>
+                <span class="text-cyan font-mono">Physics-based v2.1</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Accuracy</span>
+                <span class="text-cyan font-mono">{forecastData?.accuracy || 0}%</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Confidence</span>
+                <span class="text-cyan font-mono">{forecastData?.confidence || 0}%</span
               >
-            </div>
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -587,7 +689,26 @@
             Location
           </h3>
           <div class="space-y-2">
-            {#if selectedLocation && locations.length > 0}
+            {#if isLoadingSummary}
+              <div class="animate-pulse space-y-2">
+                <div class="h-4 bg-cyan/20 rounded w-3/4"></div>
+                <div class="h-4 bg-cyan/20 rounded w-2/3"></div>
+                <div class="h-4 bg-cyan/20 rounded w-1/2"></div>
+              </div>
+            {:else if summaryData?.location}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Name</span>
+                <span class="text-cyan font-mono text-xs">{summaryData.location.name}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Code</span>
+                <span class="text-cyan font-mono">{summaryData.location.code}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-soft-blue">Capacity</span>
+                <span class="text-cyan font-mono">{summaryData.location.capacityMW} MW</span>
+              </div>
+            {:else if selectedLocation && locations.length > 0}
               {@const location = locations.find(
                 (l) => l.id === selectedLocation,
               )}

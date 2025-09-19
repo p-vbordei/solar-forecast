@@ -34,6 +34,14 @@ router = APIRouter(
     - Returns a task ID for async tracking
     - Saves forecasts to database with confidence bands
 
+    Parameters:
+    - **location_id**: UUID of the location from the database (required)
+    - **horizon_hours**: Forecast horizon from 1 to 168 hours (default: 48)
+    - **model_type**: Choose forecast model type (default: PHYSICS)
+      - PHYSICS: Pure physics-based calculations using PVLIB
+      - ML_ENSEMBLE: Machine learning ensemble with uncertainty bands
+      - HYBRID: Combination of ML and physics models
+
     The forecast generation runs asynchronously in the background.
     Use the task status endpoint to track progress.
     """,
