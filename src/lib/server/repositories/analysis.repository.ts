@@ -21,40 +21,137 @@ export class AnalysisRepository {
       }
     });
 
-    // Transform data to match expected analysis format with validation
-    const result = forecasts.map((forecast: any) => {
-      // Clean and validate numeric values
-      const powerMW = cleanNumericValue(forecast.powerMW || forecast.powerOutputMW) || 0;
-      const energyMWh = cleanNumericValue(forecast.energyMWh) || powerMW;
-      const capacityFactor = cleanNumericValue(forecast.capacityFactor) || Math.min(1.0, powerMW / 50);
+    // Group data by interval to handle 15-minute data properly
+    const groupedData = new Map<string, {
+      powerMW: number[];
+      energyMWh: number[];
+      capacityFactor: number[];
+      powerMWQ10: number[];
+      powerMWQ25: number[];
+      powerMWQ75: number[];
+      powerMWQ90: number[];
+      qualityScore: number[];
+      timestamp: Date;
+    }>();
+
+    // Calculate interval duration in milliseconds
+    let intervalMs: number;
+    switch (interval) {
+      case '15min':
+        intervalMs = 15 * 60 * 1000;
+        break;
+      case 'hourly':
+        intervalMs = 60 * 60 * 1000;
+        break;
+      case 'daily':
+        intervalMs = 24 * 60 * 60 * 1000;
+        break;
+      case 'weekly':
+        intervalMs = 7 * 24 * 60 * 60 * 1000;
+        break;
+      default:
+        intervalMs = 60 * 60 * 1000;
+    }
+
+    // Group forecasts by interval
+    forecasts.forEach(forecast => {
+      const bucketTime = new Date(Math.floor(forecast.timestamp.getTime() / intervalMs) * intervalMs);
+      const key = bucketTime.toISOString();
+
+      if (!groupedData.has(key)) {
+        groupedData.set(key, {
+          powerMW: [],
+          energyMWh: [],
+          capacityFactor: [],
+          powerMWQ10: [],
+          powerMWQ25: [],
+          powerMWQ75: [],
+          powerMWQ90: [],
+          qualityScore: [],
+          timestamp: bucketTime
+        });
+      }
+
+      const group = groupedData.get(key)!;
+      const powerMW = cleanNumericValue(forecast.powerMW || forecast.powerOutputMW);
+
+      if (powerMW !== null && powerMW !== undefined) {
+        group.powerMW.push(powerMW);
+      }
+      if (forecast.energyMWh !== null && forecast.energyMWh !== undefined) {
+        group.energyMWh.push(cleanNumericValue(forecast.energyMWh) || 0);
+      }
+      if (forecast.capacityFactor !== null && forecast.capacityFactor !== undefined) {
+        group.capacityFactor.push(cleanNumericValue(forecast.capacityFactor) || 0);
+      }
+      if (forecast.powerMWQ10 !== null && forecast.powerMWQ10 !== undefined) {
+        group.powerMWQ10.push(cleanNumericValue(forecast.powerMWQ10) || 0);
+      }
+      if (forecast.powerMWQ25 !== null && forecast.powerMWQ25 !== undefined) {
+        group.powerMWQ25.push(cleanNumericValue(forecast.powerMWQ25) || 0);
+      }
+      if (forecast.powerMWQ75 !== null && forecast.powerMWQ75 !== undefined) {
+        group.powerMWQ75.push(cleanNumericValue(forecast.powerMWQ75) || 0);
+      }
+      if (forecast.powerMWQ90 !== null && forecast.powerMWQ90 !== undefined) {
+        group.powerMWQ90.push(cleanNumericValue(forecast.powerMWQ90) || 0);
+      }
+      if (forecast.qualityScore !== null && forecast.qualityScore !== undefined) {
+        group.qualityScore.push(cleanNumericValue(forecast.qualityScore) || 0.85);
+      }
+    });
+
+    // Calculate averages for each interval
+    const result = Array.from(groupedData.values()).map(group => {
+      const avgPowerMW = group.powerMW.length > 0
+        ? group.powerMW.reduce((a, b) => a + b, 0) / group.powerMW.length
+        : 0;
+
+      // For energy, sum instead of average (accumulate energy over the interval)
+      const totalEnergyMWh = group.energyMWh.length > 0
+        ? group.energyMWh.reduce((a, b) => a + b, 0)
+        : avgPowerMW; // Fallback to power if no energy data
+
+      const avgCapacityFactor = group.capacityFactor.length > 0
+        ? group.capacityFactor.reduce((a, b) => a + b, 0) / group.capacityFactor.length
+        : Math.min(1.0, avgPowerMW / 50);
+
+      const avgPowerMWQ10 = group.powerMWQ10.length > 0
+        ? group.powerMWQ10.reduce((a, b) => a + b, 0) / group.powerMWQ10.length
+        : avgPowerMW * 0.8;
+
+      const avgPowerMWQ25 = group.powerMWQ25.length > 0
+        ? group.powerMWQ25.reduce((a, b) => a + b, 0) / group.powerMWQ25.length
+        : avgPowerMW * 0.9;
+
+      const avgPowerMWQ75 = group.powerMWQ75.length > 0
+        ? group.powerMWQ75.reduce((a, b) => a + b, 0) / group.powerMWQ75.length
+        : avgPowerMW * 1.1;
+
+      const avgPowerMWQ90 = group.powerMWQ90.length > 0
+        ? group.powerMWQ90.reduce((a, b) => a + b, 0) / group.powerMWQ90.length
+        : avgPowerMW * 1.2;
+
+      const avgQualityScore = group.qualityScore.length > 0
+        ? group.qualityScore.reduce((a, b) => a + b, 0) / group.qualityScore.length
+        : 0.85;
 
       return {
-        bucket: forecast.timestamp,
-        avg_powerMW: powerMW,
-        avg_energyMWh: energyMWh,
-        avg_capacityFactor: capacityFactor,
-        avg_powerMWQ10: cleanNumericValue(forecast.powerMWQ10) || powerMW * 0.8,
-        avg_powerMWQ25: cleanNumericValue(forecast.powerMWQ25) || powerMW * 0.9,
-        avg_powerMWQ75: cleanNumericValue(forecast.powerMWQ75) || powerMW * 1.1,
-        avg_powerMWQ90: cleanNumericValue(forecast.powerMWQ90) || powerMW * 1.2,
-        avg_confidence: cleanNumericValue(forecast.qualityScore) || 0.85,
-        count: 1
+        timestamp: group.timestamp.toISOString(),
+        forecast: isValidNumber(avgPowerMW) ? Math.round(avgPowerMW * 100) / 100 : 0,
+        energy: isValidNumber(totalEnergyMWh) ? Math.round(totalEnergyMWh * 100) / 100 : null,
+        capacity_factor: isValidNumber(avgCapacityFactor) ? Math.round(avgCapacityFactor * 100) / 100 : null,
+        confidence_lower: isValidNumber(avgPowerMWQ10) ? Math.round(avgPowerMWQ10 * 100) / 100 : null,
+        confidence_q25: isValidNumber(avgPowerMWQ25) ? Math.round(avgPowerMWQ25 * 100) / 100 : null,
+        confidence_q75: isValidNumber(avgPowerMWQ75) ? Math.round(avgPowerMWQ75 * 100) / 100 : null,
+        confidence_upper: isValidNumber(avgPowerMWQ90) ? Math.round(avgPowerMWQ90 * 100) / 100 : null,
+        confidence: isValidNumber(avgQualityScore) ? Math.round(avgQualityScore * 100) / 100 : null,
+        count: group.powerMW.length
       };
     });
 
-    // Transform to final format expected by UI with final validation
-    return result.map(row => ({
-      timestamp: row.bucket.toISOString(),
-      forecast: isValidNumber(row.avg_powerMW) ? Math.round(row.avg_powerMW * 100) / 100 : 0,
-      energy: isValidNumber(row.avg_energyMWh) ? Math.round(row.avg_energyMWh * 100) / 100 : null,
-      capacity_factor: isValidNumber(row.avg_capacityFactor) ? Math.round(row.avg_capacityFactor * 100) / 100 : null,
-      confidence_lower: isValidNumber(row.avg_powerMWQ10) ? Math.round(row.avg_powerMWQ10 * 100) / 100 : null,
-      confidence_q25: isValidNumber(row.avg_powerMWQ25) ? Math.round(row.avg_powerMWQ25 * 100) / 100 : null,
-      confidence_q75: isValidNumber(row.avg_powerMWQ75) ? Math.round(row.avg_powerMWQ75 * 100) / 100 : null,
-      confidence_upper: isValidNumber(row.avg_powerMWQ90) ? Math.round(row.avg_powerMWQ90 * 100) / 100 : null,
-      confidence: isValidNumber(row.avg_confidence) ? Math.round(row.avg_confidence * 100) / 100 : null,
-      count: Number(row.count)
-    }));
+    // Sort by timestamp and return
+    return result.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
   /**
