@@ -1,14 +1,15 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import * as echarts from 'echarts';
-  
+
   export let data: any[] = [];
   export let interval: '15min' | 'hourly' | 'daily' | 'weekly' = 'hourly';
   export let showConfidenceBands = true;
   export let showActual = false;
   export let height = 400;
   export let isMockData = false;
-  
+  export let displayMode: 'power' | 'energy' = 'power';
+
   let chartContainer: HTMLDivElement;
   let chart: echarts.ECharts;
   
@@ -21,12 +22,50 @@
   
   function updateChart() {
     if (!chart || !data || data.length === 0) return;
-    
+
     const timestamps = data.map(d => d.timestamp);
-    const forecast = data.map(d => d.forecast);
-    const actual = showActual ? data.map(d => d.actual) : [];
-    const upperBound = showConfidenceBands ? data.map(d => d.confidence_upper) : [];
-    const lowerBound = showConfidenceBands ? data.map(d => d.confidence_lower) : [];
+
+    // Choose between power (MW) and energy (MWh) based on display mode
+    const forecast = displayMode === 'power'
+      ? data.map(d => d.forecast)
+      : data.map(d => d.energy || 0);
+
+    const actual = showActual
+      ? (displayMode === 'power'
+        ? data.map(d => d.actual)
+        : data.map(d => d.actual_energy || 0))
+      : [];
+
+    // For confidence bands, scale them appropriately for energy if needed
+    const upperBound = showConfidenceBands
+      ? (displayMode === 'power'
+        ? data.map(d => d.confidence_upper)
+        : data.map(d => {
+            // Scale confidence bands for energy based on interval
+            const scaleFactor = getEnergyScaleFactor(interval);
+            return (d.confidence_upper || d.forecast) * scaleFactor;
+          }))
+      : [];
+
+    const lowerBound = showConfidenceBands
+      ? (displayMode === 'power'
+        ? data.map(d => d.confidence_lower)
+        : data.map(d => {
+            const scaleFactor = getEnergyScaleFactor(interval);
+            return (d.confidence_lower || d.forecast) * scaleFactor;
+          }))
+      : [];
+
+    // Helper function to get energy scale factor
+    function getEnergyScaleFactor(interval: string): number {
+      switch (interval) {
+        case '15min': return 0.25;  // 15 minutes = 0.25 hours
+        case 'hourly': return 1;     // 1 hour
+        case 'daily': return 24;     // 24 hours
+        case 'weekly': return 168;   // 7 * 24 = 168 hours
+        default: return 1;
+      }
+    }
     
     const series: any[] = [];
     
@@ -146,27 +185,28 @@
         },
         formatter: (params: any) => {
           let html = `<div style="font-weight: 600; margin-bottom: 4px; color: #AFDDE5">${params[0].axisValue}</div>`;
-          
+
+          const unit = displayMode === 'power' ? ' MW' : ' MWh';
+
           params.forEach((param: any) => {
             if (param.seriesName === 'Forecast' || param.seriesName === 'Actual') {
               const value = param.value;
-              const unit = ' MW';
               html += `<div style="margin: 2px 0; color: #AFDDE5">
-                ${param.marker} ${param.seriesName}: 
+                ${param.marker} ${param.seriesName}:
                 <strong style="color: #0FA4AF">${value?.toFixed(2) || 'N/A'}${unit}</strong>
               </div>`;
             }
           });
-          
+
           if (showConfidenceBands && params[0]?.dataIndex !== undefined) {
             const idx = params[0].dataIndex;
             if (upperBound[idx] && lowerBound[idx]) {
               html += `<div style="margin: 2px 0; color: #AFDDE5; opacity: 0.8">
-                Range: ${lowerBound[idx].toFixed(2)} - ${upperBound[idx].toFixed(2)} MW
+                Range: ${lowerBound[idx].toFixed(2)} - ${upperBound[idx].toFixed(2)}${unit}
               </div>`;
             }
           }
-          
+
           return html;
         }
       },
@@ -216,7 +256,7 @@
       },
       yAxis: {
         type: 'value',
-        name: 'Power Output (MW)',
+        name: displayMode === 'power' ? 'Power Output (MW)' : 'Energy (MWh)',
         nameLocation: 'middle',
         nameGap: 50,
         nameTextStyle: {
@@ -284,6 +324,10 @@
   });
   
   $: if (chart && data) {
+    updateChart();
+  }
+
+  $: if (chart && displayMode) {
     updateChart();
   }
 </script>

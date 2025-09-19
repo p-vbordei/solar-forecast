@@ -107,10 +107,29 @@ export class AnalysisRepository {
         ? group.powerMW.reduce((a, b) => a + b, 0) / group.powerMW.length
         : 0;
 
-      // For energy, sum instead of average (accumulate energy over the interval)
-      const totalEnergyMWh = group.energyMWh.length > 0
-        ? group.energyMWh.reduce((a, b) => a + b, 0)
-        : avgPowerMW; // Fallback to power if no energy data
+      // For energy, calculate based on power * time
+      // Energy (MWh) = Power (MW) × Time (hours)
+      let totalEnergyMWh: number;
+      if (interval === '15min') {
+        // 15 minutes = 0.25 hours
+        totalEnergyMWh = avgPowerMW * 0.25;
+      } else if (interval === 'hourly') {
+        // 1 hour
+        totalEnergyMWh = avgPowerMW * 1;
+      } else if (interval === 'daily') {
+        // 24 hours - sum all power values and convert to energy
+        const sumPowerMW = group.powerMW.reduce((a, b) => a + b, 0);
+        // Each 15-min interval contributes 0.25 hours of energy
+        totalEnergyMWh = sumPowerMW * 0.25;
+      } else if (interval === 'weekly') {
+        // 168 hours (7 days) - sum all power values
+        const sumPowerMW = group.powerMW.reduce((a, b) => a + b, 0);
+        // Each 15-min interval contributes 0.25 hours of energy
+        totalEnergyMWh = sumPowerMW * 0.25;
+      } else {
+        // Default to hourly
+        totalEnergyMWh = avgPowerMW * 1;
+      }
 
       const avgCapacityFactor = group.capacityFactor.length > 0
         ? group.capacityFactor.reduce((a, b) => a + b, 0) / group.capacityFactor.length

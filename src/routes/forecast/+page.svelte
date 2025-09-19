@@ -15,6 +15,7 @@
   let showConfidenceBands = true;
   let showWeatherOverlay = false;
   let selectedTimeView: "15min" | "hourly" | "daily" | "weekly" = "hourly";
+  let displayMode: "power" | "energy" = "power";
 
   // Selected location for forecast generation - will be set after loading locations
   let selectedLocation = "";
@@ -400,21 +401,47 @@
         </div>
       </div>
 
-      <!-- Time View Selector -->
-      <div class="mb-6">
-        <label class="label mb-3">Time Resolution</label>
-        <div class="flex gap-2">
-          {#each [{ value: "15min", label: "15 Minutes" }, { value: "hourly", label: "Hourly" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }] as option}
+      <!-- Time View and Display Mode Selectors -->
+      <div class="mb-6 space-y-4">
+        <!-- Time Resolution -->
+        <div>
+          <label class="label mb-3">Time Resolution</label>
+          <div class="flex gap-2">
+            {#each [{ value: "15min", label: "15 Minutes" }, { value: "hourly", label: "Hourly" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }] as option}
+              <button
+                class="px-4 py-2 rounded-lg border transition-all duration-200 {selectedTimeView ===
+                option.value
+                  ? 'bg-cyan text-dark-petrol border-cyan'
+                  : 'bg-transparent text-soft-blue border-soft-blue/30 hover:border-cyan hover:text-cyan'}"
+                on:click={() => (selectedTimeView = option.value)}
+              >
+                {option.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <!-- Display Mode (MW vs MWh) -->
+        <div>
+          <label class="label mb-3">Display Mode</label>
+          <div class="flex gap-2">
             <button
-              class="px-4 py-2 rounded-lg border transition-all duration-200 {selectedTimeView ===
-              option.value
+              class="px-4 py-2 rounded-lg border transition-all duration-200 {displayMode === 'power'
                 ? 'bg-cyan text-dark-petrol border-cyan'
                 : 'bg-transparent text-soft-blue border-soft-blue/30 hover:border-cyan hover:text-cyan'}"
-              on:click={() => (selectedTimeView = option.value)}
+              on:click={() => (displayMode = 'power')}
             >
-              {option.label}
+              Power (MW)
             </button>
-          {/each}
+            <button
+              class="px-4 py-2 rounded-lg border transition-all duration-200 {displayMode === 'energy'
+                ? 'bg-cyan text-dark-petrol border-cyan'
+                : 'bg-transparent text-soft-blue border-soft-blue/30 hover:border-cyan hover:text-cyan'}"
+              on:click={() => (displayMode = 'energy')}
+            >
+              Energy (MWh)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -436,6 +463,7 @@
           showActual={false}
           height={450}
           {isMockData}
+          {displayMode}
         />
       {:else}
         <div class="flex items-center justify-center h-96">
