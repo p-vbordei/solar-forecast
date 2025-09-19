@@ -95,10 +95,10 @@ class ForecastService:
 
             task_manager.update_task(task_id, {"progress": 30})
 
-            # 3. Get weather from database (not API)
-            weather_df = await self.repo.get_recent_weather(
+            # 3. Get FUTURE weather forecast data for predictions
+            weather_df = await self.repo.get_future_weather(
                 location_id=task["location_id"],
-                hours=task["horizon_hours"] + 24  # Extra for features
+                hours=task["horizon_hours"]  # Get forecast horizon weather data
             )
 
             if weather_df.empty:

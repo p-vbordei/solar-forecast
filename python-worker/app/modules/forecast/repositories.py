@@ -309,8 +309,80 @@ class ForecastRepository:
             }
         return None
 
+    async def get_future_weather(self, location_id: str, hours: int) -> pd.DataFrame:
+        """Get FUTURE weather forecast data for solar power forecasting"""
+        from datetime import timedelta
+
+        try:
+            # Calculate FUTURE time range
+            start_time = datetime.utcnow()
+            end_time = start_time + timedelta(hours=hours)
+
+            # Query future weather data from database
+            query = text("""
+                SELECT
+                    timestamp,
+                    temperature as temp_air,
+                    humidity,
+                    "windSpeed" as wind_speed,
+                    "cloudCover" as cloud_cover,
+                    ghi,
+                    dni,
+                    dhi
+                FROM weather_data
+                WHERE "locationId" = :location_id
+                  AND timestamp >= :start_time
+                  AND timestamp <= :end_time
+                ORDER BY timestamp ASC
+            """)
+
+            result = await self.db.execute(query, {
+                "location_id": location_id,
+                "start_time": start_time,
+                "end_time": end_time
+            })
+
+            rows = result.fetchall()
+
+            if not rows:
+                logger.error(f"No future weather data found for location {location_id}")
+                # Return empty DataFrame - forecast should fail if no weather data
+                return pd.DataFrame()
+
+            # Convert to DataFrame
+            weather_data = []
+            for row in rows:
+                weather_data.append({
+                    'timestamp': row[0],
+                    'temp_air': row[1],
+                    'humidity': row[2],
+                    'wind_speed': row[3],
+                    'cloud_cover': row[4],
+                    'ghi': row[5],  # Real data only - no defaults
+                    'dni': row[6],
+                    'dhi': row[7]
+                })
+
+            df = pd.DataFrame(weather_data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+
+            # Add PVLIB required fields
+            df['pressure'] = 1013.25
+            df['precipitable_water'] = 14.0
+            df['albedo'] = 0.2
+
+            logger.info(f"Retrieved {len(df)} future weather records for location {location_id}")
+            return df
+
+        except Exception as e:
+            logger.error(f"Failed to get future weather data: {e}")
+            # No fallback - must have real weather data
+            raise ValueError(f"Cannot generate forecast without weather data: {e}")
+
+
     async def get_recent_weather(self, location_id: str, hours: int) -> pd.DataFrame:
-        """Get weather data from SvelteKit API as DataFrame for forecast models, with database fallback"""
+        """Get HISTORICAL weather data for ML training/validation"""
         import httpx
         import os
 

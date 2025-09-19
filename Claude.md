@@ -10,6 +10,13 @@ AM NEVOIE CA ACESTE ELEMENTE DE DESIGN SA FIE IMPLEMENTATE PRIN TAILWIND CSS
 #### PLEASE BE VERY CAREFUL REGARDING LOCATION IDs.
 WE USE UUID / GUID that are strings and not integers.
 
+#### ⚠️ CRITICAL: NO MOCK OR SYNTHETIC DATA ALLOWED
+**NEVER generate mock, synthetic, or fallback weather/forecast data.** This destroys all debugging methods and makes it impossible to identify real issues. If weather data is missing:
+- The forecast should FAIL with a clear error message
+- DO NOT provide default values for GHI, DNI, DHI or other critical parameters
+- DO NOT generate synthetic weather patterns
+- The system must fetch REAL weather data from Open-Meteo API or fail
+
 #### **🎨 Color Palette**
 Primary colors for the futuristic energy trading interface:
 
