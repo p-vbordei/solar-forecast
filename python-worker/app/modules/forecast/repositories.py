@@ -97,6 +97,11 @@ class ForecastRepository:
                 "createdAt": datetime.utcnow()
             })
 
+        # Check if we have any valid values to insert
+        if not values:
+            logger.warning(f"All {skipped} forecasts were invalid and skipped")
+            return 0
+
         # Use correct table name and field names
         query = text("""
             INSERT INTO forecasts (
@@ -567,6 +572,11 @@ class ForecastRepository:
                 "isValidated": False,  # Default validation status
                 "createdAt": datetime.utcnow()
             })
+
+        # Check if we have any valid values to insert
+        if not values:
+            logger.warning(f"All {skipped} forecasts were invalid and skipped for location {location_id}")
+            return 0
 
         # Use COPY or multi-row INSERT for TimescaleDB optimization
         query = text("""
