@@ -23,6 +23,9 @@
   function updateChart() {
     if (!chart || !data || data.length === 0) return;
 
+    // Clear previous option to ensure clean update
+    chart.clear();
+
     const timestamps = data.map(d => d.timestamp);
 
     // Choose between power (MW) and energy (MWh) based on display mode
@@ -322,7 +325,15 @@
       ]
     };
     
-    chart.setOption(option);
+    // Log for debugging
+    console.log('Chart update:', {
+      displayMode,
+      dataLength: data.length,
+      seriesCount: series.length,
+      firstForecastValue: forecast[0]
+    });
+
+    chart.setOption(option, true); // true forces complete redraw
   }
   
   function handleResize() {
@@ -339,11 +350,12 @@
     chart?.dispose();
   });
   
+  // Reactive updates - combine all triggers
   $: if (chart && data) {
     updateChart();
   }
 
-  $: if (chart && displayMode) {
+  $: if (chart && (displayMode || showConfidenceBands !== undefined || interval)) {
     updateChart();
   }
 </script>
