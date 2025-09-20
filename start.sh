@@ -35,7 +35,15 @@ else
     echo "⚠️  Schema push failed - may already be applied"
 fi
 
-# Step 3: Enable TimescaleDB extension (optional but recommended)
+# Step 3: Run database seed (ensure default client exists)
+echo "🌱 Seeding database..."
+if npx tsx prisma/seed.ts 2>/dev/null; then
+    echo "✅ Database seeded successfully!"
+else
+    echo "⚠️  Database seed failed or already seeded"
+fi
+
+# Step 4: Enable TimescaleDB extension (optional but recommended)
 echo "🔧 Checking TimescaleDB extension..."
 if [ -n "$DATABASE_URL" ]; then
     # Try to enable TimescaleDB (will fail gracefully if not available)
@@ -52,7 +60,7 @@ if [ -n "$DATABASE_URL" ]; then
     fi
 fi
 
-# Step 4: Start the application
+# Step 5: Start the application
 echo "🎯 Starting application server..."
 echo "🌐 App will be available at port ${PORT:-3000}"
 
